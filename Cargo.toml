@@ -1,0 +1,12 @@
+[package]
+name = "redo"
+version = "0.1.0"
+authors = ["evenorog <evenorog@gmail.com>"]
+description = "An undo/redo library that does not use dynamic dispatch."
+documentation = "https://docs.rs/redo"
+repository = "https://github.com/evenorog/redo"
+readme = "README.md"
+license = "MIT"
+keywords = ["undo", "redo"]
+
+[dependencies]
