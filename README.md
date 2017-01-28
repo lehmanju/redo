@@ -1,5 +1,5 @@
 # Redo
-A fast undo/redo library.
+An undo/redo library.
 
 Redo does not use [dynamic dispatch] which means it is <u>faster</u> than [undo] 
 but less flexible.
