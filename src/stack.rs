@@ -56,6 +56,9 @@ impl<T> RedoStack<T> {
     /// it will start popping of commands at the bottom of the stack when pushing new commands
     /// on to the stack. No limit is set by default which means it may grow indefinitely.
     ///
+    /// The stack will never grow above the limit, but it may remove multiple commands at a
+    /// time to increase performance.
+    ///
     /// # Panics
     /// Panics if the given limit is zero.
     ///
@@ -106,7 +109,7 @@ impl<T> RedoStack<T> {
             let x = self.idx - limit;
             self.stack.drain(..x);
             self.idx = limit;
-            debug_assert_eq!(self.stack.len(), limit);
+            debug_assert_eq!(self.idx, self.stack.len());
         }
         self.limit = Some(limit);
         self
@@ -120,14 +123,22 @@ impl<T: RedoCmd> RedoStack<T> {
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
     #[inline]
     pub fn push(&mut self, mut cmd: T) {
+        let len = self.idx;
+        // Pop off all elements after len from stack.
+        self.stack.truncate(len);
         cmd.redo();
-        let idx = self.idx;
-        self.stack.truncate(idx);
-        match self.limit.map(|limit| idx == limit) {
-            Some(false) | None => self.idx += 1,
-            Some(true) => { self.stack.remove(0); },
+
+        match self.limit {
+            Some(limit) if len == limit => {
+                // Remove ~25% of the stack at once.
+                let x = len / 4 + 1;
+                self.stack.drain(..x);
+                self.idx -= x - 1;
+            },
+            _ => self.idx += 1,
         }
         self.stack.push(cmd);
+        debug_assert_eq!(self.idx, self.stack.len());
     }
 
     /// Calls the [`redo`] method for the active `RedoCmd` and sets the next `RedoCmd` as the new
@@ -195,26 +206,26 @@ mod test {
     #[test]
     fn pop() {
         let mut vec = vec![1, 2, 3];
-        let mut redo_stack = RedoStack::new();
+        let mut stack = RedoStack::new();
 
         let cmd = PopCmd { vec: &mut vec, e: None };
-        redo_stack.push(cmd);
-        redo_stack.push(cmd);
-        redo_stack.push(cmd);
+        stack.push(cmd);
+        stack.push(cmd);
+        stack.push(cmd);
         assert!(vec.is_empty());
 
-        redo_stack.undo();
-        redo_stack.undo();
-        redo_stack.undo();
+        stack.undo();
+        stack.undo();
+        stack.undo();
         assert_eq!(vec.len(), 3);
 
-        redo_stack.push(cmd);
+        stack.push(cmd);
         assert_eq!(vec.len(), 2);
 
-        redo_stack.undo();
+        stack.undo();
         assert_eq!(vec.len(), 3);
 
-        redo_stack.redo();
+        stack.redo();
         assert_eq!(vec.len(), 2);
     }
 }
