@@ -228,4 +228,30 @@ mod test {
         stack.redo();
         assert_eq!(vec.len(), 2);
     }
+
+    #[test]
+    fn limit() {
+        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let mut stack = RedoStack::new();
+
+        let cmd = PopCmd { vec: &mut vec, e: None };
+
+        for _ in 0..6 {
+            stack.push(cmd);
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4]);
+
+        stack = stack.limit(3);
+        assert_eq!(stack.stack.len(), 3);
+
+        for _ in 0..6 {
+            stack.undo();
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7]);
+
+        for _ in 0..6 {
+            stack.redo();
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4]);
+    }
 }
