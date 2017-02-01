@@ -121,23 +121,28 @@ impl<T: RedoCmd> RedoStack<T> {
     /// This pops off all `RedoCmd`s that is above the active command from the `RedoStack`.
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    #[inline]
     pub fn push(&mut self, mut cmd: T) {
         let len = self.idx;
         // Pop off all elements after len from stack.
         self.stack.truncate(len);
         cmd.redo();
 
-        match self.limit {
-            Some(limit) if len == limit => {
-                // Remove ~25% of the stack at once.
-                let x = len / 4 + 1;
-                self.stack.drain(..x);
-                self.idx -= x - 1;
-            },
-            _ => self.idx += 1,
+        match self.stack.last_mut().and_then(|last| last.merge(&cmd)) {
+            Some(_) => (),
+            None => {
+                match self.limit {
+                    Some(limit) if len == limit => {
+                        // Remove ~25% of the stack at once.
+                        let x = len / 4 + 1;
+                        self.stack.drain(..x);
+                        self.idx -= x - 1;
+                    },
+                    _ => self.idx += 1,
+                }
+                self.stack.push(cmd);
+            }
         }
-        self.stack.push(cmd);
+
         debug_assert_eq!(self.idx, self.stack.len());
     }
 
