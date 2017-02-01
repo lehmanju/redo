@@ -154,11 +154,8 @@ impl<T: RedoCmd> RedoStack<T> {
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) {
-        if self.idx < self.stack.len() {
-            unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.redo();
-            }
+        if let Some(cmd) = self.stack.get_mut(self.idx) {
+            cmd.redo();
             self.idx += 1;
         }
     }
