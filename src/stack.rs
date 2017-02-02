@@ -20,47 +20,12 @@ impl<T> RedoStack<T> {
         }
     }
 
-    /// Creates a new `RedoStack` with the specified capacity.
-    #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
-        RedoStack {
-            stack: Vec::with_capacity(capacity),
-            idx: 0,
-            limit: None,
-        }
-    }
-
-    /// Returns the capacity of the `RedoStack`.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.stack.capacity()
-    }
-
-    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
-    /// The stack may reserve more space to avoid frequent reallocations.
+    /// Creates a new `RedoStack` with a limit on how many `RedoCmd`s can be stored in the stack.
+    /// If this limit is reached it will start popping of commands at the bottom of the stack when
+    /// pushing new commands on to the stack. No limit is set by default which means it may grow
+    /// indefinitely.
     ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.stack.reserve(additional);
-    }
-
-    /// Shrinks the capacity of the `RedoStack` as much as possible.
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.stack.shrink_to_fit();
-    }
-
-    /// Sets the limit on how many `RedoCmd`s can be stored in the stack. If this limit is reached
-    /// it will start popping of commands at the bottom of the stack when pushing new commands
-    /// on to the stack. No limit is set by default which means it may grow indefinitely.
-    ///
-    /// The stack will never grow above the limit, but it may remove multiple commands at a
-    /// time to increase performance.
-    ///
-    /// # Panics
-    /// Panics if the given limit is zero.
+    /// The stack may remove multiple commands at a time to increase performance.
     ///
     /// # Examples
     /// ```
@@ -85,10 +50,9 @@ impl<T> RedoStack<T> {
     /// #   }
     /// # }
     /// let mut vec = vec![1, 2, 3];
-    /// let mut stack = RedoStack::new()
-    ///     .limit(2);
-    ///
+    /// let mut stack = RedoStack::with_limit(2);
     /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
     /// stack.push(cmd);
     /// stack.push(cmd);
     /// stack.push(cmd); // Pops off the first cmd.
@@ -102,17 +66,77 @@ impl<T> RedoStack<T> {
     /// assert_eq!(vec, vec![1, 2]);
     /// ```
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Self {
-        assert_ne!(limit, 0);
-
-        if limit < self.idx {
-            let x = self.idx - limit;
-            self.stack.drain(..x);
-            self.idx = limit;
-            debug_assert_eq!(self.idx, self.stack.len());
+    pub fn with_limit(limit: usize) -> Self {
+        RedoStack {
+            stack: Vec::new(),
+            idx: 0,
+            limit: Some(limit),
         }
-        self.limit = Some(limit);
-        self
+    }
+
+    /// Creates a new `RedoStack` with the specified capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        RedoStack {
+            stack: Vec::with_capacity(capacity),
+            idx: 0,
+            limit: None,
+        }
+    }
+
+    /// Creates a new `RedoStack` with the specified capacity and limit.
+    #[inline]
+    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> Self {
+        RedoStack {
+            stack: Vec::with_capacity(capacity),
+            idx: 0,
+            limit: Some(limit),
+        }
+    }
+
+    /// Returns the limit of the `RedoStack`, or `None` if it has no limit.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use redo::{RedoCmd, RedoStack};
+    /// # struct A;
+    /// # impl RedoCmd for A {
+    /// #   fn redo(&mut self) {}
+    /// #   fn undo(&mut self) {}
+    /// # }
+    /// let mut stack = RedoStack::with_limit(10);
+    /// assert_eq!(stack.limit(), Some(10));
+    /// # stack.push(A);
+    ///
+    /// let mut stack = RedoStack::new();
+    /// assert_eq!(stack.limit(), None);
+    /// # stack.push(A);
+    /// ```
+    #[inline]
+    pub fn limit(&self) -> Option<usize> {
+        self.limit
+    }
+
+    /// Returns the capacity of the `RedoStack`.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+
+    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
+    /// The stack may reserve more space to avoid frequent reallocations.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.stack.reserve(additional);
+    }
+
+    /// Shrinks the capacity of the `RedoStack` as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.stack.shrink_to_fit();
     }
 }
 
@@ -234,26 +258,15 @@ mod test {
     #[test]
     fn limit() {
         let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut stack = RedoStack::new();
+        let mut stack = RedoStack::with_limit(9);
 
         let cmd = PopCmd { vec: &mut vec, e: None };
 
-        for _ in 0..6 {
+        for _ in 0..10 {
             stack.push(cmd);
         }
-        assert_eq!(vec, vec![1, 2, 3, 4]);
 
-        stack = stack.limit(3);
-        assert_eq!(stack.stack.len(), 3);
-
-        for _ in 0..6 {
-            stack.undo();
-        }
-        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7]);
-
-        for _ in 0..6 {
-            stack.redo();
-        }
-        assert_eq!(vec, vec![1, 2, 3, 4]);
+        assert!(vec.is_empty());
+        assert_eq!(stack.stack.len(), 7);
     }
 }
