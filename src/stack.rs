@@ -1,22 +1,85 @@
-use RedoCmd;
+use std::fmt;
+use {Result, RedoCmd};
 
-/// `RedoStack` maintains a stack of `RedoCmd`s that can be undone and redone by using methods
-/// on the `RedoStack`.
-#[derive(Debug, Default)]
-pub struct RedoStack<T> {
+/// Maintains a stack of `RedoCmd`s.
+///
+/// `RedoStack` uses static dispatch so it can only hold one type of command at a given time.
+///
+/// It will notice when it's state changes to either dirty or clean, and call the user
+/// defined methods set in [on_clean] and [on_dirty]. This is useful if you want to trigger some
+/// event when the state changes, eg. enabling and disabling buttons in an ui.
+///
+/// The `PopCmd` given in the examples below is defined as:
+///
+/// ```
+/// # use redo::{self, RedoCmd};
+/// #[derive(Clone, Copy)]
+/// struct PopCmd {
+///     vec: *mut Vec<i32>,
+///     e: Option<i32>,
+/// }
+///
+/// impl RedoCmd for PopCmd {
+///     type Err = ();
+///
+///     fn redo(&mut self) -> redo::Result<()> {
+///         self.e = unsafe {
+///             let ref mut vec = *self.vec;
+///             vec.pop()
+///         };
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self) -> redo::Result<()> {
+///         unsafe {
+///             let ref mut vec = *self.vec;
+///             let e = self.e.ok_or(())?;
+///             vec.push(e);
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
+///
+/// [on_clean]: struct.RedoStack.html#method.on_clean
+/// [on_dirty]: struct.RedoStack.html#method.on_dirty
+#[derive(Default)]
+pub struct RedoStack<'a, T> {
+    // All commands on the stack.
     stack: Vec<T>,
+    // Current position in the stack.
     idx: usize,
+    // Max amount of commands allowed on the stack.
     limit: Option<usize>,
+    // Called when the state changes from dirty to clean.
+    on_clean: Option<Box<FnMut() + 'a>>,
+    // Called when the state changes from clean to dirty.
+    on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
-impl<T> RedoStack<T> {
+impl<'a, T> RedoStack<'a, T> {
     /// Creates a new `RedoStack`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # struct A(u8);
+    /// # impl RedoCmd for A {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut stack = RedoStack::new();
+    /// # stack.push(A(1)).unwrap();
+    /// ```
     #[inline]
     pub fn new() -> Self {
         RedoStack {
             stack: Vec::new(),
             idx: 0,
             limit: None,
+            on_clean: None,
+            on_dirty: None,
         }
     }
 
@@ -27,70 +90,123 @@ impl<T> RedoStack<T> {
     ///
     /// The stack may remove multiple commands at a time to increase performance.
     ///
+    /// # Panics
+    /// Panics if `limit` is 0.
+    ///
     /// # Examples
     /// ```
-    /// # use redo::{RedoCmd, RedoStack};
+    /// # use redo::{self, RedoCmd, RedoStack};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl RedoCmd for PopCmd {
-    /// #   fn redo(&mut self) {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
-    /// #       }
+    /// #       };
+    /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) {
+    /// #   fn undo(&mut self) -> redo::Result<()> {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.unwrap());
+    /// #           let e = self.e.ok_or(())?;
+    /// #           vec.push(e);
     /// #       }
+    /// #       Ok(())
     /// #   }
     /// # }
+    /// # fn foo() -> redo::Result<()> {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = RedoStack::with_limit(2);
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// stack.push(cmd);
-    /// stack.push(cmd);
-    /// stack.push(cmd); // Pops off the first cmd.
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?; // Pops off the first cmd.
     ///
     /// assert!(vec.is_empty());
     ///
-    /// stack.undo();
-    /// stack.undo();
-    /// stack.undo(); // Does nothing.
+    /// stack.undo()?;
+    /// stack.undo()?;
+    /// stack.undo()?; // Does nothing.
     ///
     /// assert_eq!(vec, vec![1, 2]);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
     /// ```
     #[inline]
     pub fn with_limit(limit: usize) -> Self {
+        assert_ne!(limit, 0);
+
         RedoStack {
             stack: Vec::new(),
             idx: 0,
             limit: Some(limit),
+            on_clean: None,
+            on_dirty: None,
         }
     }
 
     /// Creates a new `RedoStack` with the specified capacity.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # struct A(u8);
+    /// # impl RedoCmd for A {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut stack = RedoStack::with_capacity(10);
+    /// assert_eq!(stack.capacity(), 10);
+    /// # stack.push(A(0)).unwrap();
+    /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         RedoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
             limit: None,
+            on_clean: None,
+            on_dirty: None,
         }
     }
 
     /// Creates a new `RedoStack` with the specified capacity and limit.
+    ///
+    /// # Panics
+    /// Panics if `limit` is 0.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # struct A(u8);
+    /// # impl RedoCmd for A {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut stack = RedoStack::with_capacity_and_limit(10, 10);
+    /// assert_eq!(stack.capacity(), 10);
+    /// assert_eq!(stack.limit(), Some(10));
+    /// # stack.push(A(0)).unwrap();
+    /// ```
     #[inline]
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> Self {
+        assert_ne!(limit, 0);
+
         RedoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
             limit: Some(limit),
+            on_clean: None,
+            on_dirty: None,
         }
     }
 
@@ -98,19 +214,24 @@ impl<T> RedoStack<T> {
     ///
     /// # Examples
     /// ```rust
-    /// # use redo::{RedoCmd, RedoStack};
-    /// # struct A;
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # struct A(u8);
     /// # impl RedoCmd for A {
-    /// #   fn redo(&mut self) {}
-    /// #   fn undo(&mut self) {}
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
+    /// # fn foo() -> redo::Result<()> {
     /// let mut stack = RedoStack::with_limit(10);
     /// assert_eq!(stack.limit(), Some(10));
-    /// # stack.push(A);
+    /// # stack.push(A(0))?;
     ///
     /// let mut stack = RedoStack::new();
     /// assert_eq!(stack.limit(), None);
-    /// # stack.push(A);
+    /// # stack.push(A(0))?;
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
     /// ```
     #[inline]
     pub fn limit(&self) -> Option<usize> {
@@ -118,6 +239,20 @@ impl<T> RedoStack<T> {
     }
 
     /// Returns the capacity of the `RedoStack`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # struct A(u8);
+    /// # impl RedoCmd for A {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut stack = RedoStack::with_capacity(10);
+    /// assert_eq!(stack.capacity(), 10);
+    /// # stack.push(A(0)).unwrap();
+    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.stack.capacity()
@@ -128,31 +263,356 @@ impl<T> RedoStack<T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.reserve(10);
+    /// assert!(stack.capacity() >= 11);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.stack.reserve(additional);
     }
 
     /// Shrinks the capacity of the `RedoStack` as much as possible.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::with_capacity(10);
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    ///
+    /// assert_eq!(stack.capacity(), 10);
+    /// stack.shrink_to_fit();
+    /// assert!(stack.capacity() >= 3);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.stack.shrink_to_fit();
     }
+
+    /// Sets what should happen if the state changes from dirty to clean.
+    /// By default the `RedoStack` does nothing when the state changes.
+    ///
+    /// Note: An empty stack is clean, so the first push will not trigger this method.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::cell::Cell;
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let x = Cell::new(0);
+    /// let mut stack = RedoStack::new();
+    /// stack.on_clean(|| x.set(1));
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.undo()?;
+    /// assert_eq!(x.get(), 0);
+    /// stack.redo()?;
+    /// assert_eq!(x.get(), 1);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn on_clean<F>(&mut self, f: F)
+        where F: FnMut() + 'a
+    {
+        self.on_clean = Some(Box::new(f));
+    }
+
+    /// Sets what should happen if the state changes from clean to dirty.
+    /// By default the `RedoStack` does nothing when the state changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::cell::Cell;
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let x = Cell::new(0);
+    /// let mut stack = RedoStack::new();
+    /// stack.on_dirty(|| x.set(1));
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// assert_eq!(x.get(), 0);
+    /// stack.undo()?;
+    /// assert_eq!(x.get(), 1);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn on_dirty<F>(&mut self, f: F)
+        where F: FnMut() + 'a
+    {
+        self.on_dirty = Some(Box::new(f));
+    }
+
+    /// Returns `true` if the state of the stack is clean, `false` otherwise.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// assert!(stack.is_clean()); // An empty stack is always clean.
+    /// stack.push(cmd)?;
+    /// assert!(stack.is_clean());
+    /// stack.undo()?;
+    /// assert!(!stack.is_clean());
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn is_clean(&self) -> bool {
+        self.idx == self.stack.len()
+    }
+
+    /// Returns `true` if the state of the stack is dirty, `false` otherwise.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// assert!(!stack.is_dirty()); // An empty stack is always clean.
+    /// stack.push(cmd)?;
+    /// assert!(!stack.is_dirty());
+    /// stack.undo()?;
+    /// assert!(stack.is_dirty());
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn is_dirty(&self) -> bool {
+        !self.is_clean()
+    }
 }
 
-impl<T: RedoCmd> RedoStack<T> {
-    /// Pushes a `RedoCmd` to the top of the `RedoStack` and executes its [`redo`] method.
-    /// This pops off all `RedoCmd`s that is above the active command from the `RedoStack`.
+impl<'a, T: RedoCmd<Err=E>, E> RedoStack<'a, T> {
+    /// Pushes `cmd` to the top of the stack and executes its [`redo`] method.
+    /// This pops off all other commands above the active command from the stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    ///
+    /// assert!(vec.is_empty());
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    pub fn push(&mut self, mut cmd: T) {
+    pub fn push(&mut self, mut cmd: T) -> Result<E> {
+        let is_dirty = self.is_dirty();
         let len = self.idx;
         // Pop off all elements after len from stack.
         self.stack.truncate(len);
-        cmd.redo();
+        cmd.redo()?;
 
         match self.stack.last_mut().and_then(|last| last.merge(&cmd)) {
-            Some(_) => (),
+            Some(x) => x?,
             None => {
                 match self.limit {
                     Some(limit) if len == limit => {
@@ -168,44 +628,174 @@ impl<T: RedoCmd> RedoStack<T> {
         }
 
         debug_assert_eq!(self.idx, self.stack.len());
+        // State is always clean after a push, check if it was dirty before.
+        if is_dirty {
+            if let Some(ref mut f) = self.on_clean {
+                f();
+            }
+        }
+        Ok(())
     }
 
     /// Calls the [`redo`] method for the active `RedoCmd` and sets the next `RedoCmd` as the new
     /// active one.
     ///
-    /// Calling this method when there are no more commands to redo does nothing.
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// stack.undo()?;
+    /// stack.undo()?;
+    /// stack.undo()?;
+    ///
+    /// assert_eq!(vec, vec![1, 2, 3]);
+    ///
+    /// stack.redo()?;
+    /// stack.redo()?;
+    /// stack.redo()?;
+    ///
+    /// assert!(vec.is_empty());
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    #[inline]
-    pub fn redo(&mut self) {
-        if let Some(cmd) = self.stack.get_mut(self.idx) {
-            cmd.redo();
+    pub fn redo(&mut self) -> Result<E> {
+        if self.idx < self.stack.len() {
+            let is_dirty = self.is_dirty();
+            unsafe {
+                let cmd = self.stack.get_unchecked_mut(self.idx);
+                cmd.redo()?;
+            }
             self.idx += 1;
+            // Check if stack went from dirty to clean.
+            if is_dirty && self.is_clean() {
+                if let Some(ref mut f) = self.on_clean {
+                    f();
+                }
+            }
         }
+        Ok(())
     }
 
     /// Calls the [`undo`] method for the active `RedoCmd` and sets the previous `RedoCmd` as the
     /// new active one.
     ///
-    /// Calling this method when there are no more commands to undo does nothing.
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #     vec: *mut Vec<i32>,
+    /// #     e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #     type Err = ();
+    /// #     fn redo(&mut self) -> redo::Result<()> {
+    /// #         self.e = unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             vec.pop()
+    /// #         };
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self) -> redo::Result<()> {
+    /// #         unsafe {
+    /// #             let ref mut vec = *self.vec;
+    /// #             let e = self.e.ok_or(())?;
+    /// #             vec.push(e);
+    /// #         }
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> redo::Result<()> {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = RedoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// stack.undo()?;
+    /// stack.undo()?;
+    /// stack.undo()?;
+    ///
+    /// assert_eq!(vec, vec![1, 2, 3]);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     ///
     /// [`undo`]: trait.RedoCmd.html#tymethod.undo
-    #[inline]
-    pub fn undo(&mut self) {
+    pub fn undo(&mut self) -> Result<E> {
         if self.idx > 0 {
+            let is_clean = self.is_clean();
             self.idx -= 1;
             debug_assert!(self.idx < self.stack.len());
             unsafe {
                 let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.undo();
+                cmd.undo()?;
+            }
+            // Check if stack went from clean to dirty.
+            if is_clean && self.is_dirty() {
+                if let Some(ref mut f) = self.on_dirty {
+                    f();
+                }
             }
         }
+        Ok(())
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for RedoStack<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("RedoStack")
+            .field("stack", &self.stack)
+            .field("idx", &self.idx)
+            .field("limit", &self.limit)
+            .finish()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use {RedoStack, RedoCmd};
+    use super::*;
 
     #[derive(Clone, Copy)]
     struct PopCmd {
@@ -214,18 +804,23 @@ mod test {
     }
 
     impl RedoCmd for PopCmd {
-        fn redo(&mut self) {
+        type Err = ();
+
+        fn redo(&mut self) -> Result<()> {
             self.e = unsafe {
                 let ref mut vec = *self.vec;
                 vec.pop()
-            }
+            };
+            Ok(())
         }
 
-        fn undo(&mut self) {
+        fn undo(&mut self) -> Result<()> {
             unsafe {
                 let ref mut vec = *self.vec;
-                vec.push(self.e.unwrap());
+                let e = self.e.ok_or(())?;
+                vec.push(e);
             }
+            Ok(())
         }
     }
 
@@ -235,23 +830,23 @@ mod test {
         let mut stack = RedoStack::new();
 
         let cmd = PopCmd { vec: &mut vec, e: None };
-        stack.push(cmd);
-        stack.push(cmd);
-        stack.push(cmd);
+        stack.push(cmd).unwrap();
+        stack.push(cmd).unwrap();
+        stack.push(cmd).unwrap();
         assert!(vec.is_empty());
 
-        stack.undo();
-        stack.undo();
-        stack.undo();
+        stack.undo().unwrap();
+        stack.undo().unwrap();
+        stack.undo().unwrap();
         assert_eq!(vec.len(), 3);
 
-        stack.push(cmd);
+        stack.push(cmd).unwrap();
         assert_eq!(vec.len(), 2);
 
-        stack.undo();
+        stack.undo().unwrap();
         assert_eq!(vec.len(), 3);
 
-        stack.redo();
+        stack.redo().unwrap();
         assert_eq!(vec.len(), 2);
     }
 
@@ -263,7 +858,7 @@ mod test {
         let cmd = PopCmd { vec: &mut vec, e: None };
 
         for _ in 0..10 {
-            stack.push(cmd);
+            stack.push(cmd).unwrap();
         }
 
         assert!(vec.is_empty());
