@@ -558,7 +558,7 @@ impl<'a, T> RedoStack<'a, T> {
     }
 }
 
-impl<'a, T: RedoCmd<Err=E>, E> RedoStack<'a, T> {
+impl<'a, T: RedoCmd> RedoStack<'a, T> {
     /// Pushes `cmd` to the top of the stack and executes its [`redo`] method.
     /// This pops off all other commands above the active command from the stack.
     ///
@@ -604,7 +604,7 @@ impl<'a, T: RedoCmd<Err=E>, E> RedoStack<'a, T> {
     /// ```
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    pub fn push(&mut self, mut cmd: T) -> Result<E> {
+    pub fn push(&mut self, mut cmd: T) -> Result<T::Err> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         // Pop off all elements after len from stack.
@@ -694,7 +694,7 @@ impl<'a, T: RedoCmd<Err=E>, E> RedoStack<'a, T> {
     /// ```
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    pub fn redo(&mut self) -> Result<E> {
+    pub fn redo(&mut self) -> Result<T::Err> {
         if self.idx < self.stack.len() {
             let is_dirty = self.is_dirty();
             unsafe {
@@ -763,7 +763,7 @@ impl<'a, T: RedoCmd<Err=E>, E> RedoStack<'a, T> {
     /// ```
     ///
     /// [`undo`]: trait.RedoCmd.html#tymethod.undo
-    pub fn undo(&mut self) -> Result<E> {
+    pub fn undo(&mut self) -> Result<T::Err> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;

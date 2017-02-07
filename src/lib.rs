@@ -25,7 +25,7 @@
 //! the merge method yourself.
 //!
 //! I recommend using `undo` by default and to use `redo` when performance is important.
-//! They have almost identical API, so it should be easy to switch between them if necessary.
+//! They have similar API, so it should be easy to switch between them if necessary.
 //!
 //! # Examples
 //! ```
@@ -90,11 +90,21 @@
 //! [`undo`]: https://crates.io/crates/undo
 //! [`merge`]: trait.RedoCmd.html#method.merge
 
+extern crate fnv;
+
+mod group;
 mod stack;
 
+pub use group::RedoGroup;
 pub use stack::RedoStack;
 
 use std::result;
+
+type Key = u32;
+
+/// An unique id for an `RedoStack`.
+#[derive(Debug)]
+pub struct Id(Key);
 
 /// A specialized `Result` that does not carry any data on success.
 pub type Result<E> = result::Result<(), E>;
@@ -118,8 +128,13 @@ pub trait RedoCmd {
 
     /// Used for manual merging of two `RedoCmd`s.
     ///
-    /// Returns `Some(Ok)` if the merging was successful, `Some(Err)` if something went wrong when trying to
-    /// merge, and `None` if it did not try to merge.
+    /// Returns `Some(Ok)` if the merging was successful, `Some(Err)` if something went wrong when
+    /// trying to merge, and `None` if it did not try to merge.
+    /// This method is always called by the [`push`] method in `RedoStack`, with `self` being the top
+    /// command on the stack and `cmd` being the new command. If `None` is returned from this
+    /// method, `cmd` will be pushed on the stack as normal. However, if the return value is
+    /// `Some(x)` it will not push the command on to the stack since either it was merged or an
+    /// error has occurred, and then the stack returns the `x` value.
     ///
     /// Default implementation returns `None`.
     ///
@@ -193,6 +208,8 @@ pub trait RedoCmd {
     ///     limit: None
     /// }
     /// ```
+    ///
+    /// [`push`]: struct.RedoStack.html#method.push
     #[allow(unused_variables)]
     #[inline]
     fn merge(&mut self, cmd: &Self) -> Option<Result<Self::Err>> {
