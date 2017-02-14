@@ -22,7 +22,8 @@
 //! it should be faster than [`undo`]. However, this means that you can only store one type of
 //! command in a `RedoStack` at a time. Both supports state handling and command merging but
 //! `undo` will automatically merge commands with the same id, while in `redo` you need to implement
-//! the merge method yourself.
+//! the merge method yourself. If state handling is not needed, it can be disabled by setting the
+//! `no_state` feature flag.
 //!
 //! I recommend using `undo` by default and to use `redo` when performance is important.
 //! They have similar API, so it should be easy to switch between them if necessary.
@@ -89,6 +90,12 @@
 //! [dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 //! [`undo`]: https://crates.io/crates/undo
 //! [`merge`]: trait.RedoCmd.html#method.merge
+
+#![deny(missing_docs,
+        missing_debug_implementations,
+        unstable_features,
+        unused_import_braces,
+        unused_qualifications)]
 
 extern crate fnv;
 

@@ -456,6 +456,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// ```
     ///
     /// [`is_clean`]: struct.RedoStack.html#method.is_clean
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_clean(&self) -> Option<bool> {
         self.active.map(|i| self.group[&i].is_clean())
@@ -506,6 +507,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// ```
     ///
     /// [`is_dirty`]: struct.RedoStack.html#method.is_dirty
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
         self.is_clean().map(|t| !t)
@@ -714,7 +716,7 @@ mod test {
     }
 
     #[test]
-    fn state() {
+    fn active() {
         let mut vec1 = vec![1, 2, 3];
         let mut vec2 = vec![1, 2, 3];
 
