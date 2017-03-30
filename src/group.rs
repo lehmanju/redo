@@ -53,7 +53,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
+    /// # #![allow(unused_variables)]
+    /// # use redo::{self, RedoCmd, RedoGroup};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -92,7 +93,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
+    /// # use redo::{self, RedoCmd, RedoGroup};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -132,7 +133,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
+    /// # use redo::{self, RedoCmd, RedoGroup};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -252,6 +253,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
