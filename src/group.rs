@@ -45,7 +45,7 @@ pub struct RedoGroup<'a, T> {
     // The active stack.
     active: Option<Key>,
     // Counter for generating new keys.
-    key: Key,
+    key: Key
 }
 
 impl<'a, T: RedoCmd> RedoGroup<'a, T> {
@@ -85,7 +85,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         RedoGroup {
             group: FnvHashMap::default(),
             active: None,
-            key: 0,
+            key: 0
         }
     }
 
@@ -125,7 +125,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         RedoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
-            key: 0,
+            key: 0
         }
     }
 
@@ -693,7 +693,7 @@ mod test {
 
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>,
+        e: Option<i32>
     }
 
     impl RedoCmd for PopCmd {

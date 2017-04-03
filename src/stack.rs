@@ -60,7 +60,7 @@ pub struct RedoStack<'a, T> {
     on_dirty: Option<Box<FnMut() + 'a>>,
     // Treat it the same when not using state.
     #[cfg(feature = "no_state")]
-    phantom: PhantomData<FnMut() + 'a>,
+    phantom: PhantomData<FnMut() + 'a>
 }
 
 impl<'a, T> RedoStack<'a, T> {
@@ -87,7 +87,7 @@ impl<'a, T> RedoStack<'a, T> {
                 idx: 0,
                 limit: None,
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -97,7 +97,7 @@ impl<'a, T> RedoStack<'a, T> {
                 stack: Vec::new(),
                 idx: 0,
                 limit: None,
-                phantom: PhantomData,
+                phantom: PhantomData
             }
         }
     }
@@ -169,7 +169,7 @@ impl<'a, T> RedoStack<'a, T> {
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -179,7 +179,7 @@ impl<'a, T> RedoStack<'a, T> {
                 stack: Vec::new(),
                 idx: 0,
                 limit: Some(limit),
-                phantom: PhantomData,
+                phantom: PhantomData
             }
         }
     }
@@ -208,7 +208,7 @@ impl<'a, T> RedoStack<'a, T> {
                 idx: 0,
                 limit: None,
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -218,7 +218,7 @@ impl<'a, T> RedoStack<'a, T> {
                 stack: Vec::with_capacity(capacity),
                 idx: 0,
                 limit: None,
-                phantom: PhantomData,
+                phantom: PhantomData
             }
         }
     }
@@ -253,7 +253,7 @@ impl<'a, T> RedoStack<'a, T> {
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -263,7 +263,7 @@ impl<'a, T> RedoStack<'a, T> {
                 stack: Vec::with_capacity(capacity),
                 idx: 0,
                 limit: Some(limit),
-                phantom: PhantomData,
+                phantom: PhantomData
             }
         }
     }
@@ -683,8 +683,8 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
                         let x = len / 4 + 1;
                         self.stack.drain(..x);
                         self.idx -= x - 1;
-                    },
-                    _ => self.idx += 1,
+                    }
+                    _ => self.idx += 1
                 }
                 self.stack.push(cmd);
             }
@@ -877,7 +877,7 @@ mod test {
     #[derive(Clone, Copy)]
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>,
+        e: Option<i32>
     }
 
     impl RedoCmd for PopCmd {
