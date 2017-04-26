@@ -79,7 +79,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// # stack.push(A(1)).unwrap();
     /// ```
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
@@ -159,7 +159,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn with_limit(limit: usize) -> Self {
+    pub fn with_limit(limit: usize) -> RedoStack<'a, T> {
         assert_ne!(limit, 0);
 
         #[cfg(not(feature = "no_state"))]
@@ -200,7 +200,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// # stack.push(A(0)).unwrap();
     /// ```
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
@@ -243,7 +243,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// # stack.push(A(0)).unwrap();
     /// ```
     #[inline]
-    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> Self {
+    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> RedoStack<'a, T> {
         assert_ne!(limit, 0);
 
         #[cfg(not(feature = "no_state"))]
