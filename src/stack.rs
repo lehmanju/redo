@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::VecDeque;
 #[cfg(feature = "no_state")] use std::marker::PhantomData;
 use {Result, RedoCmd};
 
@@ -47,7 +48,7 @@ use {Result, RedoCmd};
 #[derive(Default)]
 pub struct RedoStack<'a, T> {
     // All commands on the stack.
-    stack: Vec<T>,
+    stack: VecDeque<T>,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -83,7 +84,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: None,
                 on_clean: None,
@@ -94,7 +95,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(feature = "no_state")]
         {
             RedoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: None,
                 phantom: PhantomData
@@ -165,7 +166,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
@@ -176,7 +177,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(feature = "no_state")]
         {
             RedoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: Some(limit),
                 phantom: PhantomData
@@ -196,7 +197,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut stack = RedoStack::with_capacity(10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// # stack.push(A(0)).unwrap();
     /// ```
     #[inline]
@@ -204,7 +205,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: None,
                 on_clean: None,
@@ -215,7 +216,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(feature = "no_state")]
         {
             RedoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: None,
                 phantom: PhantomData
@@ -238,7 +239,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut stack = RedoStack::with_capacity_and_limit(10, 10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// assert_eq!(stack.limit(), Some(10));
     /// # stack.push(A(0)).unwrap();
     /// ```
@@ -249,7 +250,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(not(feature = "no_state"))]
         {
             RedoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
@@ -260,7 +261,7 @@ impl<'a, T> RedoStack<'a, T> {
         #[cfg(feature = "no_state")]
         {
             RedoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: Some(limit),
                 phantom: PhantomData
@@ -308,7 +309,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut stack = RedoStack::with_capacity(10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// # stack.push(A(0)).unwrap();
     /// ```
     #[inline]
@@ -402,7 +403,7 @@ impl<'a, T> RedoStack<'a, T> {
     /// stack.push(cmd)?;
     /// stack.push(cmd)?;
     ///
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// stack.shrink_to_fit();
     /// assert!(stack.capacity() >= 3);
     /// # Ok(())
@@ -674,19 +675,16 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
         self.stack.truncate(len);
         cmd.redo()?;
 
-        match self.stack.last_mut().and_then(|last| last.merge(&cmd)) {
+        match self.stack.back_mut().and_then(|last| last.merge(&cmd)) {
             Some(x) => x?,
             None => {
                 match self.limit {
                     Some(limit) if len == limit => {
-                        // Remove ~25% of the stack at once.
-                        let x = len / 4 + 1;
-                        self.stack.drain(..x);
-                        self.idx -= x - 1;
+                        let _ = self.stack.pop_front();
                     }
                     _ => self.idx += 1
                 }
-                self.stack.push(cmd);
+                self.stack.push_back(cmd);
             }
         }
 
@@ -765,10 +763,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
         if self.idx < self.stack.len() {
             #[cfg(not(feature = "no_state"))]
             let is_dirty = self.is_dirty();
-            unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.redo()?;
-            }
+            self.stack[self.idx].redo()?;
             self.idx += 1;
             #[cfg(not(feature = "no_state"))]
             {
@@ -840,11 +835,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
             #[cfg(not(feature = "no_state"))]
             let is_clean = self.is_clean();
             self.idx -= 1;
-            debug_assert!(self.idx < self.stack.len());
-            unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.undo()?;
-            }
+            self.stack[self.idx].undo()?;
             #[cfg(not(feature = "no_state"))]
             {
                 // Check if stack went from clean to dirty.
@@ -936,20 +927,5 @@ mod test {
         stack.redo().unwrap();
         assert_eq!(x.get(), 0);
         assert_eq!(vec, vec![1, 2]);
-    }
-
-    #[test]
-    fn limit() {
-        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut stack = RedoStack::with_limit(9);
-
-        let cmd = PopCmd { vec: &mut vec, e: None };
-
-        for _ in 0..10 {
-            stack.push(cmd).unwrap();
-        }
-
-        assert!(vec.is_empty());
-        assert_eq!(stack.stack.len(), 7);
     }
 }
