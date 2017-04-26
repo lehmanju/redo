@@ -29,18 +29,10 @@ command in a `RedoStack` at a time. Both supports state handling and command mer
 `undo` will automatically merge commands with the same id, while in `redo` you need to implement
 the merge method yourself.
 
-## Disable State Handling
-If state handling is not needed, it can be disabled by setting the `no_state` feature flag.
-
-```toml
-[dependencies]
-redo = { version = "0.2.1", features = ["no_state"] }
-```
-
 ## Examples
 ```toml
 [dependencies]
-redo = "0.2.1"
+redo = "0.3.0"
 ```
 
 ```rust
@@ -92,9 +84,6 @@ fn foo() -> redo::Result<()> {
     Ok(())
 }
 ```
-
-*An unsafe implementation of `redo` and `undo` is used in examples since it is less verbose and
-makes the examples easier to follow.*
 
 [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 [`on_clean`]: struct.RedoStack.html#method.on_clean

@@ -1,6 +1,6 @@
 [package]
 name = "redo"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo/redo library with static dispatch, state handling and manual command merging."
 documentation = "https://docs.rs/redo"
@@ -11,6 +11,3 @@ keywords = ["undo", "redo"]
 
 [dependencies]
 fnv = "1.0.5"
-
-[features]
-no_state = []

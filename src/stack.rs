@@ -1,6 +1,5 @@
-use std::fmt;
 use std::collections::VecDeque;
-#[cfg(feature = "no_state")] use std::marker::PhantomData;
+use std::fmt;
 use {Result, RedoCmd};
 
 /// Maintains a stack of `RedoCmd`s.
@@ -54,14 +53,9 @@ pub struct RedoStack<'a, T> {
     // Max amount of commands allowed on the stack.
     limit: Option<usize>,
     // Called when the state changes from dirty to clean.
-    #[cfg(not(feature = "no_state"))]
     on_clean: Option<Box<FnMut() + 'a>>,
     // Called when the state changes from clean to dirty.
-    #[cfg(not(feature = "no_state"))]
-    on_dirty: Option<Box<FnMut() + 'a>>,
-    // Treat it the same when not using state.
-    #[cfg(feature = "no_state")]
-    phantom: PhantomData<FnMut() + 'a>
+    on_dirty: Option<Box<FnMut() + 'a>>
 }
 
 impl<'a, T> RedoStack<'a, T> {
@@ -81,25 +75,12 @@ impl<'a, T> RedoStack<'a, T> {
     /// ```
     #[inline]
     pub fn new() -> RedoStack<'a, T> {
-        #[cfg(not(feature = "no_state"))]
-        {
-            RedoStack {
-                stack: VecDeque::new(),
-                idx: 0,
-                limit: None,
-                on_clean: None,
-                on_dirty: None
-            }
-        }
-
-        #[cfg(feature = "no_state")]
-        {
-            RedoStack {
-                stack: VecDeque::new(),
-                idx: 0,
-                limit: None,
-                phantom: PhantomData
-            }
+        RedoStack {
+            stack: VecDeque::new(),
+            idx: 0,
+            limit: None,
+            on_clean: None,
+            on_dirty: None
         }
     }
 
@@ -163,25 +144,12 @@ impl<'a, T> RedoStack<'a, T> {
     pub fn with_limit(limit: usize) -> RedoStack<'a, T> {
         assert_ne!(limit, 0);
 
-        #[cfg(not(feature = "no_state"))]
-        {
-            RedoStack {
-                stack: VecDeque::new(),
-                idx: 0,
-                limit: Some(limit),
-                on_clean: None,
-                on_dirty: None
-            }
-        }
-
-        #[cfg(feature = "no_state")]
-        {
-            RedoStack {
-                stack: VecDeque::new(),
-                idx: 0,
-                limit: Some(limit),
-                phantom: PhantomData
-            }
+        RedoStack {
+            stack: VecDeque::new(),
+            idx: 0,
+            limit: Some(limit),
+            on_clean: None,
+            on_dirty: None
         }
     }
 
@@ -202,25 +170,12 @@ impl<'a, T> RedoStack<'a, T> {
     /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> RedoStack<'a, T> {
-        #[cfg(not(feature = "no_state"))]
-        {
-            RedoStack {
-                stack: VecDeque::with_capacity(capacity),
-                idx: 0,
-                limit: None,
-                on_clean: None,
-                on_dirty: None
-            }
-        }
-
-        #[cfg(feature = "no_state")]
-        {
-            RedoStack {
-                stack: VecDeque::with_capacity(capacity),
-                idx: 0,
-                limit: None,
-                phantom: PhantomData
-            }
+        RedoStack {
+            stack: VecDeque::with_capacity(capacity),
+            idx: 0,
+            limit: None,
+            on_clean: None,
+            on_dirty: None
         }
     }
 
@@ -247,25 +202,12 @@ impl<'a, T> RedoStack<'a, T> {
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> RedoStack<'a, T> {
         assert_ne!(limit, 0);
 
-        #[cfg(not(feature = "no_state"))]
-        {
-            RedoStack {
-                stack: VecDeque::with_capacity(capacity),
-                idx: 0,
-                limit: Some(limit),
-                on_clean: None,
-                on_dirty: None
-            }
-        }
-
-        #[cfg(feature = "no_state")]
-        {
-            RedoStack {
-                stack: VecDeque::with_capacity(capacity),
-                idx: 0,
-                limit: Some(limit),
-                phantom: PhantomData
-            }
+        RedoStack {
+            stack: VecDeque::with_capacity(capacity),
+            idx: 0,
+            limit: Some(limit),
+            on_clean: None,
+            on_dirty: None
         }
     }
 
@@ -463,7 +405,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// # }
     /// # foo().unwrap();
     /// ```
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn on_clean<F>(&mut self, f: F)
         where F: FnMut() + 'a
@@ -516,7 +457,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// # }
     /// # foo().unwrap();
     /// ```
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn on_dirty<F>(&mut self, f: F)
         where F: FnMut() + 'a
@@ -566,7 +506,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// # }
     /// # foo().unwrap();
     /// ```
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_clean(&self) -> bool {
         self.idx == self.stack.len()
@@ -614,7 +553,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// # }
     /// # foo().unwrap();
     /// ```
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
@@ -668,7 +606,6 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
     pub fn push(&mut self, mut cmd: T) -> Result<T::Err> {
-        #[cfg(not(feature = "no_state"))]
         let is_dirty = self.is_dirty();
         let len = self.idx;
         // Pop off all elements after len from stack.
@@ -689,13 +626,10 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
         }
 
         debug_assert_eq!(self.idx, self.stack.len());
-        #[cfg(not(feature = "no_state"))]
-        {
-            // State is always clean after a push, check if it was dirty before.
-            if is_dirty {
-                if let Some(ref mut f) = self.on_clean {
-                    f();
-                }
+        // State is always clean after a push, check if it was dirty before.
+        if is_dirty {
+            if let Some(ref mut f) = self.on_clean {
+                f();
             }
         }
         Ok(())
@@ -761,17 +695,13 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     #[inline]
     pub fn redo(&mut self) -> Result<T::Err> {
         if self.idx < self.stack.len() {
-            #[cfg(not(feature = "no_state"))]
             let is_dirty = self.is_dirty();
             self.stack[self.idx].redo()?;
             self.idx += 1;
-            #[cfg(not(feature = "no_state"))]
-            {
-                // Check if stack went from dirty to clean.
-                if is_dirty && self.is_clean() {
-                    if let Some(ref mut f) = self.on_clean {
-                        f();
-                    }
+            // Check if stack went from dirty to clean.
+            if is_dirty && self.is_clean() {
+                if let Some(ref mut f) = self.on_clean {
+                    f();
                 }
             }
         }
@@ -832,17 +762,13 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     #[inline]
     pub fn undo(&mut self) -> Result<T::Err> {
         if self.idx > 0 {
-            #[cfg(not(feature = "no_state"))]
             let is_clean = self.is_clean();
             self.idx -= 1;
             self.stack[self.idx].undo()?;
-            #[cfg(not(feature = "no_state"))]
-            {
-                // Check if stack went from clean to dirty.
-                if is_clean && self.is_dirty() {
-                    if let Some(ref mut f) = self.on_dirty {
-                        f();
-                    }
+            // Check if stack went from clean to dirty.
+            if is_clean && self.is_dirty() {
+                if let Some(ref mut f) = self.on_dirty {
+                    f();
                 }
             }
         }
@@ -892,7 +818,6 @@ mod test {
         }
     }
 
-    #[cfg(not(feature = "no_state"))]
     #[test]
     fn state() {
         use std::cell::Cell;
