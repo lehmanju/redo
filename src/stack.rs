@@ -55,7 +55,7 @@ pub struct RedoStack<'a, T> {
     // Called when the state changes from dirty to clean.
     on_clean: Option<Box<FnMut() + 'a>>,
     // Called when the state changes from clean to dirty.
-    on_dirty: Option<Box<FnMut() + 'a>>
+    on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
 impl<'a, T> RedoStack<'a, T> {
@@ -80,7 +80,7 @@ impl<'a, T> RedoStack<'a, T> {
             idx: 0,
             limit: None,
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -90,9 +90,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// indefinitely.
     ///
     /// The stack may remove multiple commands at a time to increase performance.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -142,14 +139,16 @@ impl<'a, T> RedoStack<'a, T> {
     /// ```
     #[inline]
     pub fn with_limit(limit: usize) -> RedoStack<'a, T> {
-        assert_ne!(limit, 0);
-
         RedoStack {
             stack: VecDeque::new(),
             idx: 0,
-            limit: Some(limit),
+            limit: if limit == 0 {
+                None
+            } else {
+                Some(limit)
+            },
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -175,14 +174,11 @@ impl<'a, T> RedoStack<'a, T> {
             idx: 0,
             limit: None,
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
     /// Creates a new `RedoStack` with the specified capacity and limit.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -200,14 +196,16 @@ impl<'a, T> RedoStack<'a, T> {
     /// ```
     #[inline]
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> RedoStack<'a, T> {
-        assert_ne!(limit, 0);
-
         RedoStack {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
-            limit: Some(limit),
+            limit: if limit == 0 {
+                None
+            } else {
+                Some(limit)
+            },
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -619,7 +617,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
                     Some(limit) if len == limit => {
                         let _ = self.stack.pop_front();
                     }
-                    _ => self.idx += 1
+                    _ => self.idx += 1,
                 }
                 self.stack.push_back(cmd);
             }
@@ -794,7 +792,7 @@ mod test {
     #[derive(Clone, Copy)]
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>
+        e: Option<i32>,
     }
 
     impl RedoCmd for PopCmd {
@@ -828,7 +826,10 @@ mod test {
         stack.on_clean(|| x.set(0));
         stack.on_dirty(|| x.set(1));
 
-        let cmd = PopCmd { vec: &mut vec, e: None };
+        let cmd = PopCmd {
+            vec: &mut vec,
+            e: None,
+        };
         for _ in 0..3 {
             stack.push(cmd).unwrap();
         }

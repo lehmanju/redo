@@ -101,11 +101,9 @@ pub use stack::RedoStack;
 
 use std::result;
 
-type Key = u32;
-
 /// An unique id for an `RedoStack`.
 #[derive(Debug)]
-pub struct Id(Key);
+pub struct Id(u32);
 
 /// A specialized `Result` that does not carry any data on success.
 pub type Result<E> = result::Result<(), E>;

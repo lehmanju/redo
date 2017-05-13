@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use {Id, Key, Result, RedoCmd, RedoStack};
+use {Id, Result, RedoCmd, RedoStack};
 
 /// A collection of `RedoStack`s.
 ///
@@ -41,11 +41,11 @@ use {Id, Key, Result, RedoCmd, RedoStack};
 #[derive(Debug, Default)]
 pub struct RedoGroup<'a, T> {
     // The stacks in the group.
-    group: FnvHashMap<Key, RedoStack<'a, T>>,
+    group: FnvHashMap<u32, RedoStack<'a, T>>,
     // The active stack.
-    active: Option<Key>,
+    active: Option<u32>,
     // Counter for generating new keys.
-    key: Key
+    key: u32,
 }
 
 impl<'a, T: RedoCmd> RedoGroup<'a, T> {
@@ -85,7 +85,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         RedoGroup {
             group: FnvHashMap::default(),
             active: None,
-            key: 0
+            key: 0,
         }
     }
 
@@ -125,7 +125,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         RedoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
-            key: 0
+            key: 0,
         }
     }
 
@@ -563,7 +563,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// [`push`]: struct.RedoStack.html#method.push
     #[inline]
     pub fn push(&mut self, cmd: T) -> Option<Result<T::Err>> {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().push(cmd))
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().push(cmd))
     }
 
     /// Calls [`redo`] on the active `RedoStack`, if there is one.
@@ -626,7 +627,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// [`redo`]: struct.RedoStack.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<T::Err>> {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().redo())
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().redo())
     }
 
     /// Calls [`undo`] on the active `RedoStack`, if there is one.
@@ -683,7 +685,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// [`undo`]: struct.RedoStack.html#method.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<T::Err>> {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().undo())
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().undo())
     }
 }
 
@@ -693,7 +696,7 @@ mod test {
 
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>
+        e: Option<i32>,
     }
 
     impl RedoCmd for PopCmd {
@@ -728,11 +731,23 @@ mod test {
         let b = group.add(RedoStack::new());
 
         group.set_active(&a);
-        assert!(group.push(PopCmd { vec: &mut vec1, e: None }).unwrap().is_ok());
+        assert!(group
+                    .push(PopCmd {
+                              vec: &mut vec1,
+                              e: None,
+                          })
+                    .unwrap()
+                    .is_ok());
         assert_eq!(vec1.len(), 2);
 
         group.set_active(&b);
-        assert!(group.push(PopCmd { vec: &mut vec2, e: None }).unwrap().is_ok());
+        assert!(group
+                    .push(PopCmd {
+                              vec: &mut vec2,
+                              e: None,
+                          })
+                    .unwrap()
+                    .is_ok());
         assert_eq!(vec2.len(), 2);
 
         group.set_active(&a);
