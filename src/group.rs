@@ -1,3 +1,4 @@
+use std::fmt;
 use fnv::FnvHashMap;
 use {Id, Result, RedoCmd, RedoStack};
 
@@ -6,39 +7,7 @@ use {Id, Result, RedoCmd, RedoStack};
 /// A `RedoGroup` is useful when working with multiple stacks and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the stack directly.
-///
-/// The `PopCmd` given in the examples below is defined as:
-///
-/// ```
-/// # use redo::{self, RedoCmd};
-/// #[derive(Clone, Copy)]
-/// struct PopCmd {
-///     vec: *mut Vec<i32>,
-///     e: Option<i32>,
-/// }
-///
-/// impl RedoCmd for PopCmd {
-///     type Err = ();
-///
-///     fn redo(&mut self) -> redo::Result<()> {
-///         self.e = unsafe {
-///             let ref mut vec = *self.vec;
-///             vec.pop()
-///         };
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self) -> redo::Result<()> {
-///         unsafe {
-///             let ref mut vec = *self.vec;
-///             let e = self.e.ok_or(())?;
-///             vec.push(e);
-///         }
-///         Ok(())
-///     }
-/// }
-/// ```
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct RedoGroup<'a, T> {
     // The stacks in the group.
     group: FnvHashMap<u32, RedoStack<'a, T>>,
@@ -46,37 +15,22 @@ pub struct RedoGroup<'a, T> {
     active: Option<u32>,
     // Counter for generating new keys.
     key: u32,
+    // Called when the active stack changes.
+    on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
 }
 
-impl<'a, T: RedoCmd> RedoGroup<'a, T> {
+impl<'a, T> RedoGroup<'a, T> {
     /// Creates a new `RedoGroup`.
     ///
     /// # Examples
     /// ```
     /// # #![allow(unused_variables)]
     /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let group = RedoGroup::<PopCmd>::new();
     /// ```
@@ -86,6 +40,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
             group: FnvHashMap::default(),
             active: None,
             key: 0,
+            on_stack_change: None,
         }
     }
 
@@ -94,28 +49,11 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// # Examples
     /// ```
     /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let group = RedoGroup::<PopCmd>::with_capacity(10);
     /// assert!(group.capacity() >= 10);
@@ -126,6 +64,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
             key: 0,
+            on_stack_change: None,
         }
     }
 
@@ -134,28 +73,11 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// # Examples
     /// ```
     /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let group = RedoGroup::<PopCmd>::with_capacity(10);
     /// assert!(group.capacity() >= 10);
@@ -173,32 +95,16 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
-    /// group.add(RedoStack::new());
+    /// group.add_default();
     /// group.reserve(10);
     /// assert!(group.capacity() >= 11);
     /// ```
@@ -211,34 +117,18 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::with_capacity(10);
-    /// group.add(RedoStack::new());
-    /// group.add(RedoStack::new());
-    /// group.add(RedoStack::new());
+    /// group.add_default();
+    /// group.add_default();
+    /// group.add_default();
     ///
     /// assert!(group.capacity() >= 10);
     /// group.shrink_to_fit();
@@ -249,39 +139,52 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         self.group.shrink_to_fit();
     }
 
+    /// Sets what should happen when the active stack changes.
+    /// By default the `RedoGroup` does nothing when the active stack changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
+    /// # impl RedoCmd for PopCmd {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut group = RedoGroup::<PopCmd>::new();
+    /// group.on_stack_change(|is_clean| {
+    ///     match is_clean {
+    ///         Some(true) => { /* The new active stack is clean */ },
+    ///         Some(false) => { /* The new active stack is dirty */ },
+    ///         None => { /* No active stack */ },
+    ///     }
+    /// });
+    /// ```
+    #[inline]
+    pub fn on_stack_change<F>(&mut self, f: F)
+        where F: FnMut(Option<bool>) + 'a
+    {
+        self.on_stack_change = Some(Box::new(f));
+    }
+
     /// Adds an `RedoStack` to the group and returns an unique id for this stack.
     ///
     /// # Examples
     /// ```
     /// # #![allow(unused_variables)]
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
-    /// let a = group.add(RedoStack::new());
-    /// let b = group.add(RedoStack::new());
-    /// let c = group.add(RedoStack::new());
+    /// let a = group.add_default();
+    /// let b = group.add_default();
+    /// let c = group.add_default();
     /// ```
     #[inline]
     pub fn add(&mut self, stack: RedoStack<'a, T>) -> Id {
@@ -296,32 +199,16 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
-    /// let a = group.add(RedoStack::new());
+    /// let a = group.add_default();
     /// let stack = group.remove(a);
     /// assert!(stack.is_some());
     /// ```
@@ -340,38 +227,25 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
-    /// let a = group.add(RedoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     /// ```
     #[inline]
     pub fn set_active(&mut self, &Id(key): &Id) {
-        if self.group.contains_key(&key) {
+        if let Some(is_clean) = self.group.get(&key).map(|stack| stack.is_clean()) {
             self.active = Some(key);
+            if let Some(ref mut f) = self.on_stack_change {
+                f(Some(is_clean));
+            }
         }
     }
 
@@ -379,38 +253,25 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{self, RedoCmd, RedoStack, RedoGroup};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
     /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
-    /// let a = group.add(RedoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     /// group.clear_active();
     /// ```
     #[inline]
     pub fn clear_active(&mut self) {
         self.active = None;
+        if let Some(ref mut f) = self.on_stack_change {
+            f(None);
+        }
     }
 
     /// Calls [`is_clean`] on the active `RedoStack`, if there is one.
@@ -458,7 +319,6 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// ```
     ///
     /// [`is_clean`]: struct.RedoStack.html#method.is_clean
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_clean(&self) -> Option<bool> {
         self.active.map(|i| self.group[&i].is_clean())
@@ -509,12 +369,13 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// ```
     ///
     /// [`is_dirty`]: struct.RedoStack.html#method.is_dirty
-    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
         self.is_clean().map(|t| !t)
     }
+}
 
+impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// Calls [`push`] on the active `RedoStack`, if there is one.
     ///
     /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
@@ -564,7 +425,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     #[inline]
     pub fn push(&mut self, cmd: T) -> Option<Result<T::Err>> {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().push(cmd))
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.push(cmd))
     }
 
     /// Calls [`redo`] on the active `RedoStack`, if there is one.
@@ -628,7 +490,8 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     #[inline]
     pub fn redo(&mut self) -> Option<Result<T::Err>> {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().redo())
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.redo())
     }
 
     /// Calls [`undo`] on the active `RedoStack`, if there is one.
@@ -686,7 +549,44 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     #[inline]
     pub fn undo(&mut self) -> Option<Result<T::Err>> {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().undo())
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.undo())
+    }
+}
+
+impl<'a, T: Default> RedoGroup<'a, T> {
+    /// Adds a default `RedoStack` to the group and returns an unique id for this stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
+    /// # impl RedoCmd for PopCmd {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let mut group = RedoGroup::<PopCmd>::new();
+    /// let a = group.add_default();
+    /// let b = group.add_default();
+    /// let c = group.add_default();
+    /// ```
+    #[inline]
+    pub fn add_default(&mut self) -> Id {
+        self.add(Default::default())
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for RedoGroup<'a, T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("RedoGroup")
+            .field("group", &self.group)
+            .field("active", &self.active)
+            .field("key", &self.key)
+            .finish()
     }
 }
 

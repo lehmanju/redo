@@ -21,18 +21,15 @@ It also supports merging of commands by implementing the [`merge`] method for a 
 |-----------------|--------------|-----------------|
 | Dispatch        | Static       | Dynamic         |
 | State Handling  | Yes          | Yes             |
-| Command Merging | Yes (manual) | Yes (automatic) |
+| Command Merging | Manual       | Auto            |
 
-`redo` uses [static dispatch] instead of [dynamic dispatch] to store the commands, which means
-it should be faster than [`undo`]. However, this means that you can only store one type of
-command in a `RedoStack` at a time. Both supports state handling and command merging but
-`undo` will automatically merge commands with the same id, while in `redo` you need to implement
-the merge method yourself.
+Both supports command merging but `undo` will automatically merge commands with the same id
+while in `redo` you need to implement the merge method yourself.
 
 ## Examples
 ```toml
 [dependencies]
-redo = "0.3.0"
+redo = "0.4.0"
 ```
 
 ```rust
@@ -45,9 +42,9 @@ struct PopCmd {
 }
 
 impl RedoCmd for PopCmd {
-    type Err = ();
+    type Err = &'static str;
 
-    fn redo(&mut self) -> redo::Result<()> {
+    fn redo(&mut self) -> redo::Result<&'static str> {
         self.e = unsafe {
             let ref mut vec = *self.vec;
             vec.pop()
@@ -55,17 +52,17 @@ impl RedoCmd for PopCmd {
         Ok(())
     }
 
-    fn undo(&mut self) -> redo::Result<()> {
+    fn undo(&mut self) -> redo::Result<&'static str> {
         unsafe {
             let ref mut vec = *self.vec;
-            let e = self.e.ok_or(())?;
+            let e = self.e.ok_or("`e` is invalid")?;
             vec.push(e);
         }
         Ok(())
     }
 }
 
-fn foo() -> redo::Result<()> {
+fn foo() -> redo::Result<&'static str> {
     let mut vec = vec![1, 2, 3];
     let mut stack = RedoStack::new();
     let cmd = PopCmd { vec: &mut vec, e: None };
