@@ -25,19 +25,6 @@ pub struct RedoStack<'a, T> {
 
 impl<'a, T> RedoStack<'a, T> {
     /// Creates a new `RedoStack`.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # struct A(u8);
-    /// # impl RedoCmd for A {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let mut stack = RedoStack::new();
-    /// # stack.push(A(1)).unwrap();
-    /// ```
     #[inline]
     pub fn new() -> RedoStack<'a, T> {
         RedoStack {
@@ -111,21 +98,9 @@ impl<'a, T> RedoStack<'a, T> {
         }
     }
 
-    /// Creates a new `RedoStack` with the specified capacity.
+    /// Creates a new `RedoStack` with the specified [capacity].
     ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # struct A(u8);
-    /// # impl RedoCmd for A {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let mut stack = RedoStack::with_capacity(10);
-    /// assert!(stack.capacity() >= 10);
-    /// # stack.push(A(0)).unwrap();
-    /// ```
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
     pub fn with_capacity(capacity: usize) -> RedoStack<'a, T> {
         RedoStack {
@@ -136,75 +111,13 @@ impl<'a, T> RedoStack<'a, T> {
         }
     }
 
-    /// Creates a new `RedoStack` with the specified capacity and limit.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # struct A(u8);
-    /// # impl RedoCmd for A {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let mut stack = RedoStack::with_capacity_and_limit(10, 10);
-    /// assert!(stack.capacity() >= 10);
-    /// assert_eq!(stack.limit(), Some(10));
-    /// # stack.push(A(0)).unwrap();
-    /// ```
-    #[inline]
-    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> RedoStack<'a, T> {
-        RedoStack {
-            stack: VecDeque::with_capacity(capacity),
-            idx: 0,
-            limit: if limit == 0 { None } else { Some(limit) },
-            on_state_change: None,
-        }
-    }
-
     /// Returns the limit of the `RedoStack`, or `None` if it has no limit.
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # struct A(u8);
-    /// # impl RedoCmd for A {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// # fn foo() -> redo::Result<()> {
-    /// let mut stack = RedoStack::with_limit(10);
-    /// assert_eq!(stack.limit(), Some(10));
-    /// # stack.push(A(0))?;
-    ///
-    /// let mut stack = RedoStack::new();
-    /// assert_eq!(stack.limit(), None);
-    /// # stack.push(A(0))?;
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
     #[inline]
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
 
     /// Returns the capacity of the `RedoStack`.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # struct A(u8);
-    /// # impl RedoCmd for A {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let mut stack = RedoStack::with_capacity(10);
-    /// assert!(stack.capacity() >= 10);
-    /// # stack.push(A(0)).unwrap();
-    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.stack.capacity()

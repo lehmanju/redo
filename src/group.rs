@@ -1,6 +1,6 @@
 use std::fmt;
 use fnv::FnvHashMap;
-use {DebugFn, Id, Result, RedoCmd, RedoStack};
+use {DebugFn, Key, Result, RedoCmd, RedoStack};
 
 /// A collection of `RedoStack`s.
 ///
@@ -10,9 +10,9 @@ use {DebugFn, Id, Result, RedoCmd, RedoStack};
 #[derive(Default)]
 pub struct RedoGroup<'a, T> {
     // The stacks in the group.
-    group: FnvHashMap<u32, RedoStack<'a, T>>,
+    group: FnvHashMap<Key, RedoStack<'a, T>>,
     // The active stack.
-    active: Option<u32>,
+    active: Option<Key>,
     // Counter for generating new keys.
     key: u32,
     // Called when the active stack changes.
@@ -62,9 +62,7 @@ impl<'a, T> RedoGroup<'a, T> {
     pub fn with_capacity(capacity: usize) -> RedoGroup<'a, T> {
         RedoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
-            active: None,
-            key: 0,
-            on_stack_change: None,
+            ..RedoGroup::new()
         }
     }
 
@@ -158,11 +156,11 @@ impl<'a, T> RedoGroup<'a, T> {
     /// let c = group.add_default();
     /// ```
     #[inline]
-    pub fn add(&mut self, stack: RedoStack<'a, T>) -> Id {
-        let key = self.key;
+    pub fn add(&mut self, stack: RedoStack<'a, T>) -> Key {
+        let key = Key(self.key);
         self.key += 1;
         self.group.insert(key, stack);
-        Id(key)
+        key
     }
 
     /// Removes the `RedoStack` with the specified id and returns the stack.
@@ -184,7 +182,7 @@ impl<'a, T> RedoGroup<'a, T> {
     /// assert!(stack.is_some());
     /// ```
     #[inline]
-    pub fn remove(&mut self, Id(key): Id) -> Option<RedoStack<'a, T>> {
+    pub fn remove(&mut self, key: Key) -> Option<RedoStack<'a, T>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
             if active == key {
@@ -208,10 +206,10 @@ impl<'a, T> RedoGroup<'a, T> {
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     /// ```
     #[inline]
-    pub fn set_active(&mut self, &Id(key): &Id) {
+    pub fn set_active(&mut self, key: Key) {
         if let Some(is_clean) = self.group.get(&key).map(|stack| stack.is_clean()) {
             self.active = Some(key);
             if let Some(ref mut f) = self.on_stack_change {
@@ -234,7 +232,7 @@ impl<'a, T> RedoGroup<'a, T> {
     /// # }
     /// let mut group = RedoGroup::<PopCmd>::new();
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     /// group.clear_active();
     /// ```
     #[inline]
@@ -280,7 +278,7 @@ impl<'a, T> RedoGroup<'a, T> {
     ///
     /// let a = group.add(RedoStack::new());
     /// assert_eq!(group.is_clean(), None);
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// assert_eq!(group.is_clean(), Some(true)); // An empty stack is always clean.
     /// group.push(cmd);
@@ -330,7 +328,7 @@ impl<'a, T> RedoGroup<'a, T> {
     ///
     /// let a = group.add(RedoStack::new());
     /// assert_eq!(group.is_dirty(), None);
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// assert_eq!(group.is_dirty(), Some(false)); // An empty stack is always clean.
     /// group.push(cmd);
@@ -383,7 +381,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add(RedoStack::new());
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -436,7 +434,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add(RedoStack::new());
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -501,7 +499,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add(RedoStack::new());
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -545,7 +543,7 @@ impl<'a, T: Default> RedoGroup<'a, T> {
     /// let c = group.add_default();
     /// ```
     #[inline]
-    pub fn add_default(&mut self) -> Id {
+    pub fn add_default(&mut self) -> Key {
         self.add(Default::default())
     }
 }
@@ -705,7 +703,7 @@ mod test {
         let a = group.add(RedoStack::new());
         let b = group.add(RedoStack::new());
 
-        group.set_active(&a);
+        group.set_active(a);
         assert!(group
                     .push(PopCmd {
                               vec: &mut vec1,
@@ -715,7 +713,7 @@ mod test {
                     .is_ok());
         assert_eq!(vec1.len(), 2);
 
-        group.set_active(&b);
+        group.set_active(b);
         assert!(group
                     .push(PopCmd {
                               vec: &mut vec2,
@@ -725,11 +723,11 @@ mod test {
                     .is_ok());
         assert_eq!(vec2.len(), 2);
 
-        group.set_active(&a);
+        group.set_active(a);
         assert!(group.undo().unwrap().is_ok());
         assert_eq!(vec1.len(), 3);
 
-        group.set_active(&b);
+        group.set_active(b);
         assert!(group.undo().unwrap().is_ok());
         assert_eq!(vec2.len(), 3);
 

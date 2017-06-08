@@ -98,9 +98,9 @@ pub use stack::{RedoStack, RedoStackBuilder};
 use std::fmt;
 use std::result;
 
-/// An unique id for an `RedoStack`.
-#[derive(Debug)]
-pub struct Id(u32);
+/// A key for a `RedoStack` in a `RedoGroup`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Key(u32);
 
 /// A specialized `Result` that does not carry any data on success.
 pub type Result<E> = result::Result<(), E>;
