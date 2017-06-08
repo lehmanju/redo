@@ -92,9 +92,10 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::RedoGroup;
-pub use stack::RedoStack;
+pub use group::{RedoGroup, RedoGroupBuilder};
+pub use stack::{RedoStack, RedoStackBuilder};
 
+use std::fmt;
 use std::result;
 
 /// An unique id for an `RedoStack`.
@@ -209,5 +210,14 @@ pub trait RedoCmd {
     #[inline]
     fn merge(&mut self, cmd: &Self) -> Option<Result<Self::Err>> {
         None
+    }
+}
+
+struct DebugFn;
+
+impl fmt::Debug for DebugFn {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "|_| {{ .. }}")
     }
 }

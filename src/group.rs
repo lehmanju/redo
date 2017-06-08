@@ -1,6 +1,6 @@
 use std::fmt;
 use fnv::FnvHashMap;
-use {Id, Result, RedoCmd, RedoStack};
+use {DebugFn, Id, Result, RedoCmd, RedoStack};
 
 /// A collection of `RedoStack`s.
 ///
@@ -137,35 +137,6 @@ impl<'a, T> RedoGroup<'a, T> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.group.shrink_to_fit();
-    }
-
-    /// Sets what should happen when the active stack changes.
-    /// By default the `RedoGroup` does nothing when the active stack changes.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # #[derive(Clone, Copy, Default)]
-    /// # struct PopCmd;
-    /// # impl RedoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let mut group = RedoGroup::<PopCmd>::new();
-    /// group.on_stack_change(|is_clean| {
-    ///     match is_clean {
-    ///         Some(true) => { /* The new active stack is clean */ },
-    ///         Some(false) => { /* The new active stack is dirty */ },
-    ///         None => { /* No active stack */ },
-    ///     }
-    /// });
-    /// ```
-    #[inline]
-    pub fn on_stack_change<F>(&mut self, f: F)
-        where F: FnMut(Option<bool>) + 'a
-    {
-        self.on_stack_change = Some(Box::new(f));
     }
 
     /// Adds an `RedoStack` to the group and returns an unique id for this stack.
@@ -586,6 +557,110 @@ impl<'a, T: fmt::Debug> fmt::Debug for RedoGroup<'a, T> {
             .field("group", &self.group)
             .field("active", &self.active)
             .field("key", &self.key)
+            .finish()
+    }
+}
+
+/// Builder for `RedoGroup`.
+///
+/// # Examples
+/// ```
+/// # #![allow(unused_variables)]
+/// # use redo::{self, RedoCmd, RedoGroupBuilder};
+/// # #[derive(Clone, Copy, Default)]
+/// # struct PopCmd;
+/// # impl RedoCmd for PopCmd {
+/// #   type Err = ();
+/// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+/// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+/// # }
+/// let group = RedoGroupBuilder::new()
+///     .capacity(10)
+///     .on_stack_change(|is_clean| {
+///         match is_clean {
+///             Some(true) => { /* The new active stack is clean */ },
+///             Some(false) => { /* The new active stack is dirty */ },
+///             None => { /* No active stack */ },
+///         }
+///     })
+///     .build::<PopCmd>();
+/// ```
+#[derive(Default)]
+pub struct RedoGroupBuilder<'a> {
+    capacity: usize,
+    on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
+}
+
+impl<'a> RedoGroupBuilder<'a> {
+    /// Creates a new builder.
+    #[inline]
+    pub fn new() -> RedoGroupBuilder<'a> {
+        Default::default()
+    }
+
+    /// Sets the specified [capacity] for the group.
+    ///
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> RedoGroupBuilder<'a> {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Sets what should happen when the active stack changes.
+    /// By default the `RedoGroup` does nothing when the active stack changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use redo::{self, RedoCmd, RedoGroupBuilder};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
+    /// # impl RedoCmd for PopCmd {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let group = RedoGroupBuilder::new()
+    ///     .on_stack_change(|is_clean| {
+    ///         match is_clean {
+    ///             Some(true) => { /* The new active stack is clean */ },
+    ///             Some(false) => { /* The new active stack is dirty */ },
+    ///             None => { /* No active stack */ },
+    ///         }
+    ///     })
+    ///     .build::<PopCmd>();
+    /// ```
+    #[inline]
+    pub fn on_stack_change<F>(mut self, f: F) -> RedoGroupBuilder<'a>
+        where F: FnMut(Option<bool>) + 'a
+    {
+        self.on_stack_change = Some(Box::new(f));
+        self
+    }
+
+    /// Builds the `RedoGroup`.
+    #[inline]
+    pub fn build<T>(self) -> RedoGroup<'a, T> {
+        let RedoGroupBuilder {
+            capacity,
+            on_stack_change,
+        } = self;
+        RedoGroup {
+            group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
+            on_stack_change,
+            ..RedoGroup::new()
+        }
+    }
+}
+
+impl<'a> fmt::Debug for RedoGroupBuilder<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UndoStackBuilder")
+            .field("capacity", &self.capacity)
+            .field("on_stack_change",
+                   &self.on_stack_change.as_ref().map(|_| DebugFn))
             .finish()
     }
 }
