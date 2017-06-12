@@ -29,7 +29,7 @@ while in `redo` you need to implement the merge method yourself.
 ## Examples
 ```toml
 [dependencies]
-redo = "0.4.0"
+redo = "0.5.0"
 ```
 
 ```rust

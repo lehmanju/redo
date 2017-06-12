@@ -40,8 +40,6 @@ impl<'a, T> RedoStack<'a, T> {
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
     ///
-    /// The stack may remove multiple commands at a time to increase performance.
-    ///
     /// # Examples
     /// ```
     /// # use redo::{self, RedoCmd, RedoStack};
@@ -91,10 +89,8 @@ impl<'a, T> RedoStack<'a, T> {
     #[inline]
     pub fn with_limit(limit: usize) -> RedoStack<'a, T> {
         RedoStack {
-            stack: VecDeque::new(),
-            idx: 0,
             limit: if limit == 0 { None } else { Some(limit) },
-            on_state_change: None,
+            ..RedoStack::new()
         }
     }
 
@@ -105,9 +101,7 @@ impl<'a, T> RedoStack<'a, T> {
     pub fn with_capacity(capacity: usize) -> RedoStack<'a, T> {
         RedoStack {
             stack: VecDeque::with_capacity(capacity),
-            idx: 0,
-            limit: None,
-            on_state_change: None,
+            ..RedoStack::new()
         }
     }
 
@@ -321,8 +315,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     /// This pops off all other commands above the active command from the stack.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing `redo` or merging commands, the error is returned.
     ///
     /// # Examples
     /// ```
@@ -400,8 +393,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing `redo` the error is returned and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```
@@ -477,8 +469,7 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing `undo` the error is returned as `Some(Err(_))`
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing `undo` the error is returned and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```
@@ -628,8 +619,7 @@ impl<'a> RedoStackBuilder<'a> {
         self
     }
 
-    /// Sets what should happen if the state changes.
-    /// By default the `RedoStack` does nothing when the state changes.
+    /// Sets what should happen when the state changes.
     ///
     /// # Examples
     /// ```
