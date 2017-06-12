@@ -1,3 +1,4 @@
+use std::collections::hash_map;
 use std::fmt;
 use fnv::FnvHashMap;
 use {DebugFn, Key, Result, RedoCmd, RedoStack};
@@ -21,19 +22,6 @@ pub struct RedoGroup<'a, T> {
 
 impl<'a, T> RedoGroup<'a, T> {
     /// Creates a new `RedoGroup`.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # struct PopCmd;
-    /// # impl RedoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let group = RedoGroup::<PopCmd>::new();
-    /// ```
     #[inline]
     pub fn new() -> RedoGroup<'a, T> {
         RedoGroup {
@@ -44,20 +32,9 @@ impl<'a, T> RedoGroup<'a, T> {
         }
     }
 
-    /// Creates a new `RedoGroup` with the specified capacity.
+    /// Creates a new `RedoGroup` with the specified [capacity].
     ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # struct PopCmd;
-    /// # impl RedoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let group = RedoGroup::<PopCmd>::with_capacity(10);
-    /// assert!(group.capacity() >= 10);
-    /// ```
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
     pub fn with_capacity(capacity: usize) -> RedoGroup<'a, T> {
         RedoGroup {
@@ -67,19 +44,6 @@ impl<'a, T> RedoGroup<'a, T> {
     }
 
     /// Returns the capacity of the `RedoGroup`.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoGroup};
-    /// # struct PopCmd;
-    /// # impl RedoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-    /// # }
-    /// let group = RedoGroup::<PopCmd>::with_capacity(10);
-    /// assert!(group.capacity() >= 10);
-    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.group.capacity()
@@ -342,6 +306,18 @@ impl<'a, T> RedoGroup<'a, T> {
     pub fn is_dirty(&self) -> Option<bool> {
         self.is_clean().map(|t| !t)
     }
+
+    /// Returns an iterator over the `(&Key, &RedoStack)` pairs in the group.
+    #[inline]
+    pub fn stacks(&'a self) -> Stacks<'a, T> {
+        Stacks(self.group.iter())
+    }
+
+    /// Returns an iterator over the `(&Key, &mut RedoStack)` pairs in the group.
+    #[inline]
+    pub fn stacks_mut(&'a mut self) -> StacksMut<'a, T> {
+        StacksMut(self.group.iter_mut())
+    }
 }
 
 impl<'a, T: RedoCmd> RedoGroup<'a, T> {
@@ -520,6 +496,69 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
         self.active
             .and_then(|active| self.group.get_mut(&active))
             .map(|stack| stack.undo())
+    }
+}
+
+#[derive(Debug)]
+pub struct IntoStacks<'a, T>(hash_map::IntoIter<Key, RedoStack<'a, T>>);
+
+impl<'a, T> Iterator for IntoStacks<'a, T> {
+    type Item = (Key, RedoStack<'a, T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a, T> IntoIterator for RedoGroup<'a, T> {
+    type Item = (Key, RedoStack<'a, T>);
+    type IntoIter = IntoStacks<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        IntoStacks(self.group.into_iter())
+    }
+}
+
+#[derive(Debug)]
+pub struct Stacks<'a, T: 'a>(hash_map::Iter<'a, Key, RedoStack<'a, T>>);
+
+impl<'a, T> Iterator for Stacks<'a, T> {
+    type Item = (&'a Key, &'a RedoStack<'a, T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a RedoGroup<'a, T> {
+    type Item = (&'a Key, &'a RedoStack<'a, T>);
+    type IntoIter = Stacks<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        Stacks(self.group.iter())
+    }
+}
+
+#[derive(Debug)]
+pub struct StacksMut<'a, T: 'a>(hash_map::IterMut<'a, Key, RedoStack<'a, T>>);
+
+impl<'a, T> Iterator for StacksMut<'a, T> {
+    type Item = (&'a Key, &'a mut RedoStack<'a, T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut RedoGroup<'a, T> {
+    type Item = (&'a Key, &'a mut RedoStack<'a, T>);
+    type IntoIter = StacksMut<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        StacksMut(self.group.iter_mut())
     }
 }
 
