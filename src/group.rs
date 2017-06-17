@@ -1,4 +1,5 @@
 use std::collections::hash_map;
+use std::marker::PhantomData;
 use std::fmt;
 use fnv::FnvHashMap;
 use {DebugFn, Key, Result, RedoCmd, RedoStack};
@@ -29,6 +30,41 @@ impl<'a, T> RedoGroup<'a, T> {
             active: None,
             key: 0,
             on_stack_change: None,
+        }
+    }
+
+    /// Creates a configurator that can be used to configure the `RedoGroup`.
+    ///
+    /// The configurator can set the `capacity` and what should happen when the active stack
+    /// changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoGroup};
+    /// # #[derive(Clone, Copy, Default)]
+    /// # struct PopCmd;
+    /// # impl RedoCmd for PopCmd {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
+    /// # }
+    /// let _ = RedoGroup::<PopCmd>::config()
+    ///     .capacity(10)
+    ///     .on_stack_change(|is_clean| {
+    ///         match is_clean {
+    ///             Some(true) => { /* The new active stack is clean */ },
+    ///             Some(false) => { /* The new active stack is dirty */ },
+    ///             None => { /* No active stack */ },
+    ///         }
+    ///     })
+    ///     .finish();
+    /// ```
+    #[inline]
+    pub fn config() -> Config<'a, T> {
+        Config {
+            capacity: 0,
+            on_stack_change: None,
+            phantom: PhantomData,
         }
     }
 
@@ -604,48 +640,20 @@ impl<'a, T: fmt::Debug> fmt::Debug for RedoGroup<'a, T> {
     }
 }
 
-/// Builder for `RedoGroup`.
-///
-/// # Examples
-/// ```
-/// # #![allow(unused_variables)]
-/// # use redo::{self, RedoCmd, RedoGroupBuilder};
-/// # #[derive(Clone, Copy, Default)]
-/// # struct PopCmd;
-/// # impl RedoCmd for PopCmd {
-/// #   type Err = ();
-/// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
-/// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
-/// # }
-/// let group = RedoGroupBuilder::new()
-///     .capacity(10)
-///     .on_stack_change(|is_clean| {
-///         match is_clean {
-///             Some(true) => { /* The new active stack is clean */ },
-///             Some(false) => { /* The new active stack is dirty */ },
-///             None => { /* No active stack */ },
-///         }
-///     })
-///     .build::<PopCmd>();
-/// ```
+/// Configurator for `RedoGroup`.
 #[derive(Default)]
-pub struct RedoGroupBuilder<'a> {
+pub struct Config<'a, T> {
     capacity: usize,
     on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
+    phantom: PhantomData<T>,
 }
 
-impl<'a> RedoGroupBuilder<'a> {
-    /// Creates a new builder.
-    #[inline]
-    pub fn new() -> RedoGroupBuilder<'a> {
-        Default::default()
-    }
-
+impl<'a, T> Config<'a, T> {
     /// Sets the specified [capacity] for the group.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RedoGroupBuilder<'a> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, T> {
         self.capacity = capacity;
         self
     }
@@ -655,8 +663,7 @@ impl<'a> RedoGroupBuilder<'a> {
     ///
     /// # Examples
     /// ```
-    /// # #![allow(unused_variables)]
-    /// # use redo::{self, RedoCmd, RedoGroupBuilder};
+    /// # use redo::{self, RedoCmd, RedoGroup};
     /// # #[derive(Clone, Copy, Default)]
     /// # struct PopCmd;
     /// # impl RedoCmd for PopCmd {
@@ -664,7 +671,7 @@ impl<'a> RedoGroupBuilder<'a> {
     /// #   fn redo(&mut self) -> redo::Result<()> { Ok(()) }
     /// #   fn undo(&mut self) -> redo::Result<()> { Ok(()) }
     /// # }
-    /// let group = RedoGroupBuilder::new()
+    /// let _ = RedoGroup::<PopCmd>::config()
     ///     .on_stack_change(|is_clean| {
     ///         match is_clean {
     ///             Some(true) => { /* The new active stack is clean */ },
@@ -672,11 +679,12 @@ impl<'a> RedoGroupBuilder<'a> {
     ///             None => { /* No active stack */ },
     ///         }
     ///     })
-    ///     .build::<PopCmd>();
+    ///     .finish();
     /// ```
     #[inline]
-    pub fn on_stack_change<F>(mut self, f: F) -> RedoGroupBuilder<'a>
-        where F: FnMut(Option<bool>) + 'a
+    pub fn on_stack_change<F>(mut self, f: F) -> Config<'a, T>
+    where
+        F: FnMut(Option<bool>) + 'a,
     {
         self.on_stack_change = Some(Box::new(f));
         self
@@ -684,26 +692,24 @@ impl<'a> RedoGroupBuilder<'a> {
 
     /// Builds the `RedoGroup`.
     #[inline]
-    pub fn build<T>(self) -> RedoGroup<'a, T> {
-        let RedoGroupBuilder {
-            capacity,
-            on_stack_change,
-        } = self;
+    pub fn finish(self) -> RedoGroup<'a, T> {
         RedoGroup {
-            group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
-            on_stack_change,
+            group: FnvHashMap::with_capacity_and_hasher(self.capacity, Default::default()),
+            on_stack_change: self.on_stack_change,
             ..RedoGroup::new()
         }
     }
 }
 
-impl<'a> fmt::Debug for RedoGroupBuilder<'a> {
+impl<'a, T> fmt::Debug for Config<'a, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("UndoStackBuilder")
+        f.debug_struct("Config")
             .field("capacity", &self.capacity)
-            .field("on_stack_change",
-                   &self.on_stack_change.as_ref().map(|_| DebugFn))
+            .field(
+                "on_stack_change",
+                &self.on_stack_change.as_ref().map(|_| DebugFn),
+            )
             .finish()
     }
 }
@@ -749,23 +755,27 @@ mod test {
         let b = group.add(RedoStack::new());
 
         group.set_active(a);
-        assert!(group
-                    .push(PopCmd {
-                              vec: &mut vec1,
-                              e: None,
-                          })
-                    .unwrap()
-                    .is_ok());
+        assert!(
+            group
+                .push(PopCmd {
+                    vec: &mut vec1,
+                    e: None,
+                })
+                .unwrap()
+                .is_ok()
+        );
         assert_eq!(vec1.len(), 2);
 
         group.set_active(b);
-        assert!(group
-                    .push(PopCmd {
-                              vec: &mut vec2,
-                              e: None,
-                          })
-                    .unwrap()
-                    .is_ok());
+        assert!(
+            group
+                .push(PopCmd {
+                    vec: &mut vec2,
+                    e: None,
+                })
+                .unwrap()
+                .is_ok()
+        );
         assert_eq!(vec2.len(), 2);
 
         group.set_active(a);

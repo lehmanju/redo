@@ -92,8 +92,8 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::{RedoGroup, RedoGroupBuilder};
-pub use stack::{RedoStack, RedoStackBuilder};
+pub use group::RedoGroup;
+pub use stack::RedoStack;
 
 use std::fmt;
 use std::result;

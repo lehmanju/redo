@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 use std::fmt;
 use {DebugFn, Result, RedoCmd};
 
@@ -7,10 +8,8 @@ use {DebugFn, Result, RedoCmd};
 /// `RedoStack` uses static dispatch so it can only hold one type of command at a given time.
 ///
 /// When its state changes to either dirty or clean, it calls the user defined method
-/// set in [`on_state_change`]. This is useful if you want to trigger some
+/// set when configuring the stack. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling undo and redo buttons.
-///
-/// [`on_state_change`]: struct.RedoStackBuilder.html#method.on_state_change
 #[derive(Default)]
 pub struct RedoStack<'a, T> {
     // All commands on the stack.
@@ -32,6 +31,59 @@ impl<'a, T> RedoStack<'a, T> {
             idx: 0,
             limit: None,
             on_state_change: None,
+        }
+    }
+
+    /// Creates a configurator that can be used to configure the `RedoStack`.
+    ///
+    /// The configurator can set the `capacity`, `limit`, and what should happen when the state
+    /// changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{self, RedoCmd, RedoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl RedoCmd for PopCmd {
+    /// #   type Err = ();
+    /// #   fn redo(&mut self) -> redo::Result<()> {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       };
+    /// #       Ok(())
+    /// #   }
+    /// #   fn undo(&mut self) -> redo::Result<()> {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           let e = self.e.ok_or(())?;
+    /// #           vec.push(e);
+    /// #       }
+    /// #       Ok(())
+    /// #   }
+    /// # }
+    /// let _ = RedoStack::<PopCmd>::config()
+    ///     .capacity(10)
+    ///     .limit(10)
+    ///     .on_state_change(|is_clean| {
+    ///         if is_clean {
+    ///             // ..
+    ///         } else {
+    ///             // ..
+    ///         }
+    ///     })
+    ///     .finish();
+    /// ```
+    #[inline]
+    pub fn config() -> Config<'a, T> {
+        Config {
+            capacity: 0,
+            limit: None,
+            on_state_change: None,
+            phantom: PhantomData,
         }
     }
 
@@ -543,68 +595,29 @@ impl<'a, T: fmt::Debug> fmt::Debug for RedoStack<'a, T> {
             .field("stack", &self.stack)
             .field("idx", &self.idx)
             .field("limit", &self.limit)
-            .field("on_state_change",
-                   &self.on_state_change.as_ref().map(|_| DebugFn))
+            .field(
+                "on_state_change",
+                &self.on_state_change.as_ref().map(|_| DebugFn),
+            )
             .finish()
     }
 }
 
-/// Builder for `RedoStack`.
-///
-/// # Examples
-/// ```
-/// # #![allow(unused_variables)]
-/// # use redo::{self, RedoCmd, RedoStackBuilder};
-/// # #[derive(Clone, Copy)]
-/// # struct PopCmd {
-/// #     vec: *mut Vec<i32>,
-/// #     e: Option<i32>,
-/// # }
-/// # impl RedoCmd for PopCmd {
-/// #     type Err = ();
-/// #     fn redo(&mut self) -> redo::Result<()> {
-/// #         self.e = unsafe {
-/// #             let ref mut vec = *self.vec;
-/// #             vec.pop()
-/// #         };
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self) -> redo::Result<()> {
-/// #         unsafe {
-/// #             let ref mut vec = *self.vec;
-/// #             let e = self.e.ok_or(())?;
-/// #             vec.push(e);
-/// #         }
-/// #         Ok(())
-/// #     }
-/// # }
-/// let stack = RedoStackBuilder::new()
-///     .capacity(10)
-///     .limit(10)
-///     .on_state_change(|is_clean| {
-///         println!("{}", is_clean);
-///     })
-///     .build::<PopCmd>();
-/// ```
+/// Configurator for `RedoStack`.
 #[derive(Default)]
-pub struct RedoStackBuilder<'a> {
+pub struct Config<'a, T> {
     capacity: usize,
     limit: Option<usize>,
     on_state_change: Option<Box<FnMut(bool) + 'a>>,
+    phantom: PhantomData<T>,
 }
 
-impl<'a> RedoStackBuilder<'a> {
-    /// Creates the new builder.
-    #[inline]
-    pub fn new() -> RedoStackBuilder<'a> {
-        Default::default()
-    }
-
+impl<'a, T> Config<'a, T> {
     /// Sets the specified [capacity] for the stack.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RedoStackBuilder<'a> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, T> {
         self.capacity = capacity;
         self
     }
@@ -614,7 +627,7 @@ impl<'a> RedoStackBuilder<'a> {
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RedoStackBuilder<'a> {
+    pub fn limit(mut self, limit: usize) -> Config<'a, T> {
         self.limit = Some(limit);
         self
     }
@@ -624,7 +637,7 @@ impl<'a> RedoStackBuilder<'a> {
     /// # Examples
     /// ```
     /// # use std::cell::Cell;
-    /// # use redo::{self, RedoCmd, RedoStackBuilder};
+    /// # use redo::{self, RedoCmd, RedoStack};
     /// # #[derive(Clone, Copy)]
     /// # struct PopCmd {
     /// #     vec: *mut Vec<i32>,
@@ -651,7 +664,7 @@ impl<'a> RedoStackBuilder<'a> {
     /// # fn foo() -> redo::Result<()> {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
-    /// let mut stack = RedoStackBuilder::new()
+    /// let mut stack = RedoStack::<PopCmd>::config()
     ///     .on_state_change(|is_clean| {
     ///         if is_clean {
     ///             x.set(0);
@@ -659,7 +672,7 @@ impl<'a> RedoStackBuilder<'a> {
     ///             x.set(1);
     ///         }
     ///     })
-    ///     .build();
+    ///     .finish();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     /// stack.push(cmd)?;
     /// stack.undo()?;
@@ -671,38 +684,36 @@ impl<'a> RedoStackBuilder<'a> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn on_state_change<F>(mut self, f: F) -> RedoStackBuilder<'a>
-        where F: FnMut(bool) + 'a
+    pub fn on_state_change<F>(mut self, f: F) -> Config<'a, T>
+    where
+        F: FnMut(bool) + 'a,
     {
         self.on_state_change = Some(Box::new(f));
         self
     }
 
-    /// Builds the `RedoStack`.
+    /// Returns the `RedoStack`.
     #[inline]
-    pub fn build<T>(self) -> RedoStack<'a, T> {
-        let RedoStackBuilder {
-            capacity,
-            limit,
-            on_state_change,
-        } = self;
+    pub fn finish(self) -> RedoStack<'a, T> {
         RedoStack {
-            stack: VecDeque::with_capacity(capacity),
+            stack: VecDeque::with_capacity(self.capacity),
             idx: 0,
-            limit,
-            on_state_change,
+            limit: self.limit,
+            on_state_change: self.on_state_change,
         }
     }
 }
 
-impl<'a> fmt::Debug for RedoStackBuilder<'a> {
+impl<'a, T> fmt::Debug for Config<'a, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("UndoStackBuilder")
+        f.debug_struct("Config")
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
-            .field("on_state_change",
-                   &self.on_state_change.as_ref().map(|_| DebugFn))
+            .field(
+                "on_state_change",
+                &self.on_state_change.as_ref().map(|_| DebugFn),
+            )
             .finish()
     }
 }
@@ -744,12 +755,13 @@ mod test {
 
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
-        let mut stack = RedoStackBuilder::new()
+        let mut stack = RedoStack::config()
             .on_state_change(|is_clean| if is_clean {
-                                  x.set(0);
-                              } else {
-                                  x.set(1);
-                              }).build();
+                x.set(0);
+            } else {
+                x.set(1);
+            })
+            .finish();
 
         let cmd = PopCmd {
             vec: &mut vec,
