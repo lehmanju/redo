@@ -9,29 +9,23 @@ An undo/redo library with static dispatch, state handling and manual command mer
 It uses the [Command Pattern] where the user implements the `RedoCmd` trait for a command.
 
 The `RedoStack` has two states, clean and dirty. The stack is clean when no more commands can
-be redone, otherwise it is dirty. The stack will notice when it's state changes to either dirty
-or clean, and call the user defined methods set in [`on_clean`] and [`on_dirty`].
-This is useful if you want to trigger some event when the state changes, eg. enabling and
-disabling buttons in an ui.
+be redone, otherwise it is dirty. When it's state changes to either dirty or clean, it calls
+the user defined method set in [`on_state_change`]. This is useful if you want to trigger some
+event when the state changes, eg. enabling and disabling undo and redo buttons.
 
-It also supports merging of commands by implementing the [`merge`] method for a command.
+It also supports merging of commands by implementing the [`merge`][manual] method for a command.
 
 ## Redo vs Undo
-|                 | Redo         | Undo            |
-|-----------------|--------------|-----------------|
-| Dispatch        | Static       | Dynamic         |
-| State Handling  | Yes          | Yes             |
-| Command Merging | Manual       | Auto            |
+|                 | Redo             | Undo            |
+|-----------------|------------------|-----------------|
+| Dispatch        | [Static]         | [Dynamic]       |
+| State Handling  | Yes              | Yes             |
+| Command Merging | [Manual][manual] | [Auto][auto]    |
 
 Both supports command merging but `undo` will automatically merge commands with the same id
 while in `redo` you need to implement the merge method yourself.
 
 ## Examples
-```toml
-[dependencies]
-redo = "0.5.0"
-```
-
 ```rust
 use redo::{self, RedoCmd, RedoStack};
 
@@ -83,9 +77,9 @@ fn foo() -> redo::Result<&'static str> {
 ```
 
 [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
-[`on_clean`]: struct.RedoStack.html#method.on_clean
-[`on_dirty`]: struct.RedoStack.html#method.on_dirty
-[static dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
-[dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
+[`on_state_change`]: struct.RedoStack.html#method.on_state_change
+[auto]: https://docs.rs/undo/0.8.1/undo/trait.UndoCmd.html#method.id
+[manual]: trait.RedoCmd.html#method.merge
+[Static]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
+[Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 [`undo`]: https://crates.io/crates/undo
-[`merge`]: trait.RedoCmd.html#method.merge
