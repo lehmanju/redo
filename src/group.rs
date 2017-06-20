@@ -1,8 +1,8 @@
 use std::collections::hash_map;
 use std::marker::PhantomData;
-use std::fmt;
+use std::fmt::{self, Debug, Formatter};
 use fnv::FnvHashMap;
-use {DebugFn, Key, Result, RedoCmd, RedoStack};
+use {Command, Key, Result, Stack};
 
 /// A collection of `RedoStack`s.
 ///
@@ -10,9 +10,9 @@ use {DebugFn, Key, Result, RedoCmd, RedoStack};
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the stack directly.
 #[derive(Default)]
-pub struct RedoGroup<'a, T> {
+pub struct Group<'a, T, C: Command<T>> {
     // The stacks in the group.
-    group: FnvHashMap<Key, RedoStack<'a, T>>,
+    group: FnvHashMap<Key, Stack<'a, T, C>>,
     // The active stack.
     active: Option<Key>,
     // Counter for generating new keys.
@@ -21,11 +21,11 @@ pub struct RedoGroup<'a, T> {
     on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
 }
 
-impl<'a, T> RedoGroup<'a, T> {
+impl<'a, T, C: Command<T>> Group<'a, T, C> {
     /// Creates a new `RedoGroup`.
     #[inline]
-    pub fn new() -> RedoGroup<'a, T> {
-        RedoGroup {
+    pub fn new() -> Group<'a, T, C> {
+        Group {
             group: FnvHashMap::default(),
             active: None,
             key: 0,
@@ -60,11 +60,12 @@ impl<'a, T> RedoGroup<'a, T> {
     ///     .finish();
     /// ```
     #[inline]
-    pub fn config() -> Config<'a, T> {
+    pub fn config() -> Config<'a, T, C> {
         Config {
+            stack: PhantomData,
+            receiver: PhantomData,
             capacity: 0,
             on_stack_change: None,
-            phantom: PhantomData,
         }
     }
 
@@ -72,10 +73,10 @@ impl<'a, T> RedoGroup<'a, T> {
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn with_capacity(capacity: usize) -> RedoGroup<'a, T> {
-        RedoGroup {
+    pub fn with_capacity(capacity: usize) -> Group<'a, T, C> {
+        Group {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
-            ..RedoGroup::new()
+            ..Group::new()
         }
     }
 
@@ -162,7 +163,7 @@ impl<'a, T> RedoGroup<'a, T> {
     /// let c = group.add_default();
     /// ```
     #[inline]
-    pub fn add(&mut self, stack: RedoStack<'a, T>) -> Key {
+    pub fn add(&mut self, stack: Stack<'a, T, C>) -> Key {
         let key = Key(self.key);
         self.key += 1;
         self.group.insert(key, stack);
@@ -188,7 +189,7 @@ impl<'a, T> RedoGroup<'a, T> {
     /// assert!(stack.is_some());
     /// ```
     #[inline]
-    pub fn remove(&mut self, key: Key) -> Option<RedoStack<'a, T>> {
+    pub fn remove(&mut self, key: Key) -> Option<Stack<'a, T, C>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
             if active == key {
@@ -351,18 +352,16 @@ impl<'a, T> RedoGroup<'a, T> {
 
     /// Returns an iterator over the `(&Key, &RedoStack)` pairs in the group.
     #[inline]
-    pub fn stacks(&'a self) -> Stacks<'a, T> {
+    pub fn stacks(&'a self) -> Stacks<'a, T, C> {
         Stacks(self.group.iter())
     }
 
     /// Returns an iterator over the `(&Key, &mut RedoStack)` pairs in the group.
     #[inline]
-    pub fn stacks_mut(&'a mut self) -> StacksMut<'a, T> {
+    pub fn stacks_mut(&'a mut self) -> StacksMut<'a, T, C> {
         StacksMut(self.group.iter_mut())
     }
-}
 
-impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     /// Calls [`push`] on the active `RedoStack`, if there is one.
     ///
     /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
@@ -410,7 +409,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// [`push`]: struct.RedoStack.html#method.push
     #[inline]
-    pub fn push(&mut self, cmd: T) -> Option<Result<T::Err>> {
+    pub fn push(&mut self, cmd: C) -> Option<Result<C::Err>> {
         self.active
             .and_then(|active| self.group.get_mut(&active))
             .map(|stack| stack.push(cmd))
@@ -475,7 +474,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// [`redo`]: struct.RedoStack.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<T::Err>> {
+    pub fn redo(&mut self) -> Option<Result<C::Err>> {
         self.active
             .and_then(|active| self.group.get_mut(&active))
             .map(|stack| stack.redo())
@@ -534,7 +533,7 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
     ///
     /// [`undo`]: struct.RedoStack.html#method.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<T::Err>> {
+    pub fn undo(&mut self) -> Option<Result<C::Err>> {
         self.active
             .and_then(|active| self.group.get_mut(&active))
             .map(|stack| stack.undo())
@@ -542,19 +541,19 @@ impl<'a, T: RedoCmd> RedoGroup<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct IntoStacks<'a, T>(hash_map::IntoIter<Key, RedoStack<'a, T>>);
+pub struct IntoStacks<'a, T, C: Command<T>>(hash_map::IntoIter<Key, Stack<'a, T, C>>);
 
-impl<'a, T> Iterator for IntoStacks<'a, T> {
-    type Item = (Key, RedoStack<'a, T>);
+impl<'a, T, C: Command<T>> Iterator for IntoStacks<'a, T, C> {
+    type Item = (Key, Stack<'a, T, C>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
 }
 
-impl<'a, T> IntoIterator for RedoGroup<'a, T> {
-    type Item = (Key, RedoStack<'a, T>);
-    type IntoIter = IntoStacks<'a, T>;
+impl<'a, T, C: Command<T>> IntoIterator for Group<'a, T, C> {
+    type Item = (Key, Stack<'a, T, C>);
+    type IntoIter = IntoStacks<'a, T, C>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -563,19 +562,19 @@ impl<'a, T> IntoIterator for RedoGroup<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct Stacks<'a, T: 'a>(hash_map::Iter<'a, Key, RedoStack<'a, T>>);
+pub struct Stacks<'a, T: 'a, C: Command<T> + 'a>(hash_map::Iter<'a, Key, Stack<'a, T, C>>);
 
-impl<'a, T> Iterator for Stacks<'a, T> {
-    type Item = (&'a Key, &'a RedoStack<'a, T>);
+impl<'a, T, C: Command<T>> Iterator for Stacks<'a, T, C> {
+    type Item = (&'a Key, &'a Stack<'a, T, C>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
 }
 
-impl<'a, T> IntoIterator for &'a RedoGroup<'a, T> {
-    type Item = (&'a Key, &'a RedoStack<'a, T>);
-    type IntoIter = Stacks<'a, T>;
+impl<'a, T, C: Command<T>> IntoIterator for &'a Group<'a, T, C> {
+    type Item = (&'a Key, &'a Stack<'a, T, C>);
+    type IntoIter = Stacks<'a, T, C>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -584,19 +583,19 @@ impl<'a, T> IntoIterator for &'a RedoGroup<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct StacksMut<'a, T: 'a>(hash_map::IterMut<'a, Key, RedoStack<'a, T>>);
+pub struct StacksMut<'a, T: 'a, C: Command<T> + 'a>(hash_map::IterMut<'a, Key, Stack<'a, T, C>>);
 
-impl<'a, T> Iterator for StacksMut<'a, T> {
-    type Item = (&'a Key, &'a mut RedoStack<'a, T>);
+impl<'a, T, C: Command<T>> Iterator for StacksMut<'a, T, C> {
+    type Item = (&'a Key, &'a mut Stack<'a, T, C>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut RedoGroup<'a, T> {
-    type Item = (&'a Key, &'a mut RedoStack<'a, T>);
-    type IntoIter = StacksMut<'a, T>;
+impl<'a, T, C: Command<T>> IntoIterator for &'a mut Group<'a, T, C> {
+    type Item = (&'a Key, &'a mut Stack<'a, T, C>);
+    type IntoIter = StacksMut<'a, T, C>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -604,7 +603,7 @@ impl<'a, T> IntoIterator for &'a mut RedoGroup<'a, T> {
     }
 }
 
-impl<'a, T: Default> RedoGroup<'a, T> {
+impl<'a, T: Default, C: Command<T> + Default> Group<'a, T, C> {
     /// Adds a default `RedoStack` to the group and returns an unique id for this stack.
     ///
     /// # Examples
@@ -629,10 +628,10 @@ impl<'a, T: Default> RedoGroup<'a, T> {
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for RedoGroup<'a, T> {
+impl<'a, T: Debug, C: Command<T> + Debug> Debug for Group<'a, T, C> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("RedoGroup")
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Group")
             .field("group", &self.group)
             .field("active", &self.active)
             .field("key", &self.key)
@@ -642,18 +641,19 @@ impl<'a, T: fmt::Debug> fmt::Debug for RedoGroup<'a, T> {
 
 /// Configurator for `RedoGroup`.
 #[derive(Default)]
-pub struct Config<'a, T> {
+pub struct Config<'a, T, C: Command<T>> {
+    stack: PhantomData<T>,
+    receiver: PhantomData<C>,
     capacity: usize,
     on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
-    phantom: PhantomData<T>,
 }
 
-impl<'a, T> Config<'a, T> {
+impl<'a, T, C: Command<T>> Config<'a, T, C> {
     /// Sets the specified [capacity] for the group.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<'a, T> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, T, C> {
         self.capacity = capacity;
         self
     }
@@ -682,7 +682,7 @@ impl<'a, T> Config<'a, T> {
     ///     .finish();
     /// ```
     #[inline]
-    pub fn on_stack_change<F>(mut self, f: F) -> Config<'a, T>
+    pub fn on_stack_change<F>(mut self, f: F) -> Config<'a, T, C>
     where
         F: FnMut(Option<bool>) + 'a,
     {
@@ -692,23 +692,23 @@ impl<'a, T> Config<'a, T> {
 
     /// Builds the `RedoGroup`.
     #[inline]
-    pub fn finish(self) -> RedoGroup<'a, T> {
-        RedoGroup {
+    pub fn finish(self) -> Group<'a, T, C> {
+        Group {
             group: FnvHashMap::with_capacity_and_hasher(self.capacity, Default::default()),
             on_stack_change: self.on_stack_change,
-            ..RedoGroup::new()
+            ..Group::new()
         }
     }
 }
 
-impl<'a, T> fmt::Debug for Config<'a, T> {
+impl<'a, T, C: Command<T>> Debug for Config<'a, T, C> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Config")
             .field("capacity", &self.capacity)
             .field(
                 "on_stack_change",
-                &self.on_stack_change.as_ref().map(|_| DebugFn),
+                &self.on_stack_change.as_ref().map(|_| "|_| { .. }"),
             )
             .finish()
     }
@@ -718,28 +718,20 @@ impl<'a, T> fmt::Debug for Config<'a, T> {
 mod test {
     use super::*;
 
-    struct PopCmd {
-        vec: *mut Vec<i32>,
-        e: Option<i32>,
-    }
+    #[derive(Clone, Copy)]
+    struct PopCmd(Option<i32>);
 
-    impl RedoCmd for PopCmd {
+    impl Command for PopCmd {
         type Err = ();
 
-        fn redo(&mut self) -> Result<()> {
-            self.e = unsafe {
-                let ref mut vec = *self.vec;
-                vec.pop()
-            };
+        fn redo(&mut self, vec: &mut Vec<i32>) -> Result<()> {
+            self.e = vec.pop();
             Ok(())
         }
 
-        fn undo(&mut self) -> Result<()> {
-            unsafe {
-                let ref mut vec = *self.vec;
-                let e = self.e.ok_or(())?;
-                vec.push(e);
-            }
+        fn undo(&self, vec: &mut Vec<i32>) -> Result<()> {
+            let e = self.0.ok_or(())?;
+            vec.push(e);
             Ok(())
         }
     }
@@ -749,33 +741,17 @@ mod test {
         let mut vec1 = vec![1, 2, 3];
         let mut vec2 = vec![1, 2, 3];
 
-        let mut group = RedoGroup::new();
+        let mut group = Group::new();
 
-        let a = group.add(RedoStack::new());
-        let b = group.add(RedoStack::new());
+        let a = group.add(Stack::new(vec1));
+        let b = group.add(Stack::new(vec2));
 
         group.set_active(a);
-        assert!(
-            group
-                .push(PopCmd {
-                    vec: &mut vec1,
-                    e: None,
-                })
-                .unwrap()
-                .is_ok()
-        );
+        assert!(group.push(PopCmd(None).unwrap().is_ok()));
         assert_eq!(vec1.len(), 2);
 
         group.set_active(b);
-        assert!(
-            group
-                .push(PopCmd {
-                    vec: &mut vec2,
-                    e: None,
-                })
-                .unwrap()
-                .is_ok()
-        );
+        assert!(group.push(PopCmd(None).unwrap().is_ok()));
         assert_eq!(vec2.len(), 2);
 
         group.set_active(a);

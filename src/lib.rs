@@ -92,8 +92,8 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::RedoGroup;
-pub use stack::RedoStack;
+pub use group::Group;
+pub use stack::Stack;
 
 use std::fmt;
 use std::result;
@@ -108,19 +108,19 @@ pub type Result<E> = result::Result<(), E>;
 /// Trait that defines the functionality of a command.
 ///
 /// Every command needs to implement this trait to be able to be used with the `RedoStack`.
-pub trait RedoCmd {
+pub trait Command<T> {
     /// The error type.
     type Err;
 
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self) -> Result<Self::Err>;
+    fn redo(&mut self, obj: &mut T) -> Result<Self::Err>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    fn undo(&mut self) -> Result<Self::Err>;
+    fn undo(&mut self, obj: &mut T) -> Result<Self::Err>;
 
     /// Used for manual merging of two `RedoCmd`s.
     ///
@@ -206,18 +206,8 @@ pub trait RedoCmd {
     /// ```
     ///
     /// [`push`]: struct.RedoStack.html#method.push
-    #[allow(unused_variables)]
     #[inline]
-    fn merge(&mut self, cmd: &Self) -> Option<Result<Self::Err>> {
+    fn merge(&mut self, _: &Self) -> Option<Result<Self::Err>> {
         None
-    }
-}
-
-struct DebugFn;
-
-impl fmt::Debug for DebugFn {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "|_| {{ .. }}")
     }
 }

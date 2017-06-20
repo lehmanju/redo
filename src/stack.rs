@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::fmt;
-use {DebugFn, Result, RedoCmd};
+use std::fmt::{self, Debug, Formatter};
+use std::borrow::Borrow;
+use {Result, Command};
 
 /// Maintains a stack of `RedoCmd`s.
 ///
@@ -11,9 +12,11 @@ use {DebugFn, Result, RedoCmd};
 /// set when configuring the stack. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling undo and redo buttons.
 #[derive(Default)]
-pub struct RedoStack<'a, T> {
+pub struct Stack<'a, T, C: Command<T>> {
     // All commands on the stack.
-    stack: VecDeque<T>,
+    stack: VecDeque<C>,
+    // The data being operated on.
+    receiver: T,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -22,12 +25,13 @@ pub struct RedoStack<'a, T> {
     on_state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<'a, T> RedoStack<'a, T> {
+impl<'a, T, C: Command<T>> Stack<'a, T, C> {
     /// Creates a new `RedoStack`.
     #[inline]
-    pub fn new() -> RedoStack<'a, T> {
-        RedoStack {
+    pub fn new(receiver: T) -> Stack<'a, T, C> {
+        Stack {
             stack: VecDeque::new(),
+            receiver,
             idx: 0,
             limit: None,
             on_state_change: None,
@@ -78,82 +82,13 @@ impl<'a, T> RedoStack<'a, T> {
     ///     .finish();
     /// ```
     #[inline]
-    pub fn config() -> Config<'a, T> {
+    pub fn config(receiver: T) -> Config<'a, T, C> {
         Config {
+            receiver,
             capacity: 0,
             limit: None,
             on_state_change: None,
             phantom: PhantomData,
-        }
-    }
-
-    /// Creates a new `RedoStack` with a limit on how many `RedoCmd`s can be stored in the stack.
-    /// If this limit is reached it will start popping of commands at the bottom of the stack when
-    /// pushing new commands on to the stack. No limit is set by default which means it may grow
-    /// indefinitely.
-    ///
-    /// # Examples
-    /// ```
-    /// # use redo::{self, RedoCmd, RedoStack};
-    /// # #[derive(Clone, Copy)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
-    /// # impl RedoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> redo::Result<()> {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> redo::Result<()> {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           let e = self.e.ok_or(())?;
-    /// #           vec.push(e);
-    /// #       }
-    /// #       Ok(())
-    /// #   }
-    /// # }
-    /// # fn foo() -> redo::Result<()> {
-    /// let mut vec = vec![1, 2, 3];
-    /// let mut stack = RedoStack::with_limit(2);
-    /// let cmd = PopCmd { vec: &mut vec, e: None };
-    ///
-    /// stack.push(cmd)?;
-    /// stack.push(cmd)?;
-    /// stack.push(cmd)?; // Pops off the first cmd.
-    ///
-    /// assert!(vec.is_empty());
-    ///
-    /// stack.undo()?;
-    /// stack.undo()?;
-    /// stack.undo()?; // Does nothing.
-    ///
-    /// assert_eq!(vec, vec![1, 2]);
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
-    #[inline]
-    pub fn with_limit(limit: usize) -> RedoStack<'a, T> {
-        RedoStack {
-            limit: if limit == 0 { None } else { Some(limit) },
-            ..RedoStack::new()
-        }
-    }
-
-    /// Creates a new `RedoStack` with the specified [capacity].
-    ///
-    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
-    #[inline]
-    pub fn with_capacity(capacity: usize) -> RedoStack<'a, T> {
-        RedoStack {
-            stack: VecDeque::with_capacity(capacity),
-            ..RedoStack::new()
         }
     }
 
@@ -360,9 +295,13 @@ impl<'a, T> RedoStack<'a, T> {
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
     }
-}
 
-impl<'a, T: RedoCmd> RedoStack<'a, T> {
+    /// Consumes the `Stack`, returning the receiver.
+    #[inline]
+    pub fn into_receiver(self) -> T {
+        self.receiver
+    }
+
     /// Pushes `cmd` to the top of the stack and executes its [`redo`] method.
     /// This pops off all other commands above the active command from the stack.
     ///
@@ -411,10 +350,11 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     /// ```
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
-    pub fn push(&mut self, mut cmd: T) -> Result<T::Err> {
+    #[inline]
+    pub fn push(&mut self, mut cmd: C) -> Result<C::Err> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
-        cmd.redo()?;
+        cmd.redo(&mut self.receiver)?;
         // Pop off all elements after len from stack.
         self.stack.truncate(len);
 
@@ -502,10 +442,10 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     ///
     /// [`redo`]: trait.RedoCmd.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Result<T::Err> {
+    pub fn redo(&mut self) -> Result<C::Err> {
         if self.idx < self.stack.len() {
             let is_dirty = self.is_dirty();
-            self.stack[self.idx].redo()?;
+            self.stack[self.idx].redo(&mut self.receiver)?;
             self.idx += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
@@ -572,10 +512,10 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     ///
     /// [`undo`]: trait.RedoCmd.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Result<T::Err> {
+    pub fn undo(&mut self) -> Result<C::Err> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
-            self.stack[self.idx - 1].undo()?;
+            self.stack[self.idx - 1].undo(&mut self.receiver)?;
             self.idx -= 1;
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
@@ -588,16 +528,24 @@ impl<'a, T: RedoCmd> RedoStack<'a, T> {
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for RedoStack<'a, T> {
+impl<'a, T, C: Command<T>> Borrow<T> for Stack<'a, T, C> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("RedoStack")
+    fn borrow(&self) -> &T {
+        &self.receiver
+    }
+}
+
+impl<'a, T: Debug, C: Command<T> + Debug> Debug for Stack<'a, T, C> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Stack")
             .field("stack", &self.stack)
+            .field("receiver", &self.receiver)
             .field("idx", &self.idx)
             .field("limit", &self.limit)
             .field(
                 "on_state_change",
-                &self.on_state_change.as_ref().map(|_| DebugFn),
+                &self.on_state_change.as_ref().map(|_| "|_| { .. }"),
             )
             .finish()
     }
@@ -605,19 +553,20 @@ impl<'a, T: fmt::Debug> fmt::Debug for RedoStack<'a, T> {
 
 /// Configurator for `RedoStack`.
 #[derive(Default)]
-pub struct Config<'a, T> {
+pub struct Config<'a, T, C: Command<T>> {
+    receiver: T,
     capacity: usize,
     limit: Option<usize>,
     on_state_change: Option<Box<FnMut(bool) + 'a>>,
-    phantom: PhantomData<T>,
+    phantom: PhantomData<C>,
 }
 
-impl<'a, T> Config<'a, T> {
+impl<'a, T, C: Command<T>> Config<'a, T, C> {
     /// Sets the specified [capacity] for the stack.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<'a, T> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, T, C> {
         self.capacity = capacity;
         self
     }
@@ -627,7 +576,7 @@ impl<'a, T> Config<'a, T> {
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Config<'a, T> {
+    pub fn limit(mut self, limit: usize) -> Config<'a, T, C> {
         self.limit = Some(limit);
         self
     }
@@ -684,7 +633,7 @@ impl<'a, T> Config<'a, T> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn on_state_change<F>(mut self, f: F) -> Config<'a, T>
+    pub fn on_state_change<F>(mut self, f: F) -> Config<'a, T, C>
     where
         F: FnMut(bool) + 'a,
     {
@@ -694,8 +643,9 @@ impl<'a, T> Config<'a, T> {
 
     /// Returns the `RedoStack`.
     #[inline]
-    pub fn finish(self) -> RedoStack<'a, T> {
-        RedoStack {
+    pub fn finish(self) -> Stack<'a, T, C> {
+        Stack {
+            receiver: self.receiver,
             stack: VecDeque::with_capacity(self.capacity),
             idx: 0,
             limit: self.limit,
@@ -704,15 +654,16 @@ impl<'a, T> Config<'a, T> {
     }
 }
 
-impl<'a, T> fmt::Debug for Config<'a, T> {
+impl<'a, T: Debug, C: Command<T>> Debug for Config<'a, T, C> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Config")
+            .field("receiver", &self.receiver)
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
             .field(
                 "on_state_change",
-                &self.on_state_change.as_ref().map(|_| DebugFn),
+                &self.on_state_change.as_ref().map(|_| "|_| { .. }"),
             )
             .finish()
     }
@@ -723,28 +674,19 @@ mod test {
     use super::*;
 
     #[derive(Clone, Copy)]
-    struct PopCmd {
-        vec: *mut Vec<i32>,
-        e: Option<i32>,
-    }
+    struct PopCmd(Option<i32>);
 
-    impl RedoCmd for PopCmd {
+    impl Command for PopCmd {
         type Err = ();
 
-        fn redo(&mut self) -> Result<()> {
-            self.e = unsafe {
-                let ref mut vec = *self.vec;
-                vec.pop()
-            };
+        fn redo(&mut self, vec: &mut Vec<i32>) -> Result<()> {
+            self.e = vec.pop();
             Ok(())
         }
 
-        fn undo(&mut self) -> Result<()> {
-            unsafe {
-                let ref mut vec = *self.vec;
-                let e = self.e.ok_or(())?;
-                vec.push(e);
-            }
+        fn undo(&self, vec: &mut Vec<i32>) -> Result<()> {
+            let e = self.0.ok_or(())?;
+            vec.push(e);
             Ok(())
         }
     }
@@ -754,41 +696,39 @@ mod test {
         use std::cell::Cell;
 
         let x = Cell::new(0);
-        let mut vec = vec![1, 2, 3];
-        let mut stack = RedoStack::config()
-            .on_state_change(|is_clean| if is_clean {
-                x.set(0);
-            } else {
-                x.set(1);
+        let mut stack = Stack::config(vec![1, 2, 3])
+            .on_state_change(|is_clean| {
+                if is_clean {
+                    x.set(0);
+                } else {
+                    x.set(1);
+                }
             })
             .finish();
 
-        let cmd = PopCmd {
-            vec: &mut vec,
-            e: None,
-        };
+        let cmd = PopCmd(None);
         for _ in 0..3 {
             stack.push(cmd).unwrap();
         }
         assert_eq!(x.get(), 0);
-        assert!(vec.is_empty());
+        assert!(stack.borrow().is_empty());
 
         for _ in 0..3 {
             stack.undo().unwrap();
         }
         assert_eq!(x.get(), 1);
-        assert_eq!(vec, vec![1, 2, 3]);
+        assert_eq!(stack.borrow(), &vec![1, 2, 3]);
 
         stack.push(cmd).unwrap();
         assert_eq!(x.get(), 0);
-        assert_eq!(vec, vec![1, 2]);
+        assert_eq!(stack.borrow(), &vec![1, 2]);
 
         stack.undo().unwrap();
         assert_eq!(x.get(), 1);
-        assert_eq!(vec, vec![1, 2, 3]);
+        assert_eq!(stack.borrow(), &vec![1, 2, 3]);
 
         stack.redo().unwrap();
         assert_eq!(x.get(), 0);
-        assert_eq!(vec, vec![1, 2]);
+        assert_eq!(stack.borrow(), &vec![1, 2]);
     }
 }
