@@ -49,6 +49,12 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.commands.shrink_to_fit();
     }
 
+    /// Returns the number of `Command`s in the `Stack`.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
     /// Returns a reference to the receiver.
     #[inline]
     pub fn as_receiver(&self) -> &T {

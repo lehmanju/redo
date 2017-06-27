@@ -60,7 +60,7 @@ impl<T, C: Command<T>> Group<T, C> {
         self.stacks.shrink_to_fit();
     }
 
-    /// Returns the number of stacks in the group.
+    /// Returns the number of `Stack`s in the `Group`.
     #[inline]
     pub fn len(&self) -> usize {
         self.stacks.len()
