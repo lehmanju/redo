@@ -2,7 +2,7 @@
 name = "redo"
 version = "0.6.0"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "An undo/redo library with static dispatch, state handling and manual command merging."
+description = "An undo/redo library with static dispatch and manual command merging."
 documentation = "https://docs.rs/redo"
 repository = "https://github.com/evenorog/redo"
 readme = "README.md"

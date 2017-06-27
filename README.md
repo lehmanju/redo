@@ -1,5 +1,5 @@
 # Redo
-An undo/redo library with static dispatch, state handling and manual command merging.
+An undo/redo library with static dispatch and manual command merging.
 
 [![Build Status](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)

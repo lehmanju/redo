@@ -1,20 +1,10 @@
-//! An undo/redo library with static dispatch, state handling and manual command merging.
-//!
-//! # About
+//! An undo/redo library with static dispatch and manual command merging.
 //! It uses the [Command Pattern] where the user implements the `Command` trait for a command.
-//!
-//! The `Stack` has two states, clean and dirty. The stack is clean when no more commands can
-//! be redone, otherwise it is dirty. When it's state changes to either dirty or clean, it calls
-//! the user defined method set in [`on_state_change`]. This is useful if you want to trigger some
-//! event when the state changes, eg. enabling and disabling undo and redo buttons.
-//!
-//! It also supports merging of commands by implementing the [`merge`][manual] method for a command.
 //!
 //! # Redo vs Undo
 //! |                 | Redo             | Undo            |
 //! |-----------------|------------------|-----------------|
 //! | Dispatch        | [Static]         | [Dynamic]       |
-//! | State Handling  | Yes              | Yes             |
 //! | Command Merging | [Manual][manual] | [Auto][auto]    |
 //!
 //! Both supports command merging but `undo` will automatically merge commands with the same id
@@ -22,45 +12,47 @@
 //!
 //! # Examples
 //! ```
+//! # #![allow(unused_variables)]
 //! use std::borrow::Borrow;
-//! use redo::{self, Command, Stack};
+//! use redo::{Command, Stack};
 //!
-//! #[derive(Clone, Copy)]
-//! struct Pop(Option<u8>);
+//! #[derive(Clone, Copy, Debug)]
+//! struct Push(char);
 //!
-//! impl Command<Vec<u8>> for Pop {
+//! impl Command<String> for Push {
 //!     type Err = &'static str;
 //!
-//!     fn redo(&mut self, vec: &mut Vec<u8>) -> redo::Result<&'static str> {
-//!         self.0 = vec.pop();
+//!     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+//!         s.push(self.0);
 //!         Ok(())
 //!     }
 //!
-//!     fn undo(&mut self, vec: &mut Vec<u8>) -> redo::Result<&'static str> {
-//!         let e = self.0.ok_or("`e` is invalid")?;
-//!         vec.push(e);
+//!     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+//!         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 //!         Ok(())
 //!     }
 //! }
 //!
-//! fn foo() -> redo::Result<&'static str> {
-//!     let mut stack = Stack::new(vec![1, 2, 3]);
-//!     let cmd = Pop(None);
+//! fn foo() -> Result<(), (Push, &'static str)> {
+//!     let mut stack = Stack::new(String::new());
 //!
-//!     stack.push(cmd)?;
-//!     stack.push(cmd)?;
-//!     stack.push(cmd)?;
+//!     stack.push(Push('a'))?;
+//!     stack.push(Push('b'))?;
+//!     stack.push(Push('c'))?;
 //!
-//!     assert!({
-//!         let stack: &Vec<_> = stack.borrow();
-//!         stack.is_empty()
-//!     });
+//!     assert_eq!(
+//!         {
+//!             let s: &String = stack.borrow();
+//!             s.as_str()
+//!         },
+//!         "abc"
+//!     );
 //!
-//!     stack.undo()?;
-//!     stack.undo()?;
-//!     stack.undo()?;
+//!     let c = stack.pop().unwrap()?;
+//!     let b = stack.pop().unwrap()?;
+//!     let a = stack.pop().unwrap()?;
 //!
-//!     assert_eq!(stack.into_receiver(), vec![1, 2, 3]);
+//!     assert_eq!(stack.into_receiver(), "");
 //!     Ok(())
 //! }
 //! # foo().unwrap();
@@ -89,14 +81,9 @@ mod stack;
 pub use group::Group;
 pub use stack::Stack;
 
-use std::result;
-
 /// A key for a `Stack` in a `Group`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Key(u32);
-
-/// A specialized `Result` that does not carry any data on success.
-pub type Result<E> = result::Result<(), E>;
 
 /// Trait that defines the functionality of a command.
 ///
@@ -107,13 +94,13 @@ pub trait Command<T> {
 
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut T) -> Result<Self::Err>;
+    fn redo(&mut self, receiver: &mut T) -> Result<(), Self::Err>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    fn undo(&mut self, receiver: &mut T) -> Result<Self::Err>;
+    fn undo(&mut self, receiver: &mut T) -> Result<(), Self::Err>;
 
     /// Used for manual merging of two `Command`s.
     ///
@@ -129,7 +116,7 @@ pub trait Command<T> {
     ///
     /// [`push`]: struct.Stack.html#method.push
     #[inline]
-    fn merge(&mut self, _: &Self) -> Option<Result<Self::Err>> {
+    fn merge(&mut self, _: &Self) -> Option<Result<(), Self::Err>> {
         None
     }
 }
