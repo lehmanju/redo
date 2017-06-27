@@ -7,7 +7,7 @@
 //! | Dispatch        | [Static]         | [Dynamic]       |
 //! | Command Merging | [Manual][manual] | [Auto][auto]    |
 //!
-//! Both supports command merging but `undo` will automatically merge commands with the same id
+//! Both supports command merging but [`undo`] will automatically merge commands with the same id
 //! while in `redo` you need to implement the merge method yourself.
 //!
 //! # Examples
@@ -15,7 +15,7 @@
 //! # #![allow(unused_variables)]
 //! use redo::{Command, Stack};
 //!
-//! #[derive(Clone, Copy, Debug)]
+//! #[derive(Debug)]
 //! struct Push(char);
 //!
 //! impl Command<String> for Push {
@@ -52,7 +52,6 @@
 //! ```
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
-//! [`on_state_change`]: struct.StackBuilder.html#method.on_state_change
 //! [`merge`]: trait.Command.html#method.merge
 //! [auto]: https://docs.rs/undo/0.8.1/undo/trait.UndoCmd.html#method.id
 //! [manual]: trait.Command.html#method.merge

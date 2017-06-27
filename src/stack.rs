@@ -61,14 +61,15 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.receiver
     }
 
-    /// Pushes `cmd` to the top of the stack and executes its [`redo`] method.
-    /// This pops off all other commands above the active command from the stack.
+    /// Pushes `cmd` on the stack and executes its [`redo`] method. The command is merged with
+    /// the previous top `Command` if [`merge`] does not return `None`.
     ///
     /// # Errors
     /// If an error occur when executing `redo` or merging commands, the error is returned together
     /// with the `Command`.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn push(&mut self, mut cmd: C) -> Result<(), (C, C::Err)> {
         if let Err(e) = cmd.redo(&mut self.receiver) {
