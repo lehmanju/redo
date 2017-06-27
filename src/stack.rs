@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use Command;
 
 /// A stack of `Command`s.
@@ -50,6 +49,12 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.commands.shrink_to_fit();
     }
 
+    /// Returns a reference to the receiver.
+    #[inline]
+    pub fn as_receiver(&self) -> &T {
+        &self.receiver
+    }
+
     /// Consumes the `Stack`, returning the receiver.
     #[inline]
     pub fn into_receiver(self) -> T {
@@ -60,7 +65,8 @@ impl<T, C: Command<T>> Stack<T, C> {
     /// This pops off all other commands above the active command from the stack.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` or merging commands, the error is returned.
+    /// If an error occur when executing `redo` or merging commands, the error is returned together
+    /// with the `Command`.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
@@ -76,10 +82,10 @@ impl<T, C: Command<T>> Stack<T, C> {
     }
 
     /// Calls the [`undo`] method for the active `Command` and sets the previous `Command` as the
-    /// new active one.
+    /// new active one. Returns `None` if the stack is empty.
     ///
     /// # Errors
-    /// If an error occur when executing `undo` the error is returned and the state of the stack is left unchanged.
+    /// If an error occur when executing `undo` the error is returned together with the `Command`.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
@@ -95,9 +101,9 @@ impl<T, C: Command<T>> Stack<T, C> {
     }
 }
 
-impl<T, C: Command<T>> Borrow<T> for Stack<T, C> {
+impl<T, C: Command<T>> AsRef<T> for Stack<T, C> {
     #[inline]
-    fn borrow(&self) -> &T {
-        &self.receiver
+    fn as_ref(&self) -> &T {
+        self.as_receiver()
     }
 }

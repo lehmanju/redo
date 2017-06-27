@@ -13,7 +13,6 @@
 //! # Examples
 //! ```
 //! # #![allow(unused_variables)]
-//! use std::borrow::Borrow;
 //! use redo::{Command, Stack};
 //!
 //! #[derive(Clone, Copy, Debug)]
@@ -40,13 +39,7 @@
 //!     stack.push(Push('b'))?;
 //!     stack.push(Push('c'))?;
 //!
-//!     assert_eq!(
-//!         {
-//!             let s: &String = stack.borrow();
-//!             s.as_str()
-//!         },
-//!         "abc"
-//!     );
+//!     assert_eq!(stack.as_receiver(), "abc");
 //!
 //!     let c = stack.pop().unwrap()?;
 //!     let b = stack.pop().unwrap()?;
