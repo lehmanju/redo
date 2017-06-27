@@ -1,11 +1,17 @@
+//! A `Stack` of `Command`s.
+//!
+//! The `Stack` the simplest data structure and works by pushing and popping off `Command`s
+//! on the stack that modifies the `receiver`.
+
+mod group;
+
+pub use self::group::Group;
 use Command;
 
 /// A stack of `Command`s.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Stack<T, C: Command<T>> {
-    // All commands on the stack.
     commands: Vec<C>,
-    // The data being operated on.
     receiver: T,
 }
 
@@ -19,7 +25,7 @@ impl<T, C: Command<T>> Stack<T, C> {
         }
     }
 
-    /// Creates a new stack with the given `capacity`.
+    /// Creates a new `Stack` with the given `capacity`.
     #[inline]
     pub fn with_capacity(receiver: T, capacity: usize) -> Stack<T, C> {
         Stack {
@@ -34,7 +40,7 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.commands.capacity()
     }
 
-    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
+    /// Reserves capacity for at least `additional` more commands to be inserted in the `Stack`.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -55,13 +61,13 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.commands.len()
     }
 
-    /// Returns a reference to the receiver.
+    /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &T {
         &self.receiver
     }
 
-    /// Consumes the `Stack`, returning the receiver.
+    /// Consumes the `Stack`, returning the `receiver`.
     #[inline]
     pub fn into_receiver(self) -> T {
         self.receiver
@@ -104,6 +110,16 @@ impl<T, C: Command<T>> Stack<T, C> {
         match cmd.undo(&mut self.receiver) {
             Ok(_) => Some(Ok(cmd)),
             Err(e) => Some(Err((cmd, e))),
+        }
+    }
+}
+
+impl<T: Default, C: Command<T>> Default for Stack<T, C> {
+    #[inline]
+    fn default() -> Stack<T, C> {
+        Stack {
+            commands: Default::default(),
+            receiver: Default::default(),
         }
     }
 }

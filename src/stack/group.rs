@@ -1,6 +1,7 @@
 use std::collections::hash_map;
 use fnv::FnvHashMap;
-use {Command, Key, Stack};
+use super::Stack;
+use {Command, Key};
 
 /// A group of `Stack`s.
 ///
@@ -8,11 +9,8 @@ use {Command, Key, Stack};
 /// be active at the same time, for example a text editor with multiple documents opened.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Group<T, C: Command<T>> {
-    // The stacks in the group.
     stacks: FnvHashMap<Key, Stack<T, C>>,
-    // The active stack.
     active: Option<Key>,
-    // Counter for generating new keys.
     key: u32,
 }
 

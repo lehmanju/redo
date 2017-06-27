@@ -13,7 +13,8 @@
 //! # Examples
 //! ```
 //! # #![allow(unused_variables)]
-//! use redo::{Command, Stack};
+//! use redo::Command;
+//! use redo::stack::Stack;
 //!
 //! #[derive(Debug)]
 //! struct Push(char);
@@ -33,7 +34,7 @@
 //! }
 //!
 //! fn foo() -> Result<(), (Push, &'static str)> {
-//!     let mut stack = Stack::new(String::new());
+//!     let mut stack = Stack::default();
 //!
 //!     stack.push(Push('a'))?;
 //!     stack.push(Push('b'))?;
@@ -67,13 +68,10 @@
 
 extern crate fnv;
 
-mod group;
-mod stack;
+pub mod record;
+pub mod stack;
 
-pub use group::Group;
-pub use stack::Stack;
-
-/// A key for a `Stack` in a `Group`.
+/// A key used in the `Group`s.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Key(u32);
 
