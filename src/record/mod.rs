@@ -8,6 +8,60 @@ use std::fmt::{self, Debug, Formatter};
 use Command;
 
 /// A record of commands.
+///
+/// The `Record` works mostly like a `Stack`, but it stores the commands
+/// instead of returning them when undoing. In addition, the `Record` has
+/// an internal state that is either clean or dirty. A clean state means
+/// that the `Record` does not have any `Command`s to redo, while a dirty
+/// state means that it does. The user can give the `Record` a function
+/// that is called each time the state changes by using the `config` constructor.
+///
+/// # Examples
+/// ```
+/// use redo::{Command, Record};
+///
+/// #[derive(Debug)]
+/// struct Push(char);
+///
+/// impl Command<String> for Push {
+///     type Err = &'static str;
+///
+///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn foo() -> Result<(), &'static str> {
+///     let mut record = Record::default();
+///
+///     record.push(Push('a')).map_err(|(_, e)| e)?;
+///     record.push(Push('b')).map_err(|(_, e)| e)?;
+///     record.push(Push('c')).map_err(|(_, e)| e)?;
+///
+///     assert_eq!(record.as_receiver(), "abc");
+///
+///     record.undo()?;
+///     record.undo()?;
+///     record.undo()?;
+///
+///     assert_eq!(record.as_receiver(), "");
+///
+///     record.redo()?;
+///     record.redo()?;
+///     record.redo()?;
+///
+///     assert_eq!(record.into_receiver(), "abc");
+///
+///     Ok(())
+/// }
+/// # foo().unwrap();
+/// ```
 pub struct Record<T, C: Command<T>> {
     commands: VecDeque<C>,
     receiver: T,
@@ -53,18 +107,6 @@ impl<T, C: Command<T>> Record<T, C> {
         self.commands.is_empty()
     }
 
-    /// Returns a reference to the `receiver`.
-    #[inline]
-    pub fn as_receiver(&self) -> &T {
-        &self.receiver
-    }
-
-    /// Consumes the `Stack`, returning the `receiver`.
-    #[inline]
-    pub fn into_receiver(self) -> T {
-        self.receiver
-    }
-
     /// Returns `true` if the state of the `Record` is clean, `false` otherwise.
     #[inline]
     pub fn is_clean(&self) -> bool {
@@ -75,6 +117,18 @@ impl<T, C: Command<T>> Record<T, C> {
     #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
+    }
+
+    /// Returns a reference to the `receiver`.
+    #[inline]
+    pub fn as_receiver(&self) -> &T {
+        &self.receiver
+    }
+
+    /// Consumes the `Stack`, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> T {
+        self.receiver
     }
 
     /// Pushes `cmd` on top of the `Record` and executes its [`redo`] method.
@@ -167,6 +221,20 @@ impl<T, C: Command<T>> Record<T, C> {
             }
         }
         Ok(())
+    }
+}
+
+impl<T: Default, C: Command<T>> Default for Record<T, C> {
+    #[inline]
+    fn default() -> Record<T, C> {
+        Record::new(Default::default())
+    }
+}
+
+impl<T, C: Command<T>> AsRef<T> for Record<T, C> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.as_receiver()
     }
 }
 

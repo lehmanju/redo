@@ -10,7 +10,6 @@ use Command;
 ///
 /// # Examples
 /// ```
-/// # #![allow(unused_variables)]
 /// use redo::{Command, Stack};
 ///
 /// #[derive(Debug)]
@@ -43,7 +42,14 @@ use Command;
 ///     let b = stack.pop().unwrap()?;
 ///     let a = stack.pop().unwrap()?;
 ///
-///     assert_eq!(stack.into_receiver(), "");
+///     assert_eq!(stack.as_receiver(), "");
+///
+///     stack.push(a)?;
+///     stack.push(b)?;
+///     stack.push(c)?;
+///
+///     assert_eq!(stack.into_receiver(), "abc");
+///
 ///     Ok(())
 /// }
 /// # foo().unwrap();
@@ -147,10 +153,7 @@ impl<T, C: Command<T>> Stack<T, C> {
 impl<T: Default, C: Command<T>> Default for Stack<T, C> {
     #[inline]
     fn default() -> Stack<T, C> {
-        Stack {
-            commands: Default::default(),
-            receiver: Default::default(),
-        }
+        Stack::new(Default::default())
     }
 }
 
