@@ -1,7 +1,6 @@
 //! An undo/redo library with static dispatch and manual command merging.
 //! It uses the [Command Pattern] where the user implements the `Command` trait for a command.
 //!
-//! # Redo vs Undo
 //! |                 | Redo             | Undo            |
 //! |-----------------|------------------|-----------------|
 //! | Dispatch        | [Static]         | [Dynamic]       |
@@ -9,48 +8,6 @@
 //!
 //! Both supports command merging but [`undo`] will automatically merge commands with the same id
 //! while in `redo` you need to implement the merge method yourself.
-//!
-//! # Examples
-//! ```
-//! # #![allow(unused_variables)]
-//! use redo::Command;
-//! use redo::stack::Stack;
-//!
-//! #[derive(Debug)]
-//! struct Push(char);
-//!
-//! impl Command<String> for Push {
-//!     type Err = &'static str;
-//!
-//!     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
-//!         s.push(self.0);
-//!         Ok(())
-//!     }
-//!
-//!     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-//!         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
-//!         Ok(())
-//!     }
-//! }
-//!
-//! fn foo() -> Result<(), (Push, &'static str)> {
-//!     let mut stack = Stack::default();
-//!
-//!     stack.push(Push('a'))?;
-//!     stack.push(Push('b'))?;
-//!     stack.push(Push('c'))?;
-//!
-//!     assert_eq!(stack.as_receiver(), "abc");
-//!
-//!     let c = stack.pop().unwrap()?;
-//!     let b = stack.pop().unwrap()?;
-//!     let a = stack.pop().unwrap()?;
-//!
-//!     assert_eq!(stack.into_receiver(), "");
-//!     Ok(())
-//! }
-//! # foo().unwrap();
-//! ```
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [`merge`]: trait.Command.html#method.merge
@@ -68,16 +25,17 @@
 
 extern crate fnv;
 
-pub mod record;
-pub mod stack;
+mod record;
+mod stack;
 
-/// A key used in the `Group`s.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Key(u32);
+pub use record::Record;
+pub use stack::Stack;
+
+// /// A key used in the `Group`s.
+// #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+// pub struct Key(u32);
 
 /// Trait that defines the functionality of a command.
-///
-/// Every command needs to implement this trait to be able to be used with the `Stack`.
 pub trait Command<T> {
     /// The error type.
     type Err;
@@ -96,11 +54,11 @@ pub trait Command<T> {
     ///
     /// Returns `Some(Ok)` if the merging was successful, `Some(Err)` if something went wrong when
     /// trying to merge, and `None` if it did not try to merge.
-    /// This method is always called by the [`push`] method in `Stack`, with `self` being the top
-    /// command on the stack and `cmd` being the new command. If `None` is returned from this
-    /// method, `cmd` will be pushed on the stack as normal. However, if the return value is
-    /// `Some(x)` it will not push the command on to the stack since either it was merged or an
-    /// error has occurred, and then the stack returns the `x` value.
+    /// This method is called with `self` being the top command and `cmd` being the
+    /// new command. If `None` is returned from this method, `cmd` will be pushed
+    /// as normal. However, if the return value is `Some(x)` it will not push the command on to
+    /// the stack since either it was merged or an error has occurred, and then the stack returns
+    /// the `x` value.
     ///
     /// Default implementation returns `None`.
     ///

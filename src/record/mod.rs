@@ -1,11 +1,13 @@
-//! A `Record` of `Command`s.
+mod config;
+
+pub use self::config::Config;
 
 use std::collections::VecDeque;
-use std::marker::PhantomData;
+use std::collections::vec_deque;
 use std::fmt::{self, Debug, Formatter};
 use Command;
 
-/// A record of `Command`s.
+/// A record of commands.
 pub struct Record<T, C: Command<T>> {
     commands: VecDeque<C>,
     receiver: T,
@@ -27,16 +29,10 @@ impl<T, C: Command<T>> Record<T, C> {
         }
     }
 
-    /// Returns a `Config` for `Record`.
+    /// Returns a configurator for a `Record`.
     #[inline]
     pub fn config(receiver: T) -> Config<T, C> {
-        Config {
-            commands: PhantomData,
-            receiver,
-            capacity: 0,
-            limit: 0,
-            state_change: None,
-        }
+        Config::new(receiver)
     }
 
     /// Returns the capacity of the `Record`.
@@ -45,25 +41,16 @@ impl<T, C: Command<T>> Record<T, C> {
         self.commands.capacity()
     }
 
-    /// Reserves capacity for at least `additional` more commands to be inserted in the `Record`.
-    ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.commands.reserve(additional);
-    }
-
-    /// Shrinks the capacity of the `Record` as much as possible.
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.commands.shrink_to_fit();
-    }
-
     /// Returns the number of `Command`s in the `Record`.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
+    }
+
+    /// Returns `true` if the `Record` is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 
     /// Returns a reference to the `receiver`.
@@ -90,24 +77,24 @@ impl<T, C: Command<T>> Record<T, C> {
         !self.is_clean()
     }
 
-    /// Pushes `cmd` on top of the `Record` and executes its [`redo`] method. The command is merged with
-    /// the previous top `Command` if [`merge`] does not return `None`.
+    /// Pushes `cmd` on top of the `Record` and executes its [`redo`] method.
+    /// The command is merged with the previous top `Command` if [`merge`] does not return `None`.
     ///
-    /// All `Command`s above the active one are removed from the stack and returned.
+    /// All `Command`s above the active one are removed from the stack and returned as an iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] or [merging commands][`merge`], the error is returned together
-    /// with the `Command`.
+    /// If an error occur when executing [`redo`] or [merging commands][`merge`],
+    /// the error is returned together with the `Command`.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
-    /// [`merge`]: trait.Command.html#method.merge
-    pub fn push(&mut self, mut cmd: C) -> Result<Vec<C>, (C, C::Err)> {
+    /// [`redo`]: ../trait.Command.html#tymethod.redo
+    /// [`merge`]: ../trait.Command.html#method.merge
+    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, (C, C::Err)> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         if let Err(e) = cmd.redo(&mut self.receiver) {
             return Err((cmd, e));
         }
-        let drained: Vec<_> = self.commands.drain(len..).collect();
+        let iter = self.commands.split_off(len).into_iter();
 
         match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
             Some(x) => {
@@ -133,7 +120,7 @@ impl<T, C: Command<T>> Record<T, C> {
                 f(true);
             }
         }
-        Ok(drained)
+        Ok(Commands(iter))
     }
 
     /// Calls the [`redo`] method for the active `Command` and sets the next one as the new
@@ -142,7 +129,7 @@ impl<T, C: Command<T>> Record<T, C> {
     /// # Errors
     /// If an error occur when executing [`redo`] the error is returned.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Result<(), C::Err> {
         if self.idx < self.len() {
@@ -165,7 +152,7 @@ impl<T, C: Command<T>> Record<T, C> {
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Result<(), C::Err> {
         if self.idx > 0 {
@@ -184,6 +171,7 @@ impl<T, C: Command<T>> Record<T, C> {
 }
 
 impl<T: Debug, C: Command<T> + Debug> Debug for Record<T, C> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("commands", &self.commands)
@@ -194,63 +182,15 @@ impl<T: Debug, C: Command<T> + Debug> Debug for Record<T, C> {
     }
 }
 
-/// Configurator for `Record`.
-pub struct Config<T, C: Command<T>> {
-    commands: PhantomData<C>,
-    receiver: T,
-    capacity: usize,
-    limit: usize,
-    state_change: Option<Box<FnMut(bool)>>,
-}
+/// Iterator over `Command`s of type `C`.
+#[derive(Debug)]
+pub struct Commands<C>(vec_deque::IntoIter<C>);
 
-impl<T, C: Command<T>> Config<T, C> {
-    /// Sets the `capacity` for the `Record`.
+impl<C> Iterator for Commands<C> {
+    type Item = C;
+
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<T, C> {
-        self.capacity = capacity;
-        self
-    }
-
-    /// Sets the `limit` for the `Record`.
-    #[inline]
-    pub fn limit(mut self, limit: usize) -> Config<T, C> {
-        self.limit = limit;
-        self
-    }
-
-    /// Sets what should happen when the state changes.
-    #[inline]
-    pub fn state_change<F>(mut self, f: F) -> Config<T, C>
-        where
-            F: FnMut(bool) + 'static,
-    {
-        self.state_change = Some(Box::new(f));
-        self
-    }
-
-    /// Creates the `Record`.
-    #[inline]
-    pub fn finish(self) -> Record<T, C> {
-        Record {
-            commands: VecDeque::with_capacity(self.capacity),
-            receiver: self.receiver,
-            idx: 0,
-            limit: if self.limit == 0 {
-                None
-            } else {
-                Some(self.limit)
-            },
-            state_change: self.state_change,
-        }
-    }
-}
-
-impl<T: Debug, C: Command<T> + Debug> Debug for Config<T, C> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("receiver", &self.receiver)
-            .field("capacity", &self.capacity)
-            .field("limit", &self.limit)
-            .finish()
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }

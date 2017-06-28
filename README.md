@@ -6,7 +6,6 @@
 An undo/redo library with static dispatch and manual command merging.
 It uses the [Command Pattern] where the user implements the `Command` trait for a command.
 
-## Redo vs Undo
 |                 | Redo             | Undo            |
 |-----------------|------------------|-----------------|
 | Dispatch        | [Static]         | [Dynamic]       |
@@ -37,7 +36,7 @@ impl Command<String> for Push {
 }
 
 fn foo() -> Result<(), (Push, &'static str)> {
-    let mut stack = Stack::new(String::new());
+    let mut stack = Stack::default();
     
     stack.push(Push('a'))?;
     stack.push(Push('b'))?;

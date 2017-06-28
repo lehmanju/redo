@@ -1,14 +1,53 @@
-//! A `Stack` of `Command`s.
-//!
-//! The `Stack` the simplest data structure and works by pushing and popping off `Command`s
-//! on the stack that modifies the `receiver`.
+// mod stacks;
 
-mod group;
-
-pub use self::group::Group;
+// pub use self::stacks::Stacks;
 use Command;
 
-/// A stack of `Command`s.
+/// A stack of commands.
+///
+/// The `Stack` is the simplest data structure and works by pushing and
+/// popping off `Command`s that modifies the `receiver`.
+///
+/// # Examples
+/// ```
+/// # #![allow(unused_variables)]
+/// use redo::{Command, Stack};
+///
+/// #[derive(Debug)]
+/// struct Push(char);
+///
+/// impl Command<String> for Push {
+///     type Err = &'static str;
+///
+///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn foo() -> Result<(), (Push, &'static str)> {
+///     let mut stack = Stack::default();
+///
+///     stack.push(Push('a'))?;
+///     stack.push(Push('b'))?;
+///     stack.push(Push('c'))?;
+///
+///     assert_eq!(stack.as_receiver(), "abc");
+///
+///     let c = stack.pop().unwrap()?;
+///     let b = stack.pop().unwrap()?;
+///     let a = stack.pop().unwrap()?;
+///
+///     assert_eq!(stack.into_receiver(), "");
+///     Ok(())
+/// }
+/// # foo().unwrap();
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Stack<T, C: Command<T>> {
     commands: Vec<C>,
@@ -40,25 +79,16 @@ impl<T, C: Command<T>> Stack<T, C> {
         self.commands.capacity()
     }
 
-    /// Reserves capacity for at least `additional` more commands to be inserted in the `Stack`.
-    ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.commands.reserve(additional);
-    }
-
-    /// Shrinks the capacity of the `Stack` as much as possible.
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.commands.shrink_to_fit();
-    }
-
     /// Returns the number of `Command`s in the `Stack`.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
+    }
+
+    /// Returns `true` if the `Stack` is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 
     /// Returns a reference to the `receiver`.
@@ -80,8 +110,8 @@ impl<T, C: Command<T>> Stack<T, C> {
     /// If an error occur when executing `redo` or merging commands, the error is returned together
     /// with the `Command`.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
-    /// [`merge`]: trait.Command.html#method.merge
+    /// [`redo`]: ../trait.Command.html#tymethod.redo
+    /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
     pub fn push(&mut self, mut cmd: C) -> Result<(), (C, C::Err)> {
         if let Err(e) = cmd.redo(&mut self.receiver) {
@@ -94,13 +124,13 @@ impl<T, C: Command<T>> Stack<T, C> {
         Ok(())
     }
 
-    /// Calls the [`undo`] method for the active `Command` and sets the previous `Command` as the
-    /// new active one. Returns `None` if the stack is empty.
+    /// Calls the top commands [`undo`] method and pops it off the stack.
+    /// Returns `None` if the stack is empty.
     ///
     /// # Errors
     /// If an error occur when executing `undo` the error is returned together with the `Command`.
     ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<C, (C, C::Err)>> {
         let mut cmd = match self.commands.pop() {
