@@ -18,9 +18,9 @@ The library has currently two data structures that can be used to modify the rec
 use redo::{Command, Stack};
 
 #[derive(Debug)]
-struct Push(char);
+struct Add(char);
 
-impl Command<String> for Push {
+impl Command<String> for Add {
     type Err = &'static str;
 
     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
@@ -34,12 +34,12 @@ impl Command<String> for Push {
     }
 }
 
-fn foo() -> Result<(), (Push, &'static str)> {
+fn foo() -> Result<(), (Add, &'static str)> {
     let mut stack = Stack::default();
 
-    stack.push(Push('a'))?;
-    stack.push(Push('b'))?;
-    stack.push(Push('c'))?;
+    stack.push(Add('a'))?;
+    stack.push(Add('b'))?;
+    stack.push(Add('c'))?;
 
     assert_eq!(stack.as_receiver(), "abc");
 
