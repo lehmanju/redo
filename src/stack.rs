@@ -11,9 +11,9 @@ use Command;
 /// use redo::{Command, Stack};
 ///
 /// #[derive(Debug)]
-/// struct Push(char);
+/// struct Add(char);
 ///
-/// impl Command<String> for Push {
+/// impl Command<String> for Add {
 ///     type Err = &'static str;
 ///
 ///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
@@ -27,12 +27,12 @@ use Command;
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), (Push, &'static str)> {
+/// fn foo() -> Result<(), (Add, &'static str)> {
 ///     let mut stack = Stack::default();
 ///
-///     stack.push(Push('a'))?;
-///     stack.push(Push('b'))?;
-///     stack.push(Push('c'))?;
+///     stack.push(Add('a'))?;
+///     stack.push(Add('b'))?;
+///     stack.push(Add('c'))?;
 ///
 ///     assert_eq!(stack.as_receiver(), "abc");
 ///
@@ -61,19 +61,19 @@ pub struct Stack<T, C: Command<T>> {
 impl<T, C: Command<T>> Stack<T, C> {
     /// Creates a new `Stack`.
     #[inline]
-    pub fn new(receiver: T) -> Stack<T, C> {
+    pub fn new<U: Into<T>>(receiver: U) -> Stack<T, C> {
         Stack {
             commands: Vec::new(),
-            receiver,
+            receiver: receiver.into(),
         }
     }
 
     /// Creates a new `Stack` with the given `capacity`.
     #[inline]
-    pub fn with_capacity(receiver: T, capacity: usize) -> Stack<T, C> {
+    pub fn with_capacity<U: Into<T>>(receiver: U, capacity: usize) -> Stack<T, C> {
         Stack {
             commands: Vec::with_capacity(capacity),
-            receiver,
+            receiver: receiver.into(),
         }
     }
 
@@ -151,7 +151,10 @@ impl<T, C: Command<T>> Stack<T, C> {
 impl<T: Default, C: Command<T>> Default for Stack<T, C> {
     #[inline]
     fn default() -> Stack<T, C> {
-        Stack::new(Default::default())
+        Stack {
+            commands: Vec::new(),
+            receiver: Default::default(),
+        }
     }
 }
 

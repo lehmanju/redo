@@ -19,9 +19,9 @@ use Command;
 /// use redo::{Command, Record};
 ///
 /// #[derive(Debug)]
-/// struct Push(char);
+/// struct Add(char);
 ///
-/// impl Command<String> for Push {
+/// impl Command<String> for Add {
 ///     type Err = &'static str;
 ///
 ///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
@@ -38,9 +38,9 @@ use Command;
 /// fn foo() -> Result<(), &'static str> {
 ///     let mut record = Record::default();
 ///
-///     record.push(Push('a')).map_err(|(_, e)| e)?;
-///     record.push(Push('b')).map_err(|(_, e)| e)?;
-///     record.push(Push('c')).map_err(|(_, e)| e)?;
+///     record.push(Add('a')).map_err(|(_, e)| e)?;
+///     record.push(Add('b')).map_err(|(_, e)| e)?;
+///     record.push(Add('c')).map_err(|(_, e)| e)?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -71,10 +71,10 @@ pub struct Record<T, C: Command<T>> {
 impl<T, C: Command<T>> Record<T, C> {
     /// Returns a new `Record`.
     #[inline]
-    pub fn new(receiver: T) -> Record<T, C> {
+    pub fn new<U: Into<T>>(receiver: U) -> Record<T, C> {
         Record {
             commands: VecDeque::new(),
-            receiver,
+            receiver: receiver.into(),
             idx: 0,
             limit: None,
             state_change: None,
@@ -82,8 +82,46 @@ impl<T, C: Command<T>> Record<T, C> {
     }
 
     /// Returns a configurator for a `Record`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug, Eq, PartialEq)]
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     type Err = &'static str;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> Result<(), &'static str> {
+    /// let mut record = Record::config("")
+    ///     .capacity(2)
+    ///     .limit(2)
+    ///     .finish();
+    ///
+    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// record.push(Add('b')).map_err(|(_, e)| e)?;
+    /// record.push(Add('c')).map_err(|(_, e)| e)?; // 'a' is removed from the record since limit is 2.
+    ///
+    /// assert_eq!(record.as_receiver(), "abc");
+    ///
+    /// record.undo()?;
+    /// record.undo()?;
+    /// record.undo()?;
+    ///
+    /// assert_eq!(record.as_receiver(), "a");
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
-    pub fn config(receiver: T) -> Config<T, C> {
+    pub fn config<U: Into<T>>(receiver: U) -> Config<T, C> {
         Config::new(receiver)
     }
 
@@ -138,6 +176,44 @@ impl<T, C: Command<T>> Record<T, C> {
     /// If an error occur when executing [`redo`] or [merging commands][`merge`],
     /// the error is returned together with the `Command`.
     ///
+    /// # Examples
+    /// ```
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug, Eq, PartialEq)]
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     type Err = &'static str;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> Result<(), &'static str> {
+    /// let mut record = Record::default();
+    ///
+    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// record.push(Add('b')).map_err(|(_, e)| e)?;
+    /// record.push(Add('c')).map_err(|(_, e)| e)?;
+    ///
+    /// assert_eq!(record.as_receiver(), "abc");
+    ///
+    /// record.undo()?;
+    /// record.undo()?;
+    /// let mut cd = record.push(Add('e')).map_err(|(_, e)| e)?;
+    ///
+    /// assert_eq!(record.as_receiver(), "ae");
+    /// assert_eq!(cd.next(), Some(Add('b')));
+    /// assert_eq!(cd.next(), Some(Add('c')));
+    /// assert_eq!(cd.next(), None);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, (C, C::Err)> {
@@ -147,6 +223,7 @@ impl<T, C: Command<T>> Record<T, C> {
             return Err((cmd, e));
         }
         let iter = self.commands.split_off(len).into_iter();
+        debug_assert_eq!(len, self.len());
 
         match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
             Some(x) => {
@@ -225,7 +302,13 @@ impl<T, C: Command<T>> Record<T, C> {
 impl<T: Default, C: Command<T>> Default for Record<T, C> {
     #[inline]
     fn default() -> Record<T, C> {
-        Record::new(Default::default())
+        Record {
+            commands: VecDeque::new(),
+            receiver: Default::default(),
+            idx: 0,
+            limit: None,
+            state_change: None,
+        }
     }
 }
 
@@ -273,10 +356,10 @@ pub struct Config<T, C: Command<T>> {
 impl<T, C: Command<T>> Config<T, C> {
     /// Creates a `Config`.
     #[inline]
-    pub fn new(receiver: T) -> Config<T, C> {
+    pub fn new<U: Into<T>>(receiver: U) -> Config<T, C> {
         Config {
             commands: PhantomData,
-            receiver,
+            receiver: receiver.into(),
             capacity: 0,
             limit: 0,
             state_change: None,

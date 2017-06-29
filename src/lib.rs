@@ -5,7 +5,7 @@
 //! The library has currently two data structures that can be used to modify the receiver:
 //!
 //! * A simple `Stack` that pushes and pops commands to modify the receiver.
-//! * A more advanced `Record` that can roll the state of the receiver forwards and backwards.
+//! * A `Record` that can roll the state of the receiver forwards and backwards.
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 
