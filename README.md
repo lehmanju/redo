@@ -1,5 +1,6 @@
 # Redo
-[![Build Status](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
+[![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
+[![Appveyor](https://ci.appveyor.com/api/projects/status/af1g96b3xsoypbq0/branch/master?svg=true)](https://ci.appveyor.com/project/evenorog/redo/branch/master)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
