@@ -1,21 +1,13 @@
 //! An undo/redo library with static dispatch and manual command merging.
-//! It uses the [Command Pattern] where the user implements the `Command` trait for a command.
+//! It uses the [Command Pattern] where the user modifies a receiver by
+//! applying `Command`s on it.
 //!
-//! |                 | Redo             | Undo            |
-//! |-----------------|------------------|-----------------|
-//! | Dispatch        | [Static]         | [Dynamic]       |
-//! | Command Merging | [Manual][manual] | [Auto][auto]    |
+//! The library has currently two data structures that can be used to modify the receiver:
 //!
-//! Both supports command merging but [`undo`] will automatically merge commands with the same id
-//! while in `redo` you need to implement the merge method yourself.
+//! * A simple `Stack` that pushes and pops commands to modify the receiver.
+//! * A more advanced `Record` that can roll the state of the receiver forwards and backwards.
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
-//! [`merge`]: trait.Command.html#method.merge
-//! [auto]: https://docs.rs/undo/0.8.1/undo/trait.UndoCmd.html#method.id
-//! [manual]: trait.Command.html#method.merge
-//! [Static]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
-//! [Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
-//! [`undo`]: https://crates.io/crates/undo
 
 #![forbid(unstable_features, bad_style)]
 #![deny(missing_docs,
@@ -30,10 +22,6 @@ mod stack;
 
 pub use record::Record;
 pub use stack::Stack;
-
-// /// A key used in the `Group`s.
-// #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-// pub struct Key(u32);
 
 /// Trait that defines the functionality of a command.
 pub trait Command<T> {

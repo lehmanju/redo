@@ -1,12 +1,10 @@
-// mod stacks;
-
-// pub use self::stacks::Stacks;
 use Command;
 
 /// A stack of commands.
 ///
 /// The `Stack` is the simplest data structure and works by pushing and
 /// popping off `Command`s that modifies the `receiver`.
+/// Unlike the `Record`, it does not have a special state that can be used for callbacks.
 ///
 /// # Examples
 /// ```
