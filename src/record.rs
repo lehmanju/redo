@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::collections::vec_deque;
+use std::collections::vec_deque::IntoIter;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use Command;
@@ -60,18 +60,18 @@ use Command;
 /// }
 /// # foo().unwrap();
 /// ```
-pub struct Record<T, C: Command<T>> {
+pub struct Record<'a, T, C: Command<T>> {
     commands: VecDeque<C>,
     receiver: T,
     idx: usize,
     limit: Option<usize>,
-    state_change: Option<Box<FnMut(bool)>>,
+    state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<T, C: Command<T>> Record<T, C> {
+impl<'a, T, C: Command<T>> Record<'a, T, C> {
     /// Returns a new `Record`.
     #[inline]
-    pub fn new<U: Into<T>>(receiver: U) -> Record<T, C> {
+    pub fn new<U: Into<T>>(receiver: U) -> Record<'a, T, C> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
@@ -121,8 +121,14 @@ impl<T, C: Command<T>> Record<T, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn config<U: Into<T>>(receiver: U) -> Config<T, C> {
+    pub fn config<U: Into<T>>(receiver: U) -> Config<'a, T, C> {
         Config::new(receiver)
+    }
+
+    /// Returns the limit of the `Record`, or `None` if it has no limit.
+    #[inline]
+    pub fn limit(&self) -> Option<usize> {
+        self.limit
     }
 
     /// Returns the capacity of the `Record`.
@@ -161,7 +167,7 @@ impl<T, C: Command<T>> Record<T, C> {
         &self.receiver
     }
 
-    /// Consumes the `Stack`, returning the `receiver`.
+    /// Consumes the `Record`, returning the `receiver`.
     #[inline]
     pub fn into_receiver(self) -> T {
         self.receiver
@@ -299,9 +305,9 @@ impl<T, C: Command<T>> Record<T, C> {
     }
 }
 
-impl<T: Default, C: Command<T>> Default for Record<T, C> {
+impl<'a, T: Default, C: Command<T>> Default for Record<'a, T, C> {
     #[inline]
-    fn default() -> Record<T, C> {
+    fn default() -> Record<'a, T, C> {
         Record {
             commands: VecDeque::new(),
             receiver: Default::default(),
@@ -312,14 +318,14 @@ impl<T: Default, C: Command<T>> Default for Record<T, C> {
     }
 }
 
-impl<T, C: Command<T>> AsRef<T> for Record<T, C> {
+impl<'a, T, C: Command<T>> AsRef<T> for Record<'a, T, C> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.as_receiver()
     }
 }
 
-impl<T: Debug, C: Command<T> + Debug> Debug for Record<T, C> {
+impl<'a, T: Debug, C: Command<T> + Debug> Debug for Record<'a, T, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -331,9 +337,9 @@ impl<T: Debug, C: Command<T> + Debug> Debug for Record<T, C> {
     }
 }
 
-/// Iterator over `Command`s of type `C`.
+/// Iterator over `Command`s.
 #[derive(Debug)]
-pub struct Commands<C>(vec_deque::IntoIter<C>);
+pub struct Commands<C>(IntoIter<C>);
 
 impl<C> Iterator for Commands<C> {
     type Item = C;
@@ -345,18 +351,18 @@ impl<C> Iterator for Commands<C> {
 }
 
 /// Configurator for `Record`.
-pub struct Config<T, C: Command<T>> {
+pub struct Config<'a, T, C: Command<T>> {
     commands: PhantomData<C>,
     receiver: T,
     capacity: usize,
     limit: usize,
-    state_change: Option<Box<FnMut(bool)>>,
+    state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<T, C: Command<T>> Config<T, C> {
+impl<'a, T, C: Command<T>> Config<'a, T, C> {
     /// Creates a `Config`.
     #[inline]
-    pub fn new<U: Into<T>>(receiver: U) -> Config<T, C> {
+    fn new<U: Into<T>>(receiver: U) -> Config<'a, T, C> {
         Config {
             commands: PhantomData,
             receiver: receiver.into(),
@@ -368,23 +374,23 @@ impl<T, C: Command<T>> Config<T, C> {
 
     /// Sets the `capacity` for the `Record`.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<T, C> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, T, C> {
         self.capacity = capacity;
         self
     }
 
     /// Sets the `limit` for the `Record`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Config<T, C> {
+    pub fn limit(mut self, limit: usize) -> Config<'a, T, C> {
         self.limit = limit;
         self
     }
 
     /// Sets what should happen when the state changes.
     #[inline]
-    pub fn state_change<F>(mut self, f: F) -> Config<T, C>
+    pub fn state_change<F>(mut self, f: F) -> Config<'a, T, C>
         where
-            F: FnMut(bool) + 'static,
+            F: FnMut(bool) + 'a,
     {
         self.state_change = Some(Box::new(f));
         self
@@ -392,7 +398,7 @@ impl<T, C: Command<T>> Config<T, C> {
 
     /// Creates the `Record`.
     #[inline]
-    pub fn finish(self) -> Record<T, C> {
+    pub fn finish(self) -> Record<'a, T, C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: self.receiver,
@@ -407,7 +413,7 @@ impl<T, C: Command<T>> Config<T, C> {
     }
 }
 
-impl<T: Debug, C: Command<T> + Debug> Debug for Config<T, C> {
+impl<'a, T: Debug, C: Command<T> + Debug> Debug for Config<'a, T, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Config")
