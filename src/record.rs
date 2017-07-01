@@ -1,5 +1,4 @@
-use std::collections::VecDeque;
-use std::collections::vec_deque::IntoIter;
+use std::collections::vec_deque::{VecDeque, IntoIter};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use Command;
@@ -86,7 +85,7 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
     /// # Examples
     /// ```
     /// # use redo::{Command, Record};
-    /// # #[derive(Debug, Eq, PartialEq)]
+    /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
     /// #     type Err = &'static str;
@@ -122,7 +121,13 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
     /// ```
     #[inline]
     pub fn config<U: Into<T>>(receiver: U) -> Config<'a, T, C> {
-        Config::new(receiver)
+        Config {
+            commands: PhantomData,
+            receiver: receiver.into(),
+            capacity: 0,
+            limit: None,
+            state_change: None,
+        }
     }
 
     /// Returns the limit of the `Record`, or `None` if it has no limit.
@@ -209,12 +214,12 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
     ///
     /// record.undo()?;
     /// record.undo()?;
-    /// let mut cd = record.push(Add('e')).map_err(|(_, e)| e)?;
+    /// let mut bc = record.push(Add('e')).map_err(|(_, e)| e)?;
     ///
     /// assert_eq!(record.as_receiver(), "ae");
-    /// assert_eq!(cd.next(), Some(Add('b')));
-    /// assert_eq!(cd.next(), Some(Add('c')));
-    /// assert_eq!(cd.next(), None);
+    /// assert_eq!(bc.next(), Some(Add('b')));
+    /// assert_eq!(bc.next(), Some(Add('c')));
+    /// assert_eq!(bc.next(), None);
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
@@ -355,23 +360,11 @@ pub struct Config<'a, T, C: Command<T>> {
     commands: PhantomData<C>,
     receiver: T,
     capacity: usize,
-    limit: usize,
+    limit: Option<usize>,
     state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a, T, C: Command<T>> Config<'a, T, C> {
-    /// Creates a `Config`.
-    #[inline]
-    fn new<U: Into<T>>(receiver: U) -> Config<'a, T, C> {
-        Config {
-            commands: PhantomData,
-            receiver: receiver.into(),
-            capacity: 0,
-            limit: 0,
-            state_change: None,
-        }
-    }
-
     /// Sets the `capacity` for the `Record`.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> Config<'a, T, C> {
@@ -382,15 +375,56 @@ impl<'a, T, C: Command<T>> Config<'a, T, C> {
     /// Sets the `limit` for the `Record`.
     #[inline]
     pub fn limit(mut self, limit: usize) -> Config<'a, T, C> {
-        self.limit = limit;
+        self.limit = if limit == 0 { None } else { Some(limit) };
         self
     }
 
     /// Sets what should happen when the state changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::cell::Cell;
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug, Eq, PartialEq)]
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     type Err = &'static str;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> Result<(), &'static str> {
+    /// let x = Cell::new(0);
+    /// let mut record = Record::config("")
+    ///     .state_change(|is_clean| {
+    ///         if is_clean {
+    ///             x.set(1);
+    ///         } else {
+    ///             x.set(2);
+    ///         }
+    ///     })
+    ///     .finish();
+    ///
+    /// assert_eq!(x.get(), 0);
+    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// assert_eq!(x.get(), 0);
+    /// record.undo()?;
+    /// assert_eq!(x.get(), 2);
+    /// record.redo()?;
+    /// assert_eq!(x.get(), 1);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     pub fn state_change<F>(mut self, f: F) -> Config<'a, T, C>
-        where
-            F: FnMut(bool) + 'a,
+    where
+        F: FnMut(bool) + 'a,
     {
         self.state_change = Some(Box::new(f));
         self
@@ -403,11 +437,7 @@ impl<'a, T, C: Command<T>> Config<'a, T, C> {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: self.receiver,
             idx: 0,
-            limit: if self.limit == 0 {
-                None
-            } else {
-                Some(self.limit)
-            },
+            limit: self.limit,
             state_change: self.state_change,
         }
     }

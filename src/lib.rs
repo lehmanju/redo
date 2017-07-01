@@ -10,8 +10,7 @@
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_docs,
-        missing_debug_implementations,
+#![deny(missing_debug_implementations,
         unused_import_braces,
         unused_qualifications)]
 
@@ -23,7 +22,7 @@ mod stack;
 pub use record::Record;
 pub use stack::Stack;
 
-/// Trait that defines the functionality of a command.
+/// Base functionality for all commands.
 pub trait Command<T> {
     /// The error type.
     type Err;
