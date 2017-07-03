@@ -5,15 +5,13 @@
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
 An undo/redo library with static dispatch and manual command merging.
-It uses the [Command Pattern] where the user modifies a receiver by
-applying `Command`s on it.
+It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) 
+where the user modifies a receiver by applying `Command`s on it.
 
 The library has currently two data structures that can be used to modify the receiver:
 
 * A simple `Stack` that pushes and pops commands to modify the receiver.
 * A `Record` that can roll the state of the receiver forwards and backwards.
-
-[Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 
 ### License
 
