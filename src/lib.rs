@@ -21,19 +21,19 @@ pub use record::Record;
 pub use stack::Stack;
 
 /// Base functionality for all commands.
-pub trait Command<T> {
+pub trait Command<R> {
     /// The error type.
     type Err;
 
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut T) -> Result<(), Self::Err>;
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    fn undo(&mut self, receiver: &mut T) -> Result<(), Self::Err>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
 
     /// Used for manual merging of two `Command`s.
     ///

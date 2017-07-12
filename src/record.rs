@@ -59,18 +59,18 @@ use Command;
 /// }
 /// # foo().unwrap();
 /// ```
-pub struct Record<'a, T, C: Command<T>> {
+pub struct Record<'a, R, C: Command<R>> {
     commands: VecDeque<C>,
-    receiver: T,
+    receiver: R,
     idx: usize,
     limit: Option<usize>,
     state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<'a, T, C: Command<T>> Record<'a, T, C> {
+impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// Returns a new `Record`.
     #[inline]
-    pub fn new<U: Into<T>>(receiver: U) -> Record<'a, T, C> {
+    pub fn new<T: Into<R>>(receiver: T) -> Record<'a, R, C> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
@@ -120,7 +120,7 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn config<U: Into<T>>(receiver: U) -> Config<'a, T, C> {
+    pub fn config<T: Into<R>>(receiver: T) -> Config<'a, R, C> {
         Config {
             commands: PhantomData,
             receiver: receiver.into(),
@@ -142,7 +142,7 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
         self.commands.capacity()
     }
 
-    /// Returns the number of `Command`s in the `Record`.
+    /// Returns the number of commands in the `Record`.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
@@ -168,13 +168,13 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &T {
+    pub fn as_receiver(&self) -> &R {
         &self.receiver
     }
 
     /// Consumes the `Record`, returning the `receiver`.
     #[inline]
-    pub fn into_receiver(self) -> T {
+    pub fn into_receiver(self) -> R {
         self.receiver
     }
 
@@ -322,9 +322,9 @@ impl<'a, T, C: Command<T>> Record<'a, T, C> {
     }
 }
 
-impl<'a, T: Default, C: Command<T>> Default for Record<'a, T, C> {
+impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
     #[inline]
-    fn default() -> Record<'a, T, C> {
+    fn default() -> Record<'a, R, C> {
         Record {
             commands: VecDeque::new(),
             receiver: Default::default(),
@@ -335,14 +335,14 @@ impl<'a, T: Default, C: Command<T>> Default for Record<'a, T, C> {
     }
 }
 
-impl<'a, T, C: Command<T>> AsRef<T> for Record<'a, T, C> {
+impl<'a, R, C: Command<R>> AsRef<R> for Record<'a, R, C> {
     #[inline]
-    fn as_ref(&self) -> &T {
+    fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<'a, T: Debug, C: Command<T> + Debug> Debug for Record<'a, T, C> {
+impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -368,25 +368,25 @@ impl<C> Iterator for Commands<C> {
 }
 
 /// Configurator for `Record`.
-pub struct Config<'a, T, C: Command<T>> {
+pub struct Config<'a, R, C: Command<R>> {
     commands: PhantomData<C>,
-    receiver: T,
+    receiver: R,
     capacity: usize,
     limit: Option<usize>,
     state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<'a, T, C: Command<T>> Config<'a, T, C> {
+impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// Sets the `capacity` for the `Record`.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<'a, T, C> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a, R, C> {
         self.capacity = capacity;
         self
     }
 
     /// Sets the `limit` for the `Record`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Config<'a, T, C> {
+    pub fn limit(mut self, limit: usize) -> Config<'a, R, C> {
         self.limit = if limit == 0 { None } else { Some(limit) };
         self
     }
@@ -434,7 +434,7 @@ impl<'a, T, C: Command<T>> Config<'a, T, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn state_change<F>(mut self, f: F) -> Config<'a, T, C>
+    pub fn state_change<F>(mut self, f: F) -> Config<'a, R, C>
     where
         F: FnMut(bool) + 'a,
     {
@@ -444,7 +444,7 @@ impl<'a, T, C: Command<T>> Config<'a, T, C> {
 
     /// Creates the `Record`.
     #[inline]
-    pub fn create(self) -> Record<'a, T, C> {
+    pub fn create(self) -> Record<'a, R, C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: self.receiver,
@@ -455,7 +455,7 @@ impl<'a, T, C: Command<T>> Config<'a, T, C> {
     }
 }
 
-impl<'a, T: Debug, C: Command<T> + Debug> Debug for Config<'a, T, C> {
+impl<'a, R: Debug, C: Command<R> + Debug> Debug for Config<'a, R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Config")

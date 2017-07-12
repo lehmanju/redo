@@ -53,15 +53,15 @@ use Command;
 /// # foo().unwrap();
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Stack<T, C: Command<T>> {
+pub struct Stack<R, C: Command<R>> {
     commands: Vec<C>,
-    receiver: T,
+    receiver: R,
 }
 
-impl<T, C: Command<T>> Stack<T, C> {
+impl<R, C: Command<R>> Stack<R, C> {
     /// Creates a new `Stack`.
     #[inline]
-    pub fn new<U: Into<T>>(receiver: U) -> Stack<T, C> {
+    pub fn new<T: Into<R>>(receiver: T) -> Stack<R, C> {
         Stack {
             commands: Vec::new(),
             receiver: receiver.into(),
@@ -70,7 +70,7 @@ impl<T, C: Command<T>> Stack<T, C> {
 
     /// Creates a new `Stack` with the given `capacity`.
     #[inline]
-    pub fn with_capacity<U: Into<T>>(receiver: U, capacity: usize) -> Stack<T, C> {
+    pub fn with_capacity<T: Into<R>>(receiver: T, capacity: usize) -> Stack<R, C> {
         Stack {
             commands: Vec::with_capacity(capacity),
             receiver: receiver.into(),
@@ -97,13 +97,13 @@ impl<T, C: Command<T>> Stack<T, C> {
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &T {
+    pub fn as_receiver(&self) -> &R {
         &self.receiver
     }
 
     /// Consumes the `Stack`, returning the `receiver`.
     #[inline]
-    pub fn into_receiver(self) -> T {
+    pub fn into_receiver(self) -> R {
         self.receiver
     }
 
@@ -148,9 +148,9 @@ impl<T, C: Command<T>> Stack<T, C> {
     }
 }
 
-impl<T: Default, C: Command<T>> Default for Stack<T, C> {
+impl<R: Default, C: Command<R>> Default for Stack<R, C> {
     #[inline]
-    fn default() -> Stack<T, C> {
+    fn default() -> Stack<R, C> {
         Stack {
             commands: Vec::new(),
             receiver: Default::default(),
@@ -158,9 +158,9 @@ impl<T: Default, C: Command<T>> Default for Stack<T, C> {
     }
 }
 
-impl<T, C: Command<T>> AsRef<T> for Stack<T, C> {
+impl<R, C: Command<R>> AsRef<R> for Stack<R, C> {
     #[inline]
-    fn as_ref(&self) -> &T {
+    fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
