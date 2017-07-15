@@ -1,7 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use Command;
+use {Command, Error};
 
 /// A record of commands.
 ///
@@ -15,7 +15,7 @@ use Command;
 ///
 /// # Examples
 /// ```
-/// use redo::{Command, Record};
+/// use redo::{Command, Error, Record};
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
@@ -34,12 +34,12 @@ use Command;
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), &'static str> {
+/// fn foo() -> Result<(), Error<String, Add>> {
 ///     let mut record = Record::default();
 ///
-///     record.push(Add('a')).map_err(|(_, e)| e)?;
-///     record.push(Add('b')).map_err(|(_, e)| e)?;
-///     record.push(Add('c')).map_err(|(_, e)| e)?;
+///     record.push(Add('a'))?;
+///     record.push(Add('b'))?;
+///     record.push(Add('c'))?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -84,7 +84,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{Command, Record};
+    /// # use redo::{Command, Error, Record};
     /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
@@ -98,15 +98,15 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), &'static str> {
+    /// # fn foo() -> Result<(), Error<String, Add>> {
     /// let mut record = Record::config("")
     ///     .capacity(2)
     ///     .limit(2)
     ///     .create();
     ///
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
-    /// record.push(Add('b')).map_err(|(_, e)| e)?;
-    /// record.push(Add('c')).map_err(|(_, e)| e)?; // 'a' is removed from the record since limit is 2.
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -189,7 +189,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{Command, Record};
+    /// # use redo::{Command, Error, Record};
     /// # #[derive(Debug, Eq, PartialEq)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
@@ -203,18 +203,18 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), &'static str> {
+    /// # fn foo() -> Result<(), Error<String, Add>> {
     /// let mut record = Record::default();
     ///
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
-    /// record.push(Add('b')).map_err(|(_, e)| e)?;
-    /// record.push(Add('c')).map_err(|(_, e)| e)?;
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?;
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
     /// record.undo().unwrap()?;
     /// record.undo().unwrap()?;
-    /// let mut bc = record.push(Add('e')).map_err(|(_, e)| e)?;
+    /// let mut bc = record.push(Add('e'))?;
     ///
     /// assert_eq!(record.into_receiver(), "ae");
     /// assert_eq!(bc.next(), Some(Add('b')));
@@ -227,11 +227,11 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
-    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, (C, C::Err)> {
+    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, Error<R, C>> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err((cmd, e));
+            return Err(Error(cmd, e));
         }
         // Pop off all elements after len from record.
         let iter = self.commands.split_off(len).into_iter();
@@ -240,7 +240,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
             Some(x) => {
                 if let Err(e) = x {
-                    return Err((cmd, e));
+                    return Err(Error(cmd, e));
                 }
             }
             None => {
@@ -273,20 +273,25 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), C::Err>> {
+    pub fn redo(&mut self) -> Option<Result<(), Error<R, C>>> {
         if self.idx < self.len() {
             let is_dirty = self.is_dirty();
-            if let Err(e) = self.commands[self.idx].redo(&mut self.receiver) {
-                return Some(Err(e));
-            }
-            self.idx += 1;
-            // Check if record went from dirty to clean.
-            if is_dirty && self.is_clean() {
-                if let Some(ref mut f) = self.state_change {
-                    f(true);
+            match self.commands[self.idx].redo(&mut self.receiver) {
+                Ok(_) => {
+                    self.idx += 1;
+                    // Check if record went from dirty to clean.
+                    if is_dirty && self.is_clean() {
+                        if let Some(ref mut f) = self.state_change {
+                            f(true);
+                        }
+                    }
+                    Some(Ok(()))
+                }
+                Err(e) => {
+                    let cmd = self.commands.remove(self.idx).unwrap();
+                    Some(Err(Error(cmd, e)))
                 }
             }
-            Some(Ok(()))
         } else {
             None
         }
@@ -301,21 +306,25 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), C::Err>> {
+    pub fn undo(&mut self) -> Option<Result<(), Error<R, C>>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;
-            if let Err(e) = self.commands[self.idx].undo(&mut self.receiver) {
-                self.idx += 1;
-                return Some(Err(e));
-            }
-            // Check if record went from clean to dirty.
-            if is_clean && self.is_dirty() {
-                if let Some(ref mut f) = self.state_change {
-                    f(false);
+            match self.commands[self.idx].undo(&mut self.receiver) {
+                Ok(_) => {
+                    // Check if record went from clean to dirty.
+                    if is_clean && self.is_dirty() {
+                        if let Some(ref mut f) = self.state_change {
+                            f(false);
+                        }
+                    }
+                    Some(Ok(()))
+                }
+                Err(e) => {
+                    let cmd = self.commands.remove(self.idx).unwrap();
+                    Some(Err(Error(cmd, e)))
                 }
             }
-            Some(Ok(()))
         } else {
             None
         }
@@ -396,7 +405,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # Examples
     /// ```
     /// # use std::cell::Cell;
-    /// # use redo::{Command, Record};
+    /// # use redo::{Command, Error, Record};
     /// # #[derive(Debug, Eq, PartialEq)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
@@ -410,7 +419,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), &'static str> {
+    /// # fn foo() -> Result<(), Error<String, Add>> {
     /// let x = Cell::new(0);
     /// let mut record = Record::config("")
     ///     .state_change(|is_clean| {
@@ -423,7 +432,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     ///     .create();
     ///
     /// assert_eq!(x.get(), 0);
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// record.push(Add('a'))?;
     /// assert_eq!(x.get(), 0);
     /// record.undo().unwrap()?;
     /// assert_eq!(x.get(), 2);

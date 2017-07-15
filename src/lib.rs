@@ -17,6 +17,8 @@ extern crate fnv;
 pub mod record;
 mod stack;
 
+use std::fmt::{self, Debug, Display, Formatter};
+
 pub use record::Record;
 pub use stack::Stack;
 
@@ -49,5 +51,36 @@ pub trait Command<R> {
     #[inline]
     fn merge(&mut self, _: &Self) -> Option<Result<(), Self::Err>> {
         None
+    }
+}
+
+/// Custom error kind that holds the error and the command that caused the error.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
+
+impl<R, C: Command<R>> Display for Error<R, C>
+where
+    C::Err: Display
+{
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.1)
+    }
+}
+
+impl<R, C: Command<R>> std::error::Error for Error<R, C>
+where
+    R: Debug,
+    C: Debug,
+    C::Err: std::error::Error,
+{
+    #[inline]
+    fn description(&self) -> &str {
+        self.1.description()
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&std::error::Error> {
+        self.1.cause()
     }
 }
