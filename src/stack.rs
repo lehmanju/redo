@@ -118,14 +118,16 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
     pub fn push(&mut self, mut cmd: C) -> Result<(), Error<R, C>> {
-        if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err(Error(cmd, e));
+        match cmd.redo(&mut self.receiver) {
+            Ok(_) => {
+                match self.commands.last_mut().and_then(|last| last.merge(&cmd)) {
+                    Some(x) => x.map_err(|e| Error(cmd, e))?,
+                    None => self.commands.push(cmd),
+                }
+                Ok(())
+            }
+            Err(e) => Err(Error(cmd, e)),
         }
-        match self.commands.last_mut().and_then(|last| last.merge(&cmd)) {
-            Some(x) => x.map_err(|e| Error(cmd, e))?,
-            None => self.commands.push(cmd),
-        }
-        Ok(())
     }
 
     /// Calls the top commands [`undo`] method and pops it off the stack.
@@ -137,14 +139,12 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<C, Error<R, C>>> {
-        let mut cmd = match self.commands.pop() {
-            Some(cmd) => cmd,
-            None => return None,
-        };
-        match cmd.undo(&mut self.receiver) {
-            Ok(_) => Some(Ok(cmd)),
-            Err(e) => Some(Err(Error(cmd, e))),
-        }
+        self.commands.pop().map(|mut cmd| match cmd.undo(
+            &mut self.receiver,
+        ) {
+            Ok(_) => Ok(cmd),
+            Err(e) => Err(Error(cmd, e)),
+        })
     }
 }
 

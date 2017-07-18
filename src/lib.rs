@@ -60,7 +60,7 @@ pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
 
 impl<R, C: Command<R>> Display for Error<R, C>
 where
-    C::Err: Display
+    C::Err: Display,
 {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

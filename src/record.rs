@@ -230,38 +230,40 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, Error<R, C>> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
-        if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err(Error(cmd, e));
-        }
-        // Pop off all elements after len from record.
-        let iter = self.commands.split_off(len).into_iter();
-        debug_assert_eq!(len, self.len());
+        match cmd.redo(&mut self.receiver) {
+            Ok(_) => {
+                // Pop off all elements after len from record.
+                let iter = self.commands.split_off(len).into_iter();
+                debug_assert_eq!(len, self.len());
 
-        match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
-            Some(x) => {
-                if let Err(e) = x {
-                    return Err(Error(cmd, e));
-                }
-            }
-            None => {
-                match self.limit {
-                    Some(limit) if len == limit => {
-                        self.commands.pop_front();
+                match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
+                    Some(x) => {
+                        if let Err(e) = x {
+                            return Err(Error(cmd, e));
+                        }
                     }
-                    _ => self.idx += 1,
+                    None => {
+                        match self.limit {
+                            Some(limit) if len == limit => {
+                                self.commands.pop_front();
+                            }
+                            _ => self.idx += 1,
+                        }
+                        self.commands.push_back(cmd);
+                    }
                 }
-                self.commands.push_back(cmd);
-            }
-        }
 
-        debug_assert_eq!(self.idx, self.len());
-        // Record is always clean after a push, check if it was dirty before.
-        if is_dirty {
-            if let Some(ref mut f) = self.state_change {
-                f(true);
+                debug_assert_eq!(self.idx, self.len());
+                // Record is always clean after a push, check if it was dirty before.
+                if is_dirty {
+                    if let Some(ref mut f) = self.state_change {
+                        f(true);
+                    }
+                }
+                Ok(Commands(iter))
             }
+            Err(e) => Err(Error(cmd, e)),
         }
-        Ok(Commands(iter))
     }
 
     /// Calls the [`redo`] method for the active `Command` and sets the next one as the new
