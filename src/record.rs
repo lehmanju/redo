@@ -331,7 +331,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the
+    /// If an error occur when executing [`undo`] the
     /// error is returned and the state is left unchanged.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
