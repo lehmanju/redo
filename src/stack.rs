@@ -109,7 +109,7 @@ impl<R, C: Command<R>> Stack<R, C> {
                     Some(last) => match last.merge(cmd) {
                         Ok(_) => return Ok(()),
                         Err(cmd) => cmd,
-                    }
+                    },
                     None => cmd,
                 };
                 self.commands.push(cmd);

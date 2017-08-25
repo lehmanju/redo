@@ -269,7 +269,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     Some(last) => match last.merge(cmd) {
                         Ok(_) => None,
                         Err(cmd) => Some(cmd),
-                    }
+                    },
                     None => Some(cmd),
                 };
 
