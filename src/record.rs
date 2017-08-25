@@ -15,26 +15,41 @@ use {Command, Error};
 ///
 /// # Examples
 /// ```
-/// use redo::{Command, Error, Record};
+/// use std::error::Error;
+/// use std::fmt::{self, Display, Formatter};
+/// use redo::{Command, Record};
+///
+/// #[derive(Debug)]
+/// struct StrErr(&'static str);
+///
+/// impl Display for StrErr {
+///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+///         write!(f, "{}", self.0)
+///     }
+/// }
+///
+/// impl Error for StrErr {
+///     fn description(&self) -> &str { self.0 }
+/// }
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Err = &'static str;
+///     type Err = StrErr;
 ///
-///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
+///         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), Error<String, Add>> {
+/// fn foo() -> Result<(), Box<Error>> {
 ///     let mut record = Record::default();
 ///
 ///     record.push(Add('a'))?;
@@ -84,21 +99,31 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{Command, Error, Record};
+    /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug)]
+    /// # struct StrErr(&'static str);
+    /// # impl Display for StrErr {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
+    /// # }
+    /// # impl Error for StrErr {
+    /// #     fn description(&self) -> &str { self.0 }
+    /// # }
     /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
-    /// #     type Err = &'static str;
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #     type Err = StrErr;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), Error<String, Add>> {
+    /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::config("")
     ///     .capacity(2)
     ///     .limit(2)
@@ -189,21 +214,31 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{Command, Error, Record};
+    /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug)]
+    /// # struct StrErr(&'static str);
+    /// # impl Display for StrErr {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
+    /// # }
+    /// # impl Error for StrErr {
+    /// #     fn description(&self) -> &str { self.0 }
+    /// # }
     /// # #[derive(Debug, Eq, PartialEq)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
-    /// #     type Err = &'static str;
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #     type Err = StrErr;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), Error<String, Add>> {
+    /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
     /// record.push(Add('a'))?;
@@ -271,12 +306,12 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the command that caused the error is removed from
-    /// the record and returned together with the error.
+    /// If an error occur when executing [`redo`] the
+    /// error is returned and the state is left unchanged.
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R, C>>> {
+    pub fn redo(&mut self) -> Option<Result<(), C::Err>> {
         if self.idx < self.len() {
             let is_dirty = self.is_dirty();
             match self.commands[self.idx].redo(&mut self.receiver) {
@@ -290,10 +325,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     }
                     Some(Ok(()))
                 }
-                Err(e) => {
-                    let cmd = self.commands.remove(self.idx).unwrap();
-                    Some(Err(Error(cmd, e)))
-                }
+                Err(e) => Some(Err(e)),
             }
         } else {
             None
@@ -304,17 +336,17 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the command that caused the error is removed from
-    /// the record and returned together with the error.
+    /// If an error occur when executing [`redo`] the
+    /// error is returned and the state is left unchanged.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R, C>>> {
+    pub fn undo(&mut self) -> Option<Result<(), C::Err>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
-            self.idx -= 1;
-            match self.commands[self.idx].undo(&mut self.receiver) {
+            match self.commands[self.idx - 1].undo(&mut self.receiver) {
                 Ok(_) => {
+                    self.idx -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
                         if let Some(ref mut f) = self.state_change {
@@ -323,10 +355,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     }
                     Some(Ok(()))
                 }
-                Err(e) => {
-                    let cmd = self.commands.remove(self.idx).unwrap();
-                    Some(Err(Error(cmd, e)))
-                }
+                Err(e) => Some(Err(e)),
             }
         } else {
             None
@@ -408,21 +437,31 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # Examples
     /// ```
     /// # use std::cell::Cell;
-    /// # use redo::{Command, Error, Record};
-    /// # #[derive(Debug, Eq, PartialEq)]
+    /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
+    /// # use redo::{Command, Record};
+    /// # #[derive(Debug)]
+    /// # struct StrErr(&'static str);
+    /// # impl Display for StrErr {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
+    /// # }
+    /// # impl Error for StrErr {
+    /// #     fn description(&self) -> &str { self.0 }
+    /// # }
+    /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
-    /// #     type Err = &'static str;
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+    /// #     type Err = StrErr;
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # fn foo() -> Result<(), Error<String, Add>> {
+    /// # fn foo() -> Result<(), Box<Error>> {
     /// let x = Cell::new(0);
     /// let mut record = Record::config("")
     ///     .state_change(|is_clean| {
