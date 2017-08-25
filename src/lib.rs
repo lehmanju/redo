@@ -17,6 +17,7 @@ extern crate fnv;
 pub mod record;
 mod stack;
 
+use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use record::Record;
@@ -60,11 +61,11 @@ where
     }
 }
 
-impl<R, C: Command<R>> std::error::Error for CmdError<R, C>
+impl<R, C: Command<R>> Error for CmdError<R, C>
 where
     R: Debug,
     C: Debug,
-    C::Err: std::error::Error,
+    C::Err: Error,
 {
     #[inline]
     fn description(&self) -> &str {
@@ -72,7 +73,7 @@ where
     }
 
     #[inline]
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&Error> {
         self.1.cause()
     }
 }
