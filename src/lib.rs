@@ -46,11 +46,11 @@ pub trait Command<R> {
     }
 }
 
-/// Custom error kind that holds the error and the command that caused the error.
+/// An error kind that holds the error and the command that caused the error.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
+pub struct CmdError<R, C: Command<R>>(pub C, pub C::Err);
 
-impl<R, C: Command<R>> Display for Error<R, C>
+impl<R, C: Command<R>> Display for CmdError<R, C>
 where
     C::Err: Display,
 {
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<R, C: Command<R>> std::error::Error for Error<R, C>
+impl<R, C: Command<R>> std::error::Error for CmdError<R, C>
 where
     R: Debug,
     C: Debug,

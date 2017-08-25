@@ -1,4 +1,4 @@
-use {Command, Error};
+use {Command, CmdError};
 
 /// A stack of commands.
 ///
@@ -8,7 +8,7 @@ use {Command, Error};
 ///
 /// # Examples
 /// ```
-/// use redo::{Command, Error, Stack};
+/// use redo::{Command, CmdError, Stack};
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
@@ -27,7 +27,7 @@ use {Command, Error};
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), Error<String, Add>> {
+/// fn foo() -> Result<(), CmdError<String, Add>> {
 ///     let mut stack = Stack::default();
 ///
 ///     stack.push(Add('a'))?;
@@ -102,7 +102,7 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
-    pub fn push(&mut self, mut cmd: C) -> Result<(), Error<R, C>> {
+    pub fn push(&mut self, mut cmd: C) -> Result<(), CmdError<R, C>> {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {
@@ -115,7 +115,7 @@ impl<R, C: Command<R>> Stack<R, C> {
                 self.commands.push(cmd);
                 Ok(())
             }
-            Err(e) => Err(Error(cmd, e)),
+            Err(e) => Err(CmdError(cmd, e)),
         }
     }
 
@@ -127,12 +127,12 @@ impl<R, C: Command<R>> Stack<R, C> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<C, Error<R, C>>> {
+    pub fn pop(&mut self) -> Option<Result<C, CmdError<R, C>>> {
         self.commands.pop().map(|mut cmd| match cmd.undo(
             &mut self.receiver,
         ) {
             Ok(_) => Ok(cmd),
-            Err(e) => Err(Error(cmd, e)),
+            Err(e) => Err(CmdError(cmd, e)),
         })
     }
 }

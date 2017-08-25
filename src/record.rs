@@ -1,7 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use {Command, Error};
+use {Command, CmdError};
 
 /// A record of commands.
 ///
@@ -256,7 +256,8 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
-    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, Error<R, C>> {
+    #[inline]
+    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, CmdError<R, C>> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         match cmd.redo(&mut self.receiver) {
@@ -292,7 +293,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 }
                 Ok(Commands(iter))
             }
-            Err(e) => Err(Error(cmd, e)),
+            Err(e) => Err(CmdError(cmd, e)),
         }
     }
 
