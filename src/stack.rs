@@ -120,10 +120,14 @@ impl<R, C: Command<R>> Stack<R, C> {
     pub fn push(&mut self, mut cmd: C) -> Result<(), Error<R, C>> {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
-                match self.commands.last_mut().and_then(|last| last.merge(&cmd)) {
-                    Some(x) => x.map_err(|e| Error(cmd, e))?,
-                    None => self.commands.push(cmd),
-                }
+                let cmd = match self.commands.last_mut() {
+                    Some(last) => match last.merge(cmd) {
+                        Ok(_) => return Ok(()),
+                        Err(cmd) => cmd,
+                    }
+                    None => cmd,
+                };
+                self.commands.push(cmd);
                 Ok(())
             }
             Err(e) => Err(Error(cmd, e)),

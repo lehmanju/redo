@@ -39,18 +39,10 @@ pub trait Command<R> {
 
     /// Used for manual merging of two `Command`s.
     ///
-    /// Returns `Some(Ok)` if the merging was successful, `Some(Err)` if something went wrong when
-    /// trying to merge, and `None` if it did not try to merge.
-    /// This method is called with `self` being the top command and `cmd` being the
-    /// new command. If `None` is returned from this method, `cmd` will be pushed
-    /// as normal. However, if the return value is `Some(x)` it will not push the command on to
-    /// the stack since either it was merged or an error has occurred, and then the stack returns
-    /// the `x` value.
-    ///
-    /// [`push`]: struct.Stack.html#method.push
+    /// Returns `Ok` if commands was merged and `Err(cmd)` if not.
     #[inline]
-    fn merge(&mut self, _: &Self) -> Option<Result<(), Self::Err>> {
-        None
+    fn merge(&mut self, cmd: Self) -> Result<(), Self> where Self: Sized {
+        Err(cmd)
     }
 }
 

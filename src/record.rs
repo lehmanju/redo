@@ -236,21 +236,22 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 let iter = self.commands.split_off(len).into_iter();
                 debug_assert_eq!(len, self.len());
 
-                match self.commands.back_mut().and_then(|last| last.merge(&cmd)) {
-                    Some(x) => {
-                        if let Err(e) = x {
-                            return Err(Error(cmd, e));
-                        }
+                let cmd = match self.commands.back_mut() {
+                    Some(last) => match last.merge(cmd) {
+                        Ok(_) => None,
+                        Err(cmd) => Some(cmd),
                     }
-                    None => {
-                        match self.limit {
-                            Some(limit) if len == limit => {
-                                self.commands.pop_front();
-                            }
-                            _ => self.idx += 1,
+                    None => Some(cmd),
+                };
+
+                if let Some(cmd) = cmd {
+                    match self.limit {
+                        Some(limit) if len == limit => {
+                            self.commands.pop_front();
                         }
-                        self.commands.push_back(cmd);
+                        _ => self.idx += 1,
                     }
+                    self.commands.push_back(cmd);
                 }
 
                 debug_assert_eq!(self.idx, self.len());
