@@ -68,21 +68,6 @@ impl<R, C: Command<R>> Stack<R, C> {
         }
     }
 
-    /// Creates a new `Stack` with the given `capacity`.
-    #[inline]
-    pub fn with_capacity<T: Into<R>>(receiver: T, capacity: usize) -> Stack<R, C> {
-        Stack {
-            commands: Vec::with_capacity(capacity),
-            receiver: receiver.into(),
-        }
-    }
-
-    /// Returns the capacity of the `Stack`.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.commands.capacity()
-    }
-
     /// Returns the number of `Command`s in the `Stack`.
     #[inline]
     pub fn len(&self) -> usize {
