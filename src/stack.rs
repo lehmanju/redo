@@ -106,10 +106,12 @@ impl<R, C: Command<R>> Stack<R, C> {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {
-                    Some(last) => match last.merge(cmd) {
-                        Ok(_) => return Ok(()),
-                        Err(cmd) => cmd,
-                    },
+                    Some(last) => {
+                        match last.merge(cmd) {
+                            Ok(_) => return Ok(()),
+                            Err(cmd) => cmd,
+                        }
+                    }
                     None => cmd,
                 };
                 self.commands.push(cmd);
@@ -128,12 +130,12 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<C, CmdError<R, C>>> {
-        self.commands.pop().map(|mut cmd| match cmd.undo(
-            &mut self.receiver,
-        ) {
-            Ok(_) => Ok(cmd),
-            Err(e) => Err(CmdError(cmd, e)),
-        })
+        self.commands
+            .pop()
+            .map(|mut cmd| match cmd.undo(&mut self.receiver) {
+                     Ok(_) => Ok(cmd),
+                     Err(e) => Err(CmdError(cmd, e)),
+                 })
     }
 }
 

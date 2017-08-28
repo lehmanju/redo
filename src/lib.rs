@@ -42,7 +42,9 @@ pub trait Command<R> {
     ///
     /// Returns `Ok` if commands was merged and `Err(cmd)` if not.
     #[inline]
-    fn merge(&mut self, cmd: Self) -> Result<(), Self> where Self: Sized {
+    fn merge(&mut self, cmd: Self) -> Result<(), Self>
+        where Self: Sized
+    {
         Err(cmd)
     }
 }
@@ -52,8 +54,7 @@ pub trait Command<R> {
 pub struct CmdError<R, C: Command<R>>(pub C, pub C::Err);
 
 impl<R, C: Command<R>> Display for CmdError<R, C>
-where
-    C::Err: Display,
+    where C::Err: Display
 {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -62,10 +63,9 @@ where
 }
 
 impl<R, C: Command<R>> Error for CmdError<R, C>
-where
-    R: Debug,
-    C: Debug,
-    C::Err: Error,
+    where R: Debug,
+          C: Debug,
+          C::Err: Error
 {
     #[inline]
     fn description(&self) -> &str {

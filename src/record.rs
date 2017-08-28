@@ -267,10 +267,12 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 debug_assert_eq!(len, self.len());
 
                 let cmd = match self.commands.back_mut() {
-                    Some(last) => match last.merge(cmd) {
-                        Ok(_) => None,
-                        Err(cmd) => Some(cmd),
-                    },
+                    Some(last) => {
+                        match last.merge(cmd) {
+                            Ok(_) => None,
+                            Err(cmd) => Some(cmd),
+                        }
+                    }
                     None => Some(cmd),
                 };
 
@@ -278,7 +280,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     match self.limit {
                         Some(limit) if len == limit => {
                             self.commands.pop_front();
-                        }
+                        },
                         _ => self.idx += 1,
                     }
                     self.commands.push_back(cmd);
@@ -459,7 +461,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let x = Cell::new(0);
     /// let mut record = Record::config("")
-    ///     .state_change(|is_clean| {
+    ///     .state_handle(|is_clean| {
     ///         if is_clean {
     ///             x.set(1);
     ///         } else {
@@ -480,9 +482,8 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn state_change<F>(mut self, f: F) -> Config<'a, R, C>
-    where
-        F: FnMut(bool) + 'a,
+    pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
+        where F: FnMut(bool) + 'a
     {
         self.state_change = Some(Box::new(f));
         self
