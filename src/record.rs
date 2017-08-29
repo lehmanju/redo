@@ -1,7 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use {Command, CmdError};
+use {Command, Error};
 
 /// A record of commands.
 ///
@@ -23,9 +23,7 @@ use {Command, CmdError};
 /// struct StrErr(&'static str);
 ///
 /// impl Display for StrErr {
-///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-///         write!(f, "{}", self.0)
-///     }
+///     fn fmt(&self, f: &mut Formatter) -> fmt::Result { f.write_str(self.0) }
 /// }
 ///
 /// impl Error for StrErr {
@@ -34,6 +32,10 @@ use {Command, CmdError};
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
+///
+/// impl From<char> for Add {
+///     fn from(c: char) -> Add { Add(c) }
+/// }
 ///
 /// impl Command<String> for Add {
 ///     type Err = StrErr;
@@ -50,11 +52,11 @@ use {Command, CmdError};
 /// }
 ///
 /// fn foo() -> Result<(), Box<Error>> {
-///     let mut record = Record::default();
+///     let mut record = Record::<_, Add>::default();
 ///
-///     record.push(Add('a'))?;
-///     record.push(Add('b'))?;
-///     record.push(Add('c'))?;
+///     record.push('a')?;
+///     record.push('b')?;
+///     record.push('c')?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -112,6 +114,9 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # }
     /// # #[derive(Debug)]
     /// # struct Add(char);
+    /// # impl From<char> for Add {
+    /// #   fn from(c: char) -> Add { Add(c) }
+    /// # }
     /// # impl Command<String> for Add {
     /// #     type Err = StrErr;
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
@@ -124,14 +129,14 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::config("")
+    /// let mut record = Record::<_, Add>::config("")
     ///     .capacity(2)
     ///     .limit(2)
     ///     .create();
     ///
-    /// record.push(Add('a'))?;
-    /// record.push(Add('b'))?;
-    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
+    /// record.push('a')?;
+    /// record.push('b')?;
+    /// record.push('c')?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -221,6 +226,9 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # }
     /// # #[derive(Debug, Eq, PartialEq)]
     /// # struct Add(char);
+    /// # impl From<char> for Add {
+    /// #   fn from(c: char) -> Add { Add(c) }
+    /// # }
     /// # impl Command<String> for Add {
     /// #     type Err = StrErr;
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
@@ -235,15 +243,15 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
-    /// record.push(Add('a'))?;
-    /// record.push(Add('b'))?;
-    /// record.push(Add('c'))?;
+    /// record.push('a')?;
+    /// record.push('b')?;
+    /// record.push('c')?;
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
     /// record.undo().unwrap()?;
     /// record.undo().unwrap()?;
-    /// let mut bc = record.push(Add('e'))?;
+    /// let mut bc = record.push('e')?;
     ///
     /// assert_eq!(record.into_receiver(), "ae");
     /// assert_eq!(bc.next(), Some(Add('b')));
@@ -257,7 +265,8 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
-    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, CmdError<R, C>> {
+    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Result<Commands<C>, Error<R, C>> {
+        let mut cmd = cmd.into();
         let is_dirty = self.is_dirty();
         let len = self.idx;
         match cmd.redo(&mut self.receiver) {
@@ -295,7 +304,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 }
                 Ok(Commands(iter))
             }
-            Err(e) => Err(CmdError(cmd, e)),
+            Err(e) => Err(Error(cmd, e)),
         }
     }
 
@@ -447,6 +456,9 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # }
     /// # #[derive(Debug)]
     /// # struct Add(char);
+    /// # impl From<char> for Add {
+    /// #   fn from(c: char) -> Add { Add(c) }
+    /// # }
     /// # impl Command<String> for Add {
     /// #     type Err = StrErr;
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
@@ -460,7 +472,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let x = Cell::new(0);
-    /// let mut record = Record::config("")
+    /// let mut record = Record::<_, Add>::config("")
     ///     .state_handle(|is_clean| {
     ///         if is_clean {
     ///             x.set(1);
@@ -471,7 +483,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     ///     .create();
     ///
     /// assert_eq!(x.get(), 0);
-    /// record.push(Add('a'))?;
+    /// record.push('a')?;
     /// assert_eq!(x.get(), 0);
     /// record.undo().unwrap()?;
     /// assert_eq!(x.get(), 2);

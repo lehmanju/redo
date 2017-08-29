@@ -12,12 +12,10 @@
         unused_import_braces,
         unused_qualifications)]
 
-extern crate fnv;
-
 pub mod record;
 mod stack;
 
-use std::error::Error;
+use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use record::Record;
@@ -51,9 +49,9 @@ pub trait Command<R> {
 
 /// An error kind that holds the error and the command that caused the error.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct CmdError<R, C: Command<R>>(pub C, pub C::Err);
+pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
 
-impl<R, C: Command<R>> Display for CmdError<R, C>
+impl<R, C: Command<R>> Display for Error<R, C>
     where C::Err: Display
 {
     #[inline]
@@ -62,10 +60,10 @@ impl<R, C: Command<R>> Display for CmdError<R, C>
     }
 }
 
-impl<R, C: Command<R>> Error for CmdError<R, C>
+impl<R, C: Command<R>> error::Error for Error<R, C>
     where R: Debug,
           C: Debug,
-          C::Err: Error
+          C::Err: error::Error
 {
     #[inline]
     fn description(&self) -> &str {
@@ -73,7 +71,7 @@ impl<R, C: Command<R>> Error for CmdError<R, C>
     }
 
     #[inline]
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&error::Error> {
         self.1.cause()
     }
 }

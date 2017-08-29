@@ -1,4 +1,4 @@
-use {Command, CmdError};
+use {Command, Error};
 
 /// A stack of commands.
 ///
@@ -8,10 +8,14 @@ use {Command, CmdError};
 ///
 /// # Examples
 /// ```
-/// use redo::{Command, CmdError, Stack};
+/// use redo::{Command, Error, Stack};
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
+///
+/// impl From<char> for Add {
+///     fn from(c: char) -> Add { Add(c) }
+/// }
 ///
 /// impl Command<String> for Add {
 ///     type Err = &'static str;
@@ -27,12 +31,12 @@ use {Command, CmdError};
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), CmdError<String, Add>> {
+/// fn foo() -> Result<(), Error<String, Add>> {
 ///     let mut stack = Stack::default();
 ///
-///     stack.push(Add('a'))?;
-///     stack.push(Add('b'))?;
-///     stack.push(Add('c'))?;
+///     stack.push('a')?;
+///     stack.push('b')?;
+///     stack.push('c')?;
 ///
 ///     assert_eq!(stack.as_receiver(), "abc");
 ///
@@ -102,7 +106,8 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
-    pub fn push(&mut self, mut cmd: C) -> Result<(), CmdError<R, C>> {
+    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Result<(), Error<R, C>> {
+        let mut cmd = cmd.into();
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {
@@ -117,7 +122,7 @@ impl<R, C: Command<R>> Stack<R, C> {
                 self.commands.push(cmd);
                 Ok(())
             }
-            Err(e) => Err(CmdError(cmd, e)),
+            Err(e) => Err(Error(cmd, e)),
         }
     }
 
@@ -129,12 +134,12 @@ impl<R, C: Command<R>> Stack<R, C> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<C, CmdError<R, C>>> {
+    pub fn pop(&mut self) -> Option<Result<C, Error<R, C>>> {
         self.commands
             .pop()
             .map(|mut cmd| match cmd.undo(&mut self.receiver) {
                      Ok(_) => Ok(cmd),
-                     Err(e) => Err(CmdError(cmd, e)),
+                     Err(e) => Err(Error(cmd, e)),
                  })
     }
 }
