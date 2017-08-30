@@ -12,12 +12,14 @@
         unused_import_braces,
         unused_qualifications)]
 
+mod group;
 pub mod record;
 mod stack;
 
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
+pub use group::Group;
 pub use record::Record;
 pub use stack::Stack;
 
