@@ -4,20 +4,24 @@
 //!
 //! The library has currently two data structures that can be used to modify the receiver:
 //!
-//! * A simple `Stack` that pushes and pops commands to modify the receiver.
+//! * A `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
+//!
+//! It also has a structure called `Group` that can be used to group multiple stacks or records together.
 
 #![forbid(unstable_features, bad_style)]
 #![deny(missing_debug_implementations,
         unused_import_braces,
         unused_qualifications)]
 
+mod group;
 pub mod record;
 mod stack;
 
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
+pub use group::Group;
 pub use record::Record;
 pub use stack::Stack;
 
