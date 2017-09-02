@@ -81,7 +81,7 @@ pub struct Record<'a, R, C: Command<R>> {
     receiver: R,
     idx: usize,
     limit: Option<usize>,
-    state_change: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a, R, C: Command<R>> Record<'a, R, C> {
@@ -93,7 +93,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             receiver: receiver.into(),
             idx: 0,
             limit: None,
-            state_change: None,
+            state_handle: None,
         }
     }
 
@@ -156,7 +156,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             receiver: receiver.into(),
             capacity: 0,
             limit: None,
-            state_change: None,
+            state_handle: None,
         }
     }
 
@@ -298,7 +298,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 debug_assert_eq!(self.idx, self.len());
                 // Record is always clean after a push, check if it was dirty before.
                 if is_dirty {
-                    if let Some(ref mut f) = self.state_change {
+                    if let Some(ref mut f) = self.state_handle {
                         f(true);
                     }
                 }
@@ -325,7 +325,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     self.idx += 1;
                     // Check if record went from dirty to clean.
                     if is_dirty && self.is_clean() {
-                        if let Some(ref mut f) = self.state_change {
+                        if let Some(ref mut f) = self.state_handle {
                             f(true);
                         }
                     }
@@ -355,7 +355,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     self.idx -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
-                        if let Some(ref mut f) = self.state_change {
+                        if let Some(ref mut f) = self.state_handle {
                             f(false);
                         }
                     }
@@ -377,7 +377,7 @@ impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
             receiver: Default::default(),
             idx: 0,
             limit: None,
-            state_change: None,
+            state_handle: None,
         }
     }
 }
@@ -420,7 +420,7 @@ pub struct Config<'a, R, C: Command<R>> {
     receiver: R,
     capacity: usize,
     limit: Option<usize>,
-    state_change: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a, R, C: Command<R>> Config<'a, R, C> {
@@ -497,7 +497,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
         where F: FnMut(bool) + 'a
     {
-        self.state_change = Some(Box::new(f));
+        self.state_handle = Some(Box::new(f));
         self
     }
 
@@ -509,7 +509,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
             receiver: self.receiver,
             idx: 0,
             limit: self.limit,
-            state_change: self.state_change,
+            state_handle: self.state_handle,
         }
     }
 }
