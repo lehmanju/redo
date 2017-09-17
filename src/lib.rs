@@ -7,12 +7,11 @@
 //! * A `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
 //!
-//! It also has a structure called `Group` that can be used to group multiple stacks or records together.
+//! It also has a structure called `Group` that can be used to group multiple
+//! stacks or records together.
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations,
-        unused_import_braces,
-        unused_qualifications)]
+#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications)]
 
 mod group;
 pub mod record;
@@ -45,7 +44,8 @@ pub trait Command<R> {
     /// Returns `Ok` if commands was merged and `Err(cmd)` if not.
     #[inline]
     fn merge(&mut self, cmd: Self) -> Result<(), Self>
-        where Self: Sized
+    where
+        Self: Sized,
     {
         Err(cmd)
     }
@@ -56,7 +56,8 @@ pub trait Command<R> {
 pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
 
 impl<R, C: Command<R>> Display for Error<R, C>
-    where C::Err: Display
+where
+    C::Err: Display,
 {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -65,9 +66,10 @@ impl<R, C: Command<R>> Display for Error<R, C>
 }
 
 impl<R, C: Command<R>> error::Error for Error<R, C>
-    where R: Debug,
-          C: Debug,
-          C::Err: error::Error
+where
+    R: Debug,
+    C: Debug,
+    C::Err: error::Error,
 {
     #[inline]
     fn description(&self) -> &str {
