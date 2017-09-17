@@ -1,4 +1,4 @@
-use std::collections::vec_deque::{VecDeque, IntoIter};
+use std::collections::vec_deque::{IntoIter, VecDeque};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use {Command, Error};
@@ -276,12 +276,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 debug_assert_eq!(len, self.len());
 
                 let cmd = match self.commands.back_mut() {
-                    Some(last) => {
-                        match last.merge(cmd) {
-                            Ok(_) => None,
-                            Err(cmd) => Some(cmd),
-                        }
-                    }
+                    Some(last) => match last.merge(cmd) {
+                        Ok(_) => None,
+                        Err(cmd) => Some(cmd),
+                    },
                     None => Some(cmd),
                 };
 
@@ -289,7 +287,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     match self.limit {
                         Some(limit) if len == limit => {
                             self.commands.pop_front();
-                        },
+                        }
                         _ => self.idx += 1,
                     }
                     self.commands.push_back(cmd);
@@ -373,7 +371,7 @@ impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
     #[inline]
     fn default() -> Record<'a, R, C> {
         Record {
-            commands: VecDeque::new(),
+            commands: Default::default(),
             receiver: Default::default(),
             idx: 0,
             limit: None,
@@ -495,7 +493,8 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// ```
     #[inline]
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
-        where F: FnMut(bool) + 'a
+    where
+        F: FnMut(bool) + 'a,
     {
         self.state_handle = Some(Box::new(f));
         self

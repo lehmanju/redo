@@ -111,12 +111,10 @@ impl<R, C: Command<R>> Stack<R, C> {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {
-                    Some(last) => {
-                        match last.merge(cmd) {
-                            Ok(_) => return Ok(()),
-                            Err(cmd) => cmd,
-                        }
-                    }
+                    Some(last) => match last.merge(cmd) {
+                        Ok(_) => return Ok(()),
+                        Err(cmd) => cmd,
+                    },
                     None => cmd,
                 };
                 self.commands.push(cmd);
@@ -138,9 +136,9 @@ impl<R, C: Command<R>> Stack<R, C> {
         self.commands
             .pop()
             .map(|mut cmd| match cmd.undo(&mut self.receiver) {
-                     Ok(_) => Ok(cmd),
-                     Err(e) => Err(Error(cmd, e)),
-                 })
+                Ok(_) => Ok(cmd),
+                Err(e) => Err(Error(cmd, e)),
+            })
     }
 }
 
@@ -148,7 +146,7 @@ impl<R: Default, C: Command<R>> Default for Stack<R, C> {
     #[inline]
     fn default() -> Stack<R, C> {
         Stack {
-            commands: Vec::new(),
+            commands: Default::default(),
             receiver: Default::default(),
         }
     }
