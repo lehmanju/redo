@@ -33,10 +33,6 @@ use {Command, Error};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
-/// impl From<char> for Add {
-///     fn from(c: char) -> Add { Add(c) }
-/// }
-///
 /// impl Command<String> for Add {
 ///     type Err = StrErr;
 ///
@@ -52,7 +48,7 @@ use {Command, Error};
 /// }
 ///
 /// fn foo() -> Result<(), Box<Error>> {
-///     let mut record = Record::<_, Add>::default();
+///     let mut record = Record::default();
 ///
 ///     record.push(Add('a'))?;
 ///     record.push(Add('b'))?;
@@ -114,9 +110,6 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # }
     /// # #[derive(Debug)]
     /// # struct Add(char);
-    /// # impl From<char> for Add {
-    /// #   fn from(c: char) -> Add { Add(c) }
-    /// # }
     /// # impl Command<String> for Add {
     /// #     type Err = StrErr;
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
@@ -129,10 +122,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::<_, Add>::configure("")
+    /// let mut record = Record::configure()
     ///     .capacity(2)
     ///     .limit(2)
-    ///     .create();
+    ///     .default();
     ///
     /// record.push(Add('a'))?;
     /// record.push(Add('b'))?;
@@ -150,10 +143,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn configure<T: Into<R>>(receiver: T) -> Config<'a, R, C> {
+    pub fn configure() -> Config<'a, R, C> {
         Config {
             commands: PhantomData,
-            receiver: receiver.into(),
+            receiver: PhantomData,
             capacity: 0,
             limit: None,
             state_handle: None,
@@ -414,7 +407,7 @@ impl<C> Iterator for Commands<C> {
 /// Configurator for `Record`.
 pub struct Config<'a, R, C: Command<R>> {
     commands: PhantomData<C>,
-    receiver: R,
+    receiver: PhantomData<R>,
     capacity: usize,
     limit: Option<usize>,
     state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
@@ -452,9 +445,6 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # }
     /// # #[derive(Debug)]
     /// # struct Add(char);
-    /// # impl From<char> for Add {
-    /// #   fn from(c: char) -> Add { Add(c) }
-    /// # }
     /// # impl Command<String> for Add {
     /// #     type Err = StrErr;
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
@@ -468,7 +458,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut x = 0;
-    /// Record::<_, Add>::configure("")
+    /// let mut record = Record::configure()
     ///     .state_handle(|is_clean| {
     ///         if is_clean {
     ///             x = 1;
@@ -476,15 +466,17 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     ///             x = 2;
     ///         }
     ///     })
-    ///     .create();
+    ///     .default();
+    /// # record.push(Add('a'))?;
+    /// #
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
     /// ```
     #[inline]
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
-    where
-        F: FnMut(bool) + Send + Sync + 'a,
+        where
+            F: FnMut(bool) + Send + Sync + 'a,
     {
         self.state_handle = Some(Box::new(f));
         self
@@ -492,14 +484,21 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
 
     /// Creates the `Record`.
     #[inline]
-    pub fn create(self) -> Record<'a, R, C> {
+    pub fn create<T: Into<R>>(self, receiver: T) -> Record<'a, R, C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
-            receiver: self.receiver,
+            receiver: receiver.into(),
             idx: 0,
             limit: self.limit,
             state_handle: self.state_handle,
         }
+    }
+}
+
+impl<'a, R: Default, C: Command<R>> Config<'a, R, C> {
+    #[inline]
+    pub fn default(self) -> Record<'a, R, C> {
+        self.create(R::default())
     }
 }
 
