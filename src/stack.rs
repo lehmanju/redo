@@ -34,9 +34,9 @@ use {Command, Error};
 /// fn foo() -> Result<(), Error<String, Add>> {
 ///     let mut stack = Stack::default();
 ///
-///     stack.push('a')?;
-///     stack.push('b')?;
-///     stack.push('c')?;
+///     stack.push(Add('a'))?;
+///     stack.push(Add('b'))?;
+///     stack.push(Add('c'))?;
 ///
 ///     assert_eq!(stack.as_receiver(), "abc");
 ///
@@ -106,8 +106,7 @@ impl<R, C: Command<R>> Stack<R, C> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
-    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Result<(), Error<R, C>> {
-        let mut cmd = cmd.into();
+    pub fn push(&mut self, mut cmd: C) -> Result<(), Error<R, C>> {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {

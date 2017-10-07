@@ -68,7 +68,7 @@ impl<K: Hash + Eq, R, C: Command<R>> Group<K, Stack<R, C>> {
     ///
     /// [`push`]: stack/struct.Stack.html#method.push
     #[inline]
-    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Option<Result<(), Error<R, C>>> {
+    pub fn push(&mut self, cmd: C) -> Option<Result<(), Error<R, C>>> {
         let map = &mut self.map;
         self.active
             .as_ref()
@@ -94,7 +94,7 @@ impl<'a, K: Hash + Eq, R, C: Command<R>> Group<K, Record<'a, R, C>> {
     ///
     /// [`push`]: record/struct.Record.html#method.push
     #[inline]
-    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Option<Result<Commands<C>, Error<R, C>>> {
+    pub fn push(&mut self, cmd: C) -> Option<Result<Commands<C>, Error<R, C>>> {
         let map = &mut self.map;
         self.active
             .as_ref()

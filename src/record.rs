@@ -54,9 +54,9 @@ use {Command, Error};
 /// fn foo() -> Result<(), Box<Error>> {
 ///     let mut record = Record::<_, Add>::default();
 ///
-///     record.push('a')?;
-///     record.push('b')?;
-///     record.push('c')?;
+///     record.push(Add('a'))?;
+///     record.push(Add('b'))?;
+///     record.push(Add('c'))?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -81,7 +81,7 @@ pub struct Record<'a, R, C: Command<R>> {
     receiver: R,
     idx: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R, C: Command<R>> Record<'a, R, C> {
@@ -129,14 +129,14 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::<_, Add>::config("")
+    /// let mut record = Record::<_, Add>::configure("")
     ///     .capacity(2)
     ///     .limit(2)
     ///     .create();
     ///
-    /// record.push('a')?;
-    /// record.push('b')?;
-    /// record.push('c')?; // 'a' is removed from the record since limit is 2.
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -150,7 +150,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn config<T: Into<R>>(receiver: T) -> Config<'a, R, C> {
+    pub fn configure<T: Into<R>>(receiver: T) -> Config<'a, R, C> {
         Config {
             commands: PhantomData,
             receiver: receiver.into(),
@@ -243,15 +243,15 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
-    /// record.push('a')?;
-    /// record.push('b')?;
-    /// record.push('c')?;
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?;
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
     /// record.undo().unwrap()?;
     /// record.undo().unwrap()?;
-    /// let mut bc = record.push('e')?;
+    /// let mut bc = record.push(Add('e'))?;
     ///
     /// assert_eq!(record.into_receiver(), "ae");
     /// assert_eq!(bc.next(), Some(Add('b')));
@@ -265,8 +265,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     /// [`merge`]: ../trait.Command.html#method.merge
     #[inline]
-    pub fn push<T: Into<C>>(&mut self, cmd: T) -> Result<Commands<C>, Error<R, C>> {
-        let mut cmd = cmd.into();
+    pub fn push(&mut self, mut cmd: C) -> Result<Commands<C>, Error<R, C>> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         match cmd.redo(&mut self.receiver) {
@@ -418,7 +417,7 @@ pub struct Config<'a, R, C: Command<R>> {
     receiver: R,
     capacity: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R, C: Command<R>> Config<'a, R, C> {
@@ -440,7 +439,6 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     ///
     /// # Examples
     /// ```
-    /// # use std::cell::Cell;
     /// # use std::error::Error;
     /// # use std::fmt::{self, Display, Formatter};
     /// # use redo::{Command, Record};
@@ -469,24 +467,16 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let x = Cell::new(0);
-    /// let mut record = Record::<_, Add>::config("")
+    /// let mut x = 0;
+    /// Record::<_, Add>::configure("")
     ///     .state_handle(|is_clean| {
     ///         if is_clean {
-    ///             x.set(1);
+    ///             x = 1;
     ///         } else {
-    ///             x.set(2);
+    ///             x = 2;
     ///         }
     ///     })
     ///     .create();
-    ///
-    /// assert_eq!(x.get(), 0);
-    /// record.push('a')?;
-    /// assert_eq!(x.get(), 0);
-    /// record.undo().unwrap()?;
-    /// assert_eq!(x.get(), 2);
-    /// record.redo().unwrap()?;
-    /// assert_eq!(x.get(), 1);
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
@@ -494,7 +484,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     #[inline]
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
     where
-        F: FnMut(bool) + 'a,
+        F: FnMut(bool) + Send + Sync + 'a,
     {
         self.state_handle = Some(Box::new(f));
         self
