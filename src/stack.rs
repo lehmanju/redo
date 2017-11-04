@@ -13,10 +13,6 @@ use {Command, Error};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
-/// impl From<char> for Add {
-///     fn from(c: char) -> Add { Add(c) }
-/// }
-///
 /// impl Command<String> for Add {
 ///     type Err = &'static str;
 ///
