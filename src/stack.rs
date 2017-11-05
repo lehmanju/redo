@@ -153,3 +153,10 @@ impl<R, C: Command<R>> AsRef<R> for Stack<R, C> {
         self.as_receiver()
     }
 }
+
+impl<R, C: Command<R>> From<R> for Stack<R, C> {
+    #[inline]
+    fn from(receiver: R) -> Self {
+        Stack::new(receiver)
+    }
+}

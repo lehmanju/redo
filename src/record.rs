@@ -379,6 +379,13 @@ impl<'a, R, C: Command<R>> AsRef<R> for Record<'a, R, C> {
     }
 }
 
+impl<'a, R, C: Command<R>> From<R> for Record<'a, R, C> {
+    #[inline]
+    fn from(receiver: R) -> Self {
+        Record::new(receiver)
+    }
+}
+
 impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -392,7 +399,7 @@ impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
 }
 
 /// Iterator over `Command`s.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Commands<C>(IntoIter<C>);
 
 impl<C> Iterator for Commands<C> {
