@@ -8,7 +8,7 @@
 //! * A record that can roll the state of the receiver forwards and backwards.
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications)]
+#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
 pub mod record;
