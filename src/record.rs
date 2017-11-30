@@ -153,6 +153,12 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         }
     }
 
+    /// Returns the capacity of the `Record`.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.commands.capacity()
+    }
+
     /// Returns the limit of the `Record`, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
