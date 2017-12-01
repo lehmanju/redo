@@ -11,14 +11,14 @@
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
-pub mod record;
+mod record;
 mod stack;
 
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use group::Group;
-pub use record::Record;
+pub use record::{Commands, Record, RecordBuilder};
 pub use stack::Stack;
 
 /// Base functionality for all commands.

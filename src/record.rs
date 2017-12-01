@@ -77,7 +77,7 @@ pub struct Record<'a, R, C: Command<R>> {
     receiver: R,
     idx: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
+    callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R, C: Command<R>> Record<'a, R, C> {
@@ -89,11 +89,11 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             receiver: receiver.into(),
             idx: 0,
             limit: None,
-            state_handle: None,
+            callback: None,
         }
     }
 
-    /// Returns a configurator for a `Record`.
+    /// Returns a builder for a `Record`.
     ///
     /// # Examples
     /// ```
@@ -122,7 +122,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::configure()
+    /// let mut record = Record::builder()
     ///     .capacity(2)
     ///     .limit(2)
     ///     .default();
@@ -143,13 +143,13 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn configure() -> Config<'a, R, C> {
-        Config {
+    pub fn builder() -> RecordBuilder<'a, R, C> {
+        RecordBuilder {
             commands: PhantomData,
             receiver: PhantomData,
             capacity: 0,
             limit: None,
-            state_handle: None,
+            callback: None,
         }
     }
 
@@ -294,7 +294,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 debug_assert_eq!(self.idx, self.len());
                 // Record is always clean after a push, check if it was dirty before.
                 if is_dirty {
-                    if let Some(ref mut f) = self.state_handle {
+                    if let Some(ref mut f) = self.callback {
                         f(true);
                     }
                 }
@@ -321,7 +321,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     self.idx += 1;
                     // Check if record went from dirty to clean.
                     if is_dirty && self.is_clean() {
-                        if let Some(ref mut f) = self.state_handle {
+                        if let Some(ref mut f) = self.callback {
                             f(true);
                         }
                     }
@@ -351,7 +351,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     self.idx -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
-                        if let Some(ref mut f) = self.state_handle {
+                        if let Some(ref mut f) = self.callback {
                             f(false);
                         }
                     }
@@ -373,7 +373,7 @@ impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
             receiver: Default::default(),
             idx: 0,
             limit: None,
-            state_handle: None,
+            callback: None,
         }
     }
 }
@@ -404,7 +404,7 @@ impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
     }
 }
 
-/// Iterator over `Command`s.
+/// Iterator over commands.
 #[derive(Clone, Debug)]
 pub struct Commands<C>(IntoIter<C>);
 
@@ -417,26 +417,26 @@ impl<C> Iterator for Commands<C> {
     }
 }
 
-/// Configurator for `Record`.
-pub struct Config<'a, R, C: Command<R>> {
+/// Builder for a record.
+pub struct RecordBuilder<'a, R, C: Command<R>> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,
     capacity: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
+    callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
-impl<'a, R, C: Command<R>> Config<'a, R, C> {
+impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// Sets the `capacity` for the `Record`.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> Config<'a, R, C> {
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<'a, R, C> {
         self.capacity = capacity;
         self
     }
 
     /// Sets the `limit` for the `Record`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Config<'a, R, C> {
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R, C> {
         self.limit = if limit == 0 { None } else { Some(limit) };
         self
     }
@@ -471,8 +471,8 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut x = 0;
-    /// let mut record = Record::configure()
-    ///     .state_handle(|is_clean| {
+    /// let mut record = Record::builder()
+    ///     .callback(|is_clean| {
     ///         if is_clean {
     ///             x = 1;
     ///         } else {
@@ -487,36 +487,36 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn state_handle<F>(mut self, f: F) -> Config<'a, R, C>
+    pub fn callback<F>(mut self, f: F) -> RecordBuilder<'a, R, C>
         where
             F: FnMut(bool) + Send + Sync + 'a,
     {
-        self.state_handle = Some(Box::new(f));
+        self.callback = Some(Box::new(f));
         self
     }
 
     /// Creates the `Record`.
     #[inline]
-    pub fn create<T: Into<R>>(self, receiver: T) -> Record<'a, R, C> {
+    pub fn build<T: Into<R>>(self, receiver: T) -> Record<'a, R, C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
             idx: 0,
             limit: self.limit,
-            state_handle: self.state_handle,
+            callback: self.callback,
         }
     }
 }
 
-impl<'a, R: Default, C: Command<R>> Config<'a, R, C> {
+impl<'a, R: Default, C: Command<R>> RecordBuilder<'a, R, C> {
     /// Creates the `Record` with a default receiver.
     #[inline]
     pub fn default(self) -> Record<'a, R, C> {
-        self.create(R::default())
+        self.build(R::default())
     }
 }
 
-impl<'a, R: Debug, C: Command<R> + Debug> Debug for Config<'a, R, C> {
+impl<'a, R: Debug, C: Command<R> + Debug> Debug for RecordBuilder<'a, R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Config")
