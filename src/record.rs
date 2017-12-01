@@ -36,13 +36,13 @@ use {Command, Error};
 /// impl Command<String> for Add {
 ///     type Err = StrErr;
 ///
-///     fn redo(&mut self, s: &mut String) -> Result<(), StrErr> {
+///     fn redo(&mut self, s: &mut String) -> Result<(), Self::Err> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
-///         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
+///     fn undo(&mut self, s: &mut String) -> Result<(), Self::Err> {
+///         self.0 = s.pop().ok_or(StrErr("`s` is empty"))?;
 ///         Ok(())
 ///     }
 /// }
@@ -509,6 +509,7 @@ impl<'a, R, C: Command<R>> Config<'a, R, C> {
 }
 
 impl<'a, R: Default, C: Command<R>> Config<'a, R, C> {
+    /// Creates the `Record` with a default receiver.
     #[inline]
     pub fn default(self) -> Record<'a, R, C> {
         self.create(R::default())
