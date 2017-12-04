@@ -36,9 +36,57 @@ pub trait Command<R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
 
-    /// Used for manual merging of two `Command`s.
+    /// Used for manual merging of two commands.
     ///
-    /// Returns `Ok` if commands was merged and `Err(cmd)` if not.
+    /// Returns `Ok` if commands was merged and `Err` if not.
+    ///
+    /// # Examples
+    /// ```
+    /// use redo::{Command, Error, Stack};
+    ///
+    /// #[derive(Debug)]
+    /// struct Add(String);
+    ///
+    /// impl Command<String> for Add {
+    ///     type Err = ();
+    ///
+    ///     fn redo(&mut self, s: &mut String) -> Result<(), ()> {
+    ///         s.push_str(&self.0);
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn undo(&mut self, s: &mut String) -> Result<(), ()> {
+    ///         let len = s.len() - self.0.len();
+    ///         s.truncate(len);
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn merge(&mut self, Add(s): Self) -> Result<(), Self> {
+    ///         self.0.push_str(&s);
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// fn foo() -> Result<(), Error<String, Add>> {
+    ///     let mut stack = Stack::default();
+    ///
+    ///     stack.push(Add("a".into()))?;
+    ///     stack.push(Add("b".into()))?;
+    ///     stack.push(Add("c".into()))?; // "a", "b", and "c" are merged.
+    ///
+    ///     assert_eq!(stack.len(), 1);
+    ///     assert_eq!(stack.as_receiver(), "abc");
+    ///
+    ///     let abc = stack.pop().unwrap()?;
+    ///     assert_eq!(stack.as_receiver(), "");
+    ///
+    ///     stack.push(abc)?;
+    ///     assert_eq!(stack.into_receiver(), "abc");
+    ///
+    ///     Ok(())
+    /// }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     fn merge(&mut self, cmd: Self) -> Result<(), Self>
     where
