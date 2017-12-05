@@ -333,10 +333,10 @@ impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
     }
 }
 
-impl<'a, T, R: AsRef<T>, C: Command<R>> AsRef<T> for Record<'a, R, C> {
+impl<'a, R, C: Command<R>> AsRef<R> for Record<'a, R, C> {
     #[inline]
-    fn as_ref(&self) -> &T {
-        self.receiver.as_ref()
+    fn as_ref(&self) -> &R {
+        self.as_receiver()
     }
 }
 

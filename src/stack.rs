@@ -147,10 +147,10 @@ impl<R: Default, C: Command<R>> Default for Stack<R, C> {
     }
 }
 
-impl<T, R: AsRef<T>, C: Command<R>> AsRef<T> for Stack<R, C> {
+impl<R, C: Command<R>> AsRef<R> for Stack<R, C> {
     #[inline]
-    fn as_ref(&self) -> &T {
-        self.receiver.as_ref()
+    fn as_ref(&self) -> &R {
+        self.as_receiver()
     }
 }
 
