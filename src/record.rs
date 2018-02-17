@@ -78,7 +78,7 @@ pub struct Record<'a, R, C: Command<R>> {
     commands: VecDeque<C>,
     receiver: R,
     cursor: usize,
-    limit: Option<usize>,
+    limit: usize,
     callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
@@ -90,7 +90,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             commands: VecDeque::new(),
             receiver: receiver.into(),
             cursor: 0,
-            limit: None,
+            limit: 0,
             callback: None,
         }
     }
@@ -102,7 +102,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             commands: PhantomData,
             receiver: PhantomData,
             capacity: 0,
-            limit: None,
+            limit: 0,
             callback: None,
         }
     }
@@ -116,7 +116,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// Returns the limit of the record, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
-        self.limit
+        if self.limit == 0 { None } else { Some(self.limit) }
     }
 
     /// Returns the number of commands in the record.
@@ -237,11 +237,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 };
 
                 if let Some(cmd) = cmd {
-                    match self.limit {
-                        Some(limit) if len == limit => {
-                            self.commands.pop_front();
-                        }
-                        _ => self.cursor += 1,
+                    if self.limit != 0 && self.limit == len {
+                        self.commands.pop_front();
+                    } else {
+                        self.cursor += 1;
                     }
                     self.commands.push_back(cmd);
                 }
@@ -327,7 +326,7 @@ impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
             commands: Default::default(),
             receiver: Default::default(),
             cursor: 0,
-            limit: None,
+            limit: 0,
             callback: None,
         }
     }
@@ -377,7 +376,7 @@ pub struct RecordBuilder<'a, R, C: Command<R>> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,
     capacity: usize,
-    limit: Option<usize>,
+    limit: usize,
     callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
@@ -440,7 +439,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// ```
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R, C> {
-        self.limit = if limit == 0 { None } else { Some(limit) };
+        self.limit = limit;
         self
     }
 
