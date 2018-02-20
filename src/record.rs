@@ -126,33 +126,6 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         }
     }
 
-    /// Marks the receiver as being in a saved state.
-    #[inline]
-    pub fn set_saved(&mut self, is_saved: bool) {
-        self.saved = match self.saved {
-            Some(saved) if is_saved && saved != self.cursor => {
-                if let Some(ref mut f) = self.signals {
-                    f(Signal::Saved);
-                }
-                Some(self.cursor)
-            },
-            Some(saved) if is_saved => Some(saved),
-            Some(_) => {
-                if let Some(ref mut f) = self.signals {
-                    f(Signal::Unsaved);
-                }
-                None
-            },
-            None => None,
-        };
-    }
-
-    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.cursor)
-    }
-
     /// Returns the capacity of the record.
     #[inline]
     pub fn capacity(&self) -> usize {
@@ -187,6 +160,33 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
+    }
+
+    /// Marks the receiver as being in a saved state.
+    #[inline]
+    pub fn set_saved(&mut self, is_saved: bool) {
+        self.saved = match self.saved {
+            Some(saved) if is_saved && saved != self.cursor => {
+                if let Some(ref mut f) = self.signals {
+                    f(Signal::Saved);
+                }
+                Some(self.cursor)
+            },
+            Some(saved) if is_saved => Some(saved),
+            Some(_) => {
+                if let Some(ref mut f) = self.signals {
+                    f(Signal::Unsaved);
+                }
+                None
+            },
+            None => None,
+        };
+    }
+
+    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.saved.map_or(false, |saved| saved == self.cursor)
     }
 
     /// Pushes the command on top of the record and executes its [`redo`] method.
@@ -527,7 +527,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// ```
     /// # use std::error::Error;
     /// # use std::fmt::{self, Display, Formatter};
-    /// # use redo::{Command, Record, Signal::*};
+    /// # use redo::{Command, Record, Signal};
     /// # #[derive(Debug)]
     /// # struct StrErr(&'static str);
     /// # impl Display for StrErr {
@@ -554,12 +554,12 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// Record::builder()
     ///     .signals(|signal| {
     ///         match signal {
-    ///             Redo => println!("The record can redo."),
-    ///             NoRedo => println!("The record can not redo."),
-    ///             Undo => println!("The record can undo."),
-    ///             NoUndo => println!("The record can not undo."),
-    ///             Saved => println!("The receiver is in a saved state."),
-    ///             Unsaved => println!("The receiver is not in a saved state."),
+    ///             Signal::Redo => println!("The record can redo."),
+    ///             Signal::NoRedo => println!("The record can not redo."),
+    ///             Signal::Undo => println!("The record can undo."),
+    ///             Signal::NoUndo => println!("The record can not undo."),
+    ///             Signal::Saved => println!("The receiver is in a saved state."),
+    ///             Signal::Unsaved => println!("The receiver is not in a saved state."),
     ///         }
     ///     })
     ///     .default();
