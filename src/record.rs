@@ -135,7 +135,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// Returns the limit of the record, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
-        if self.limit == 0 { None } else { Some(self.limit) }
+        match self.limit {
+            0 => None,
+            v => Some(v)
+        }
     }
 
     /// Returns the number of commands in the record.
