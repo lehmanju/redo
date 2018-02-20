@@ -1,7 +1,6 @@
 use std::collections::hash_map::{HashMap, RandomState};
 use std::hash::{BuildHasher, Hash};
-use record::Commands;
-use {Command, Error, Record, Stack};
+use {Command, Commands, Error, Record, Stack};
 
 /// A group of either stacks or records.
 #[derive(Clone, Debug, Eq, PartialEq)]
