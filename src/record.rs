@@ -263,6 +263,13 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 let iter = self.commands.split_off(cursor).into_iter();
                 debug_assert_eq!(cursor, self.len());
 
+                // Check if the saved state was popped off.
+                if let Some(saved) = self.saved {
+                    if saved > cursor {
+                        self.saved = None;
+                    }
+                }
+
                 let cmd = match self.commands.back_mut() {
                     Some(ref mut last) if !was_saved => match last.merge(cmd) {
                         Ok(_) => None,
