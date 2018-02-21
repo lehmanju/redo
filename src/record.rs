@@ -311,7 +311,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     if cursor == 0 {
                         f(Signal::Undo);
                     }
-                    // Check if record went from saved to unsaved.
+                    // Check if receiver went from saved to unsaved.
                     if was_saved {
                         f(Signal::Unsaved);
                     }
@@ -349,12 +349,10 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                         if self.cursor == 1 {
                             f(Signal::Undo);
                         }
-                        // Check if record went from saved to unsaved.
+                        // Check if receiver went from saved to unsaved, or unsaved to saved.
                         if was_saved {
                             f(Signal::Unsaved);
-                        }
-                        // Check if record went from unsaved to saved.
-                        if is_saved {
+                        } else if is_saved {
                             f(Signal::Saved);
                         }
                     }
@@ -386,17 +384,18 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                     let is_dirty = self.cursor != self.len();
                     let is_saved = self.is_saved();
                     if let Some(ref mut f) = self.signals {
+                        // Check if record went from clean to dirty.
                         if was_clean && is_dirty {
-                            // Check if record went from clean to dirty.
                             f(Signal::Redo);
-                        } else if self.cursor == 0 {
-                            // Check if the stack was not empty before pushing the command.
+                        }
+                        // Check if the stack was not empty before pushing the command.
+                        if self.cursor == 0 {
                             f(Signal::NoUndo);
-                        } else if was_saved {
-                            // Check if record went from saved to unsaved.
+                        }
+                        // Check if receiver went from saved to unsaved, or unsaved to saved.
+                        if was_saved {
                             f(Signal::Unsaved);
                         } else if is_saved {
-                            // Check if record went from unsaved to saved.
                             f(Signal::Saved);
                         }
                     }
