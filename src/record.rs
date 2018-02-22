@@ -1,5 +1,5 @@
 use std::collections::vec_deque::{IntoIter, VecDeque};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 use {Command, Error};
 
@@ -447,6 +447,20 @@ impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
             .field("limit", &self.limit)
             .field("saved", &self.saved)
             .finish()
+    }
+}
+
+impl<'a, R, C: Command<R> + Display> Display for Record<'a, R, C> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        for (idx, cmd) in self.commands.iter().rev().enumerate() {
+            if idx + 1 == self.cursor {
+                writeln!(f, " -> {}.", cmd)?;
+            } else {
+                writeln!(f, "    {}.", cmd)?;
+            }
+        }
+        Ok(())
     }
 }
 
