@@ -472,6 +472,32 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     }
 }
 
+impl<'a, R, C: Command<R> + ToString> Record<'a, R, C> {
+    /// Returns the string of the command which will be undone in the next call to [`undo`].
+    ///
+    /// [`undo`]: struct.Record.html#method.undo
+    #[inline]
+    pub fn to_undo_string(&self) -> Option<String> {
+        if self.can_undo() {
+            Some(self.commands[self.cursor - 1].to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the string of the command which will be redone in the next call to [`redo`].
+    ///
+    /// [`redo`]: struct.Record.html#method.redo
+    #[inline]
+    pub fn to_redo_string(&self) -> Option<String> {
+        if self.can_redo() {
+            Some(self.commands[self.cursor].to_string())
+        } else {
+            None
+        }
+    }
+}
+
 impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
     #[inline]
     fn default() -> Record<'a, R, C> {
