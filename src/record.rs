@@ -501,14 +501,7 @@ impl<'a, R, C: Command<R> + ToString> Record<'a, R, C> {
 impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
     #[inline]
     fn default() -> Record<'a, R, C> {
-        Record {
-            commands: Default::default(),
-            receiver: Default::default(),
-            cursor: 0,
-            limit: 0,
-            saved: None,
-            signals: None,
-        }
+        Record::new(R::default())
     }
 }
 
