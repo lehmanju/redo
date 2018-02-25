@@ -169,6 +169,24 @@ impl<'a, K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<'a, K, Record<'a,
     }
 }
 
+impl<'a, K: Hash + Eq, R, C: Command<R> + ToString, S: BuildHasher> Group<'a, K, Record<'a, R, C>, S> {
+    /// Calls the [`to_undo_string`] method on the active record.
+    ///
+    /// [`to_undo_string`]: record/struct.Record.html#method.to_undo_string
+    #[inline]
+    pub fn to_undo_string(&self) -> Option<String> {
+        self.get().and_then(|record| record.to_undo_string())
+    }
+
+    /// Calls the [`to_redo_string`] method on the active record.
+    ///
+    /// [`to_redo_string`]: record/struct.Record.html#method.to_redo_string
+    #[inline]
+    pub fn to_redo_string(&self) -> Option<String> {
+        self.get().and_then(|record| record.to_redo_string())
+    }
+}
+
 impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, V, S> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
