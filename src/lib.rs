@@ -28,12 +28,12 @@ pub trait Command<R> {
 
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
 
-    /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
+    /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
 
     /// Used for manual merging of two commands.
@@ -50,7 +50,7 @@ pub trait Command<R> {
     /// impl Command<String> for Add {
     ///     type Err = ();
     ///
-    ///     fn redo(&mut self, s: &mut String) -> Result<(), ()> {
+    ///     fn exec(&mut self, s: &mut String) -> Result<(), ()> {
     ///         s.push_str(&self.0);
     ///         Ok(())
     ///     }
@@ -70,16 +70,18 @@ pub trait Command<R> {
     /// fn foo() -> Result<(), Error<String, Add>> {
     ///     let mut stack = Stack::default();
     ///
+    ///     // "a", "b", and "c" are merged.
     ///     stack.push(Add("a".into()))?;
     ///     stack.push(Add("b".into()))?;
-    ///     stack.push(Add("c".into()))?; // "a", "b", and "c" are merged.
-    ///
+    ///     stack.push(Add("c".into()))?;
     ///     assert_eq!(stack.len(), 1);
     ///     assert_eq!(stack.as_receiver(), "abc");
     ///
+    ///     // Calling `pop` once will undo all merged commands.
     ///     let abc = stack.pop().unwrap()?;
     ///     assert_eq!(stack.as_receiver(), "");
     ///
+    ///     // Pushing the merged commands back on the stack will redo them.
     ///     stack.push(abc)?;
     ///     assert_eq!(stack.into_receiver(), "abc");
     ///

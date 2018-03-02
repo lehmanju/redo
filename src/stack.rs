@@ -17,7 +17,7 @@ use {Command, Error};
 /// impl Command<String> for Add {
 ///     type Err = &'static str;
 ///
-///     fn redo(&mut self, s: &mut String) -> Result<(), &'static str> {
+///     fn exec(&mut self, s: &mut String) -> Result<(), &'static str> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
@@ -89,18 +89,18 @@ impl<R, C: Command<R>> Stack<R, C> {
         self.commands.clear();
     }
 
-    /// Pushes the command on the stack and executes its [`redo`] method. The command is merged with
+    /// Pushes the command on the stack and executes its [`exec`] method. The command is merged with
     /// the previous top command if [`merge`] does not return `None`.
     ///
     /// # Errors
     /// If an error occur when executing `redo` or merging commands, the error is returned together
     /// with the command.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn push(&mut self, mut cmd: C) -> Result<(), Error<R, C>> {
-        match cmd.redo(&mut self.receiver) {
+        match cmd.exec(&mut self.receiver) {
             Ok(_) => {
                 let cmd = match self.commands.last_mut() {
                     Some(last) => match last.merge(cmd) {
