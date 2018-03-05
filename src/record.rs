@@ -388,7 +388,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             return None;
         }
 
-        let ok = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor -= 1;
@@ -411,7 +411,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 }
             }
         });
-        Some(ok)
+        Some(result)
     }
 
     /// Calls the [`exec`] method for the active command and sets the next one as the new
@@ -428,7 +428,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             return None;
         }
 
-        let ok = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor += 1;
@@ -451,7 +451,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 }
             }
         });
-        Some(ok)
+        Some(result)
     }
 
     /// Returns a reference to the `receiver`.
