@@ -330,10 +330,8 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 debug_assert_eq!(self.cursor, self.len());
 
                 // Check if the saved state was popped off.
-                if let Some(saved) = self.saved {
-                    if saved > self.cursor {
-                        self.saved = None;
-                    }
+                if self.saved.map_or(false, |saved| saved > self.cursor) {
+                    self.saved = None;
                 }
 
                 let cmd = match self.commands.back_mut() {
@@ -346,7 +344,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
 
                 if let Some(cmd) = cmd {
                     if self.limit != 0 && self.limit == self.cursor {
-                        let _ = self.commands.pop_front().unwrap();
+                        self.commands.pop_front();
                         self.saved = match self.saved {
                             Some(0) => None,
                             Some(saved) => Some(saved - 1),

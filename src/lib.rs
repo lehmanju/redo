@@ -98,7 +98,9 @@ pub trait Command<R> {
     }
 }
 
-/// An error kind that holds the error and the command that caused the error.
+/// The error type.
+///
+/// The error contains the error itself and the command that caused the error.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
 
