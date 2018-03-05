@@ -335,10 +335,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                 }
 
                 let cmd = match self.commands.back_mut() {
-                    Some(ref mut last) if !was_saved => match last.merge(cmd) {
-                        Ok(_) => None,
-                        Err(cmd) => Some(cmd),
-                    },
+                    Some(ref mut last) if !was_saved => last.merge(cmd).err(),
                     _ => Some(cmd),
                 };
 
