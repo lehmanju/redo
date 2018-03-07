@@ -15,7 +15,7 @@ use {Command, Error};
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Err = &'static str;
+///     type Error = &'static str;
 ///
 ///     fn exec(&mut self, s: &mut String) -> Result<(), &'static str> {
 ///         s.push(self.0);

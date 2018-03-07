@@ -24,17 +24,17 @@ pub use stack::Stack;
 /// Base functionality for all commands.
 pub trait Command<R> {
     /// The error type.
-    type Err;
+    type Error;
 
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
 
     /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`exec`]: trait.Command.html#tymethod.exec
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Err>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
 
     /// Used for manual merging of two commands.
     ///
@@ -48,7 +48,7 @@ pub trait Command<R> {
     /// struct Add(String);
     ///
     /// impl Command<String> for Add {
-    ///     type Err = ();
+    ///     type Error = ();
     ///
     ///     fn exec(&mut self, s: &mut String) -> Result<(), ()> {
     ///         s.push_str(&self.0);
@@ -90,10 +90,7 @@ pub trait Command<R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    fn merge(&mut self, cmd: Self) -> Result<(), Self>
-    where
-        Self: Sized,
-    {
+    fn merge(&mut self, cmd: Self) -> Result<(), Self> where Self: Sized {
         Err(cmd)
     }
 }
@@ -102,12 +99,9 @@ pub trait Command<R> {
 ///
 /// The error contains the error itself and the command that caused the error.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Error<R, C: Command<R>>(pub C, pub C::Err);
+pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
 
-impl<R, C: Command<R>> Display for Error<R, C>
-where
-    C::Err: Display,
-{
+impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.1)
@@ -118,7 +112,7 @@ impl<R, C: Command<R>> error::Error for Error<R, C>
 where
     R: Debug,
     C: Debug,
-    C::Err: error::Error,
+    C::Error: error::Error,
 {
     #[inline]
     fn description(&self) -> &str {
