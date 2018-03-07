@@ -44,26 +44,25 @@ pub enum Signal {
 ///
 /// # Examples
 /// ```
-/// use std::error::Error;
-/// use std::fmt::{self, Display, Formatter};
-/// use redo::{Command, Record};
-///
+/// # use std::error::Error;
+/// # use std::fmt::{self, Display, Formatter};
+/// # use redo::*;
 /// #[derive(Debug)]
-/// struct StrErr(&'static str);
+/// struct MyError(&'static str);
 ///
-/// impl Display for StrErr {
-///     fn fmt(&self, f: &mut Formatter) -> fmt::Result { f.write_str(self.0) }
-/// }
-///
-/// impl Error for StrErr {
-///     fn description(&self) -> &str { self.0 }
-/// }
+/// // impl Display + Error for MyError..
+/// # impl Display for MyError {
+/// #    fn fmt(&self, f: &mut Formatter) -> fmt::Result { f.write_str(self.0) }
+/// # }
+/// # impl Error for MyError {
+/// #    fn description(&self) -> &str { self.0 }
+/// # }
 ///
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Error = StrErr;
+///     type Error = MyError;
 ///
 ///     fn exec(&mut self, s: &mut String) -> Result<(), Self::Error> {
 ///         s.push(self.0);
@@ -71,7 +70,7 @@ pub enum Signal {
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
-///         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
+///         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
 ///         Ok(())
 ///     }
 /// }
@@ -261,33 +260,29 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// # use redo::*;
     /// #
     /// # #[derive(Debug)]
-    /// # struct StrErr(&'static str);
+    /// # struct MyError(&'static str);
     /// #
-    /// # impl Display for StrErr {
+    /// # impl Display for MyError {
     /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
     /// # }
     /// #
-    /// # impl Error for StrErr {
+    /// # impl Error for MyError {
     /// #     fn description(&self) -> &str { self.0 }
     /// # }
     /// #
     /// # #[derive(Debug, Eq, PartialEq)]
     /// # struct Add(char);
     /// #
-    /// # impl From<char> for Add {
-    /// #     fn from(c: char) -> Add { Add(c) }
-    /// # }
-    /// #
     /// # impl Command<String> for Add {
-    /// #     type Error = StrErr;
+    /// #     type Error = MyError;
     /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
-    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
+    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -530,8 +525,8 @@ impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
 impl<'a, R, C: Command<R> + Display> Display for Record<'a, R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (idx, cmd) in self.commands.iter().enumerate().rev() {
-            if idx + 1 == self.cursor {
+        for (i, cmd) in self.commands.iter().enumerate().rev() {
+            if i + 1 == self.cursor {
                 writeln!(f, "* {}", cmd)?;
             } else {
                 writeln!(f, "  {}", cmd)?;
@@ -591,13 +586,13 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # use redo::*;
     /// #
     /// # #[derive(Debug)]
-    /// # struct StrErr(&'static str);
+    /// # struct MyError(&'static str);
     /// #
-    /// # impl Display for StrErr {
+    /// # impl Display for MyError {
     /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
     /// # }
     /// #
-    /// # impl Error for StrErr {
+    /// # impl Error for MyError {
     /// #     fn description(&self) -> &str { self.0 }
     /// # }
     /// #
@@ -605,15 +600,15 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     type Error = StrErr;
+    /// #     type Error = MyError;
     /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
-    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
+    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -655,13 +650,13 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # use redo::*;
     /// #
     /// # #[derive(Debug)]
-    /// # struct StrErr(&'static str);
+    /// # struct MyError(&'static str);
     /// #
-    /// # impl Display for StrErr {
+    /// # impl Display for MyError {
     /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
     /// # }
     /// #
-    /// # impl Error for StrErr {
+    /// # impl Error for MyError {
     /// #     fn description(&self) -> &str { self.0 }
     /// # }
     /// #
@@ -669,15 +664,15 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     type Error = StrErr;
+    /// #     type Error = MyError;
     /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), StrErr> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), StrErr> {
-    /// #         self.0 = s.pop().ok_or(StrErr("`String` is unexpectedly empty"))?;
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
+    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }

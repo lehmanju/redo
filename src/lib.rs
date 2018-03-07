@@ -42,8 +42,7 @@ pub trait Command<R> {
     ///
     /// # Examples
     /// ```
-    /// use redo::{Command, Error, Stack};
-    ///
+    /// # use redo::*;
     /// #[derive(Debug)]
     /// struct Add(String);
     ///

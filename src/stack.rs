@@ -9,8 +9,7 @@ use {Command, Error};
 ///
 /// # Examples
 /// ```
-/// use redo::{Command, Error, Stack};
-///
+/// # use redo::*;
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
