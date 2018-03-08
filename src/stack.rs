@@ -172,9 +172,9 @@ impl<R, C: Command<R>> From<R> for Stack<R, C> {
 impl<R, C: Command<R> + Display> Display for Stack<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Some(cmd) = self.commands.last() {
-            writeln!(f, "* {}", cmd)?;
-            for cmd in self.commands.iter().rev().skip(1) {
+        if let Some((last, commands)) = self.commands.split_last() {
+            writeln!(f, "* {}", last)?;
+            for cmd in commands.iter().rev() {
                 writeln!(f, "  {}", cmd)?;
             }
         }
