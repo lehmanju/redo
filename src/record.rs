@@ -1,4 +1,4 @@
-use std::collections::vec_deque::{IntoIter, VecDeque};
+use std::collections::vec_deque::VecDeque;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 use {Command, Error};
@@ -29,11 +29,16 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the records active command has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
-    /// The `old` and `new` fields are always `index + 1`.
-    Active { old: usize, new: usize },
+    /// The `old` and `new` fields are `index of command + 1`.
+    Active {
+        /// The old command.
+        old: usize,
+        /// The new command.
+        new: usize
+    },
 }
 
-/// The command record.
+/// A record of commands.
 ///
 /// The record works mostly like a stack, but it stores the commands
 /// instead of returning them when undoing. This means it can roll the
@@ -64,7 +69,7 @@ pub enum Signal {
 /// impl Command<String> for Add {
 ///     type Error = MyError;
 ///
-///     fn exec(&mut self, s: &mut String) -> Result<(), Self::Error> {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
@@ -78,9 +83,9 @@ pub enum Signal {
 /// fn foo() -> Result<(), Box<Error>> {
 ///     let mut record = Record::default();
 ///
-///     record.exec(Add('a'))?;
-///     record.exec(Add('b'))?;
-///     record.exec(Add('c'))?;
+///     record.apply(Add('a'))?;
+///     record.apply(Add('b'))?;
+///     record.apply(Add('c'))?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -244,76 +249,20 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         }
     }
 
-    /// Pushes the command on top of the record and executes its [`exec`] method.
+    /// Pushes the command on top of the record and executes its [`apply`] method.
     /// The command is merged with the previous top command if [`merge`] does not return `None`.
     ///
     /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`exec`] or [merging commands][`merge`],
+    /// If an error occur when calling [`apply`] or when [merging commands][`merge`],
     /// the error is returned together with the command.
     ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
-    /// # use redo::*;
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct MyError(&'static str);
-    /// #
-    /// # impl Display for MyError {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
-    /// # }
-    /// #
-    /// # impl Error for MyError {
-    /// #     fn description(&self) -> &str { self.0 }
-    /// # }
-    /// #
-    /// # #[derive(Debug, Eq, PartialEq)]
-    /// # struct Add(char);
-    /// #
-    /// # impl Command<String> for Add {
-    /// #     type Error = MyError;
-    /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::default();
-    ///
-    /// record.exec(Add('a'))?;
-    /// record.exec(Add('b'))?;
-    /// record.exec(Add('c'))?;
-    ///
-    /// assert_eq!(record.as_receiver(), "abc");
-    ///
-    /// record.undo().unwrap()?;
-    /// record.undo().unwrap()?;
-    /// let mut bc = record.exec(Add('e'))?;
-    ///
-    /// assert_eq!(record.into_receiver(), "ae");
-    /// assert_eq!(bc.next(), Some(Add('b')));
-    /// assert_eq!(bc.next(), Some(Add('c')));
-    /// assert_eq!(bc.next(), None);
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
-    ///
-    /// [`exec`]: trait.Command.html#tymethod.exec
+    /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
-    pub fn exec(&mut self, mut cmd: C) -> Result<Commands<C>, Error<R, C>> {
-        match cmd.exec(&mut self.receiver) {
+    pub fn apply(&mut self, mut cmd: C) -> Result<impl Iterator<Item=C>, Error<R, C>> {
+        match cmd.apply(&mut self.receiver) {
             Ok(_) => {
                 let old = self.cursor;
                 let could_undo = self.can_undo();
@@ -361,7 +310,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
                         f(Signal::Saved(false));
                     }
                 }
-                Ok(Commands(iter))
+                Ok(iter)
             }
             Err(e) => Err(Error(cmd, e)),
         }
@@ -405,21 +354,21 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         Some(result)
     }
 
-    /// Calls the [`exec`] method for the active command and sets the next one as the new
+    /// Calls the [`apply`] method for the active command and sets the next one as the new
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`exec`] the
+    /// If an error occur when executing [`apply`] the
     /// error is returned and the state is left unchanged.
     ///
-    /// [`exec`]: trait.Command.html#tymethod.exec
+    /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), C::Error>> {
         if !self.can_redo() {
             return None;
         }
 
-        let result = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor].apply(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor += 1;
@@ -455,6 +404,12 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
+    }
+
+    /// Returns an iterator over the commands.
+    #[inline]
+    pub fn commands(&self) -> impl Iterator<Item = &C> {
+        self.commands.iter()
     }
 }
 
@@ -532,24 +487,6 @@ impl<'a, R, C: Command<R> + Display> Display for Record<'a, R, C> {
     }
 }
 
-/// Iterator over commands.
-#[derive(Clone, Debug)]
-pub struct Commands<C>(IntoIter<C>);
-
-impl<C> Iterator for Commands<C> {
-    type Item = C;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
 /// Builder for a record.
 pub struct RecordBuilder<'a, R, C: Command<R>> {
     commands: PhantomData<C>,
@@ -598,7 +535,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # impl Command<String> for Add {
     /// #     type Error = MyError;
     /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
+    /// #     fn apply(&mut self, s: &mut String) -> Result<(), MyError> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
@@ -615,9 +552,9 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     ///     .limit(2)
     ///     .default();
     ///
-    /// record.exec(Add('a'))?;
-    /// record.exec(Add('b'))?;
-    /// record.exec(Add('c'))?; // 'a' is removed from the record since limit is 2.
+    /// record.apply(Add('a'))?;
+    /// record.apply(Add('b'))?;
+    /// record.apply(Add('c'))?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -662,7 +599,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # impl Command<String> for Add {
     /// #     type Error = MyError;
     /// #
-    /// #     fn exec(&mut self, s: &mut String) -> Result<(), MyError> {
+    /// #     fn apply(&mut self, s: &mut String) -> Result<(), MyError> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
@@ -690,7 +627,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     ///         }
     ///     })
     ///     .default();
-    /// # record.exec(Add('a'))?;
+    /// # record.apply(Add('a'))?;
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
