@@ -259,7 +259,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
-    pub fn apply(&mut self, mut cmd: C) -> Result<impl Iterator<Item=C>, Error<R, C>> {
+    pub fn apply(&mut self, mut cmd: C) -> Result<impl Iterator<Item = C>, Error<R, C>> {
         match cmd.apply(&mut self.receiver) {
             Ok(_) => {
                 let old = self.cursor;
@@ -352,21 +352,21 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         Some(result)
     }
 
-    /// Calls the [`apply`] method for the active command and sets the next one as the new
+    /// Calls the [`redo`] method for the active command and sets the next one as the new
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the
+    /// If an error occur when applying [`redo`] the
     /// error is returned and the state is left unchanged.
     ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
+    /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), C::Error>> {
         if !self.can_redo() {
             return None;
         }
 
-        let result = self.commands[self.cursor].apply(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor].redo(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor += 1;

@@ -70,7 +70,7 @@ impl<'a, K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<'a, K, R, C, S> {
     #[inline]
     pub fn get_mut(&mut self) -> Option<&mut Record<'a, R, C>> {
         let map = &mut self.records;
-        self.active.as_mut().and_then(move |active| map.get_mut(active))
+        self.active.as_ref().and_then(move |active| map.get_mut(active))
     }
 
     /// Sets the current active item in the group.
@@ -115,7 +115,7 @@ impl<'a, K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<'a, K, R, C, S> {
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
     #[inline]
     pub fn set_saved(&mut self) -> Option<()> {
-        self.get_mut().map(|stack| stack.set_saved())
+        self.get_mut().map(|record| record.set_saved())
     }
 
     /// Calls the [`set_unsaved`] method on the active record.
@@ -123,7 +123,7 @@ impl<'a, K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<'a, K, R, C, S> {
     /// [`set_unsaved`]: record/struct.Record.html#method.set_unsaved
     #[inline]
     pub fn set_unsaved(&mut self) -> Option<()> {
-        self.get_mut().map(|stack| stack.set_unsaved())
+        self.get_mut().map(|record| record.set_unsaved())
     }
 
     /// Calls the [`is_saved`] method on the active record.
@@ -131,14 +131,14 @@ impl<'a, K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<'a, K, R, C, S> {
     /// [`is_saved`]: record/struct.Record.html#method.is_saved
     #[inline]
     pub fn is_saved(&self) -> Option<bool> {
-        self.get().map(|stack| stack.is_saved())
+        self.get().map(|record| record.is_saved())
     }
 
     /// Calls the [`apply`] method on the active record.
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, cmd: C) -> Option<Result<impl Iterator<Item=C>, Error<R, C>>> {
+    pub fn apply(&mut self, cmd: C) -> Option<Result<impl Iterator<Item = C>, Error<R, C>>> {
         self.get_mut().map(move |record| record.apply(cmd))
     }
 

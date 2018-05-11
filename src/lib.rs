@@ -19,15 +19,24 @@ pub trait Command<R> {
     /// The error type.
     type Error;
 
-    /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
-    /// something went wrong.
+    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
 
-    /// Restores the state as it was before [`apply`] was called and returns `Ok` if everything
-    /// went fine, and `Err` if something went wrong.
+    /// Restores the state of the receiver as it was before the command was applied
+    /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+
+    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
+    ///
+    /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Error> {
+        self.apply(receiver)
+    }
 
     /// Used for manual merging of two commands.
     ///
