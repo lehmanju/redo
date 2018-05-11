@@ -59,7 +59,7 @@ pub trait Command<R> {
     ///     }
     /// }
     ///
-    /// fn foo() -> Result<(), ()> {
+    /// fn main() -> Result<(), ()> {
     ///     let mut record = Record::default();
     ///
     ///     // The `a`, `b`, and `c` commands are merged.
@@ -78,7 +78,6 @@ pub trait Command<R> {
     ///
     ///     Ok(())
     /// }
-    /// # foo().unwrap();
     /// ```
     #[inline]
     fn merge(&mut self, cmd: Self) -> Result<(), Self> where Self: Sized {

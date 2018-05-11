@@ -29,11 +29,10 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the records active command has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
-    /// The `old` and `new` fields are `index of command + 1`.
     Active {
-        /// The old command.
+        /// The `index + 1` of the old active command.
         old: usize,
-        /// The new command.
+        /// The `index + 1` of the new active command.
         new: usize
     },
 }
@@ -80,7 +79,7 @@ pub enum Signal {
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), Box<Error>> {
+/// fn main() -> Result<(), Box<Error>> {
 ///     let mut record = Record::default();
 ///
 ///     record.apply(Add('a'))?;
@@ -103,7 +102,6 @@ pub enum Signal {
 ///
 ///     Ok(())
 /// }
-/// # foo().unwrap();
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html
@@ -546,7 +544,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// #     }
     /// # }
     /// #
-    /// # fn foo() -> Result<(), Box<Error>> {
+    /// # fn main() -> Result<(), Box<Error>> {
     /// let mut record = Record::builder()
     ///     .capacity(2)
     ///     .limit(2)
@@ -565,7 +563,6 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// assert_eq!(record.into_receiver(), "a");
     /// # Ok(())
     /// # }
-    /// # foo().unwrap();
     /// ```
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R, C> {
@@ -610,7 +607,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// #     }
     /// # }
     /// #
-    /// # fn foo() -> Result<(), Box<Error>> {
+    /// # fn main() -> Result<(), Box<Error>> {
     /// # let mut record =
     /// Record::builder()
     ///     .signals(|signal| {
@@ -630,7 +627,6 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # record.apply(Add('a'))?;
     /// # Ok(())
     /// # }
-    /// # foo().unwrap();
     /// ```
     #[inline]
     pub fn signals<F>(mut self, f: F) -> RecordBuilder<'a, R, C>
