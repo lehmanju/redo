@@ -94,16 +94,14 @@ pub trait Command<R> {
     }
 }
 
-/// The error type.
-///
-/// The error contains the error itself and the command that caused the error.
+/// An error which holds the command that caused it.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
 
 impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.1)
+        write!(f, "{error}", error = self.1)
     }
 }
 
@@ -120,6 +118,6 @@ where
 
     #[inline]
     fn cause(&self) -> Option<&error::Error> {
-        Some(&self.1 as &error::Error)
+        self.1.cause()
     }
 }

@@ -39,29 +39,25 @@ pub enum Signal {
 
 /// A record of commands.
 ///
-/// The record works mostly like a stack, but it stores the commands
-/// instead of returning them when undoing. This means it can roll the
-/// receivers state backwards and forwards by using the undo and redo methods.
-/// In addition, the record can notify the user about changes to the stack or
-/// the receiver through [signals]. The user can give the record a function
-/// that is called each time the state changes by using the [`builder`].
+/// The record can roll the receivers state backwards and forwards by using
+/// the undo and redo methods. In addition, the record can notify the user
+/// about changes to the stack or the receiver through [signals]. The user
+/// can give the record a function that is called each time the state changes
+/// by using the [`builder`].
 ///
 /// # Examples
 /// ```
 /// # use std::error::Error;
 /// # use std::fmt::{self, Display, Formatter};
 /// # use redo::*;
-/// #[derive(Debug)]
-/// struct MyError(&'static str);
-///
-/// // impl Display + Error for MyError..
+/// # #[derive(Debug)]
+/// # struct MyError(&'static str);
 /// # impl Display for MyError {
 /// #    fn fmt(&self, f: &mut Formatter) -> fmt::Result { f.write_str(self.0) }
 /// # }
 /// # impl Error for MyError {
 /// #    fn description(&self) -> &str { self.0 }
 /// # }
-///
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -106,19 +102,19 @@ pub enum Signal {
 ///
 /// [`builder`]: struct.RecordBuilder.html
 /// [signals]: enum.Signal.html
-pub struct Record<'a, R, C: Command<R>> {
+pub struct Record<R, C: Command<R>> {
     commands: VecDeque<C>,
     receiver: R,
     cursor: usize,
     limit: usize,
     saved: Option<usize>,
-    signals: Option<Box<FnMut(Signal) + Send + Sync + 'a>>,
+    signals: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
 }
 
-impl<'a, R, C: Command<R>> Record<'a, R, C> {
+impl<R, C: Command<R>> Record<R, C> {
     /// Returns a new record.
     #[inline]
-    pub fn new<T: Into<R>>(receiver: T) -> Record<'a, R, C> {
+    pub fn new<T: Into<R>>(receiver: T) -> Record<R, C> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
@@ -131,7 +127,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
 
     /// Returns a builder for a record.
     #[inline]
-    pub fn builder() -> RecordBuilder<'a, R, C> {
+    pub fn builder() -> RecordBuilder<R, C> {
         RecordBuilder {
             commands: PhantomData,
             receiver: PhantomData,
@@ -139,6 +135,15 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
             limit: 0,
             signals: None,
         }
+    }
+
+    /// Reserves capacity for at least `additional` more commands.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.commands.reserve(additional);
     }
 
     /// Returns the capacity of the record.
@@ -159,13 +164,34 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
         self.commands.is_empty()
     }
 
-    /// Returns the limit of the record, or `None` if it has no limit.
+    /// Returns the limit of the record.
     #[inline]
-    pub fn limit(&self) -> Option<usize> {
-        match self.limit {
-            0 => None,
-            v => Some(v)
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    /// Sets the limit of the record and returns the new limit.
+    ///
+    /// If `limit < len` the first commands will be removed until `len == limit`.
+    /// However, if the current active command is going to be removed, the limit is instead
+    /// adjusted to `len - active` so that the active command is not popped off.
+    #[inline]
+    pub fn set_limit(&mut self, limit: usize) -> usize {
+        if limit > 0 && limit < self.len() {
+            unimplemented!();
+        } else {
+            self.limit = limit;
         }
+        self.limit
+    }
+
+    /// Sets how different signals should be handled when the state changes.
+    #[inline]
+    pub fn set_signals<F>(&mut self, f: F)
+        where
+            F: FnMut(Signal) + Send + Sync + 'static,
+    {
+        self.signals = Some(Box::new(f) as _);
     }
 
     /// Returns `true` if the record can undo.
@@ -411,7 +437,7 @@ impl<'a, R, C: Command<R>> Record<'a, R, C> {
     }
 }
 
-impl<'a, R, C: Command<R> + ToString> Record<'a, R, C> {
+impl<R, C: Command<R> + ToString> Record<R, C> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -437,28 +463,28 @@ impl<'a, R, C: Command<R> + ToString> Record<'a, R, C> {
     }
 }
 
-impl<'a, R: Default, C: Command<R>> Default for Record<'a, R, C> {
+impl<R: Default, C: Command<R>> Default for Record<R, C> {
     #[inline]
-    fn default() -> Record<'a, R, C> {
+    fn default() -> Record<R, C> {
         Record::new(R::default())
     }
 }
 
-impl<'a, R, C: Command<R>> AsRef<R> for Record<'a, R, C> {
+impl<R, C: Command<R>> AsRef<R> for Record<R, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<'a, R, C: Command<R>> From<R> for Record<'a, R, C> {
+impl<R, C: Command<R>> From<R> for Record<R, C> {
     #[inline]
     fn from(receiver: R) -> Self {
         Record::new(receiver)
     }
 }
 
-impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
+impl<R: Debug, C: Command<R> + Debug> Debug for Record<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -471,7 +497,7 @@ impl<'a, R: Debug, C: Command<R> + Debug> Debug for Record<'a, R, C> {
     }
 }
 
-impl<'a, R, C: Command<R> + Display> Display for Record<'a, R, C> {
+impl<R, C: Command<R> + Display> Display for Record<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (i, cmd) in self.commands.iter().enumerate().rev() {
@@ -486,20 +512,20 @@ impl<'a, R, C: Command<R> + Display> Display for Record<'a, R, C> {
 }
 
 /// Builder for a record.
-pub struct RecordBuilder<'a, R, C: Command<R>> {
+pub struct RecordBuilder<R, C: Command<R>> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,
     capacity: usize,
     limit: usize,
-    signals: Option<Box<FnMut(Signal) + Send + Sync + 'a>>,
+    signals: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
 }
 
-impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
+impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// Sets the [capacity] for the record.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<'a, R, C> {
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
         self.capacity = capacity;
         self
     }
@@ -565,7 +591,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # }
     /// ```
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R, C> {
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C> {
         self.limit = limit;
         self
     }
@@ -629,9 +655,9 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     /// # }
     /// ```
     #[inline]
-    pub fn signals<F>(mut self, f: F) -> RecordBuilder<'a, R, C>
+    pub fn signals<F>(mut self, f: F) -> RecordBuilder<R, C>
         where
-            F: FnMut(Signal) + Send + Sync + 'a,
+            F: FnMut(Signal) + Send + Sync + 'static,
     {
         self.signals = Some(Box::new(f));
         self
@@ -639,7 +665,7 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
 
     /// Creates the record.
     #[inline]
-    pub fn build<T: Into<R>>(self, receiver: T) -> Record<'a, R, C> {
+    pub fn build<T: Into<R>>(self, receiver: T) -> Record<R, C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
@@ -651,15 +677,15 @@ impl<'a, R, C: Command<R>> RecordBuilder<'a, R, C> {
     }
 }
 
-impl<'a, R: Default, C: Command<R>> RecordBuilder<'a, R, C> {
+impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default(self) -> Record<'a, R, C> {
+    pub fn default(self) -> Record<R, C> {
         self.build(R::default())
     }
 }
 
-impl<'a, R: Debug, C: Command<R> + Debug> Debug for RecordBuilder<'a, R, C> {
+impl<R: Debug, C: Command<R> + Debug> Debug for RecordBuilder<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("RecordBuilder")
