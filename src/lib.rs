@@ -95,8 +95,17 @@ pub trait Command<R> {
 }
 
 /// An error which holds the command that caused it.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
+
+impl<R, C: Command<R> + Debug> Debug for Error<R, C> where C::Error: Debug {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("Error")
+            .field(&self.0)
+            .field(&self.1)
+            .finish()
+    }
+}
 
 impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
     #[inline]
@@ -106,10 +115,9 @@ impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
 }
 
 impl<R, C: Command<R>> error::Error for Error<R, C>
-where
-    R: Debug,
-    C: Debug,
-    C::Error: error::Error,
+    where
+        C: Debug,
+        C::Error: error::Error,
 {
     #[inline]
     fn description(&self) -> &str {
