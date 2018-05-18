@@ -67,7 +67,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
         where
             F: FnMut(Option<&K>) + Send + Sync + 'static,
     {
-        self.signals = Some(Box::new(f) as _);
+        self.signals = Some(Box::new(f));
     }
 
     /// Inserts an item into the group.

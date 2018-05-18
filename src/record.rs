@@ -193,7 +193,7 @@ impl<R, C: Command<R>> Record<R, C> {
         where
             F: FnMut(Signal) + Send + Sync + 'static,
     {
-        self.signals = Some(Box::new(f) as _);
+        self.signals = Some(Box::new(f));
     }
 
     /// Returns `true` if the record can undo.
@@ -274,55 +274,54 @@ impl<R, C: Command<R>> Record<R, C> {
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn apply(&mut self, mut cmd: C) -> Result<impl Iterator<Item=C>, Error<R, C>> {
-        match cmd.apply(&mut self.receiver) {
-            Ok(_) => {
-                let old = self.cursor;
-                let could_undo = self.can_undo();
-                let could_redo = self.can_redo();
-                let was_saved = self.is_saved();
-
-                // Pop off all elements after len from record.
-                let iter = self.commands.split_off(self.cursor).into_iter();
-                debug_assert_eq!(self.cursor, self.len());
-
-                // Check if the saved state was popped off.
-                if self.saved.map_or(false, |saved| saved > self.cursor) {
-                    self.saved = None;
-                }
-
-                // Try to merge commands unless the receiver is in a saved state.
-                let cmd = match self.commands.back_mut() {
-                    Some(ref mut last) if !was_saved => last.merge(cmd).err(),
-                    _ => Some(cmd),
-                };
-
-                // If commands are not merged push it onto the record.
-                if let Some(cmd) = cmd {
-                    // If limit is reached, pop off the first command.
-                    if self.limit != 0 && self.limit == self.cursor {
-                        self.commands.pop_front();
-                        self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
-                    } else {
-                        self.cursor += 1;
-                    }
-                    self.commands.push_back(cmd);
-                }
-
-                debug_assert_eq!(self.cursor, self.len());
-                if let Some(ref mut f) = self.signals {
-                    // We emit this signal even if the commands might have been merged.
-                    f(Signal::Active { old, new: self.cursor });
-                    // Record can never redo after executing a command, check if you could redo before.
-                    if could_redo { f(Signal::Redo(false)); }
-                    // Record can always undo after executing a command, check if you could not undo before.
-                    if !could_undo { f(Signal::Undo(true)); }
-                    // Check if the receiver went from saved to unsaved.
-                    if was_saved { f(Signal::Saved(false)); }
-                }
-                Ok(iter)
-            }
-            Err(e) => Err(Error(cmd, e)),
+        if let Err(e) = cmd.apply(&mut self.receiver) {
+            return Err(Error(cmd, e));
         }
+
+        let old = self.cursor;
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+
+        // Pop off all elements after len from record.
+        let iter = self.commands.split_off(self.cursor).into_iter();
+        debug_assert_eq!(self.cursor, self.len());
+
+        // Check if the saved state was popped off.
+        if self.saved.map_or(false, |saved| saved > self.cursor) {
+            self.saved = None;
+        }
+
+        // Try to merge commands unless the receiver is in a saved state.
+        let cmd = match self.commands.back_mut() {
+            Some(ref mut last) if !was_saved => last.merge(cmd).err(),
+            _ => Some(cmd),
+        };
+
+        // If commands are not merged push it onto the record.
+        if let Some(cmd) = cmd {
+            // If limit is reached, pop off the first command.
+            if self.limit != 0 && self.limit == self.cursor {
+                self.commands.pop_front();
+                self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+            } else {
+                self.cursor += 1;
+            }
+            self.commands.push_back(cmd);
+        }
+
+        debug_assert_eq!(self.cursor, self.len());
+        if let Some(ref mut f) = self.signals {
+            // We emit this signal even if the commands might have been merged.
+            f(Signal::Active { old, new: self.cursor });
+            // Record can never redo after executing a command, check if you could redo before.
+            if could_redo { f(Signal::Redo(false)); }
+            // Record can always undo after executing a command, check if you could not undo before.
+            if !could_undo { f(Signal::Undo(true)); }
+            // Check if the receiver went from saved to unsaved.
+            if was_saved { f(Signal::Saved(false)); }
+        }
+        Ok(iter)
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
