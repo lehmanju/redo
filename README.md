@@ -8,6 +8,49 @@ An undo-redo library with static dispatch and manual command merging.
 It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern) 
 where the user modifies a receiver by applying commands on it.
 
+```rust
+#[derive(Debug)]
+struct Add(char);
+
+impl Command<String> for Add {
+    type Error = MyError;
+
+    fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+        s.push(self.0);
+        Ok(())
+    }
+
+    fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+        self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
+        Ok(())
+    }
+}
+
+fn main() -> Result<(), Box<Error>> {
+    let mut record = Record::default();
+
+    record.apply(Add('a'))?;
+    record.apply(Add('b'))?;
+    record.apply(Add('c'))?;
+
+    assert_eq!(record.as_receiver(), "abc");
+
+    record.undo().unwrap()?;
+    record.undo().unwrap()?;
+    record.undo().unwrap()?;
+
+    assert_eq!(record.as_receiver(), "");
+
+    record.redo().unwrap()?;
+    record.redo().unwrap()?;
+    record.redo().unwrap()?;
+
+    assert_eq!(record.into_receiver(), "abc");
+
+    Ok(())
+}
+```
+
 ## License
 
 Licensed under either of
