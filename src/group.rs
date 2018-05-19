@@ -154,7 +154,7 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, cmd: C) -> Option<Result<impl Iterator<Item = C>, Error<R, C>>> {
+    pub fn apply(&mut self, cmd: C) -> Option<Result<impl Iterator<Item=C>, Error<R, C>>> {
         self.get_mut().map(move |record| record.apply(cmd))
     }
 
@@ -174,9 +174,17 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
         self.get_mut().and_then(|record| record.redo())
     }
 
+    /// Calls the [`set_command`] method on the active record.
+    ///
+    /// [`set_command`]: record/struct.Record.html#method.set_command
+    #[inline]
+    pub fn set_command(&mut self, index: usize) -> Option<Result<(), C::Error>> {
+        self.get_mut().and_then(|record| record.set_command(index))
+    }
+
     /// Returns an iterator over the records.
     #[inline]
-    pub fn records(&self) -> impl Iterator<Item = &Record<R, C>> {
+    pub fn records(&self) -> impl Iterator<Item=&Record<R, C>> {
         self.group.values()
     }
 }
