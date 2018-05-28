@@ -110,7 +110,7 @@ impl<R, C: Command<R> + Debug> Debug for Error<R, C> where C::Error: Debug {
 impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{error}", error = self.1)
+        (&self.1 as &Display).fmt(f)
     }
 }
 
