@@ -178,9 +178,31 @@ impl<R, C: Command<R>> Record<R, C> {
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
         if limit > 0 && limit < self.len() {
+            let old = self.cursor;
+            let could_undo = self.can_undo();
+            let was_saved = self.is_saved();
+
             let begin = usize::min(self.cursor, self.len() - limit);
             self.commands = self.commands.split_off(begin);
             self.limit = self.len();
+            self.cursor -= begin;
+
+            // Check if the saved state has been removed.
+            if self.saved.map_or(false, |saved| saved > 0 && saved < begin) {
+                self.saved = None;
+            }
+
+            let new = self.cursor;
+            let can_undo = self.can_undo();
+            let is_saved = self.is_saved();
+            if let Some(ref mut f) = self.signals {
+                // Emit signal if the cursor has changed.
+                if old != new { f(Signal::Active { old, new }) }
+                // Check if the records ability to undo changed.
+                if could_undo != can_undo { f(Signal::Undo(can_undo)) }
+                // Check if the receiver went from saved to unsaved.
+                if was_saved != is_saved { f(Signal::Saved(is_saved)) }
+            }
         } else {
             self.limit = limit;
         }
@@ -715,5 +737,93 @@ impl<R: Debug, C: Command<R> + Debug> Debug for RecordBuilder<R, C> {
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+    use super::*;
+
+    #[derive(Debug)]
+    struct Add(char);
+
+    impl Command<String> for Add {
+        type Error = Box<Error>;
+
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<Error>> {
+            receiver.push(self.0);
+            Ok(())
+        }
+
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<Error>> {
+            self.0 = receiver.pop().ok_or("`receiver` is empty")?;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn set_limit() {
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.apply(Add('d')).unwrap();
+        record.apply(Add('e')).unwrap();
+
+        record.set_limit(3);
+        assert_eq!(record.cursor, 3);
+        assert_eq!(record.limit(), 3);
+        assert_eq!(record.len(), 3);
+        assert!(record.can_undo());
+        assert!(!record.can_redo());
+
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.apply(Add('d')).unwrap();
+        record.apply(Add('e')).unwrap();
+
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+
+        record.set_limit(2);
+        assert_eq!(record.cursor, 0);
+        assert_eq!(record.limit(), 3);
+        assert_eq!(record.len(), 3);
+        assert!(!record.can_undo());
+        assert!(record.can_redo());
+
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.apply(Add('d')).unwrap();
+        record.apply(Add('e')).unwrap();
+
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+
+        record.set_limit(2);
+        assert_eq!(record.cursor, 0);
+        assert_eq!(record.limit(), 5);
+        assert_eq!(record.len(), 5);
+        assert!(!record.can_undo());
+        assert!(record.can_redo());
+
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
     }
 }
