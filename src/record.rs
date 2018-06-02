@@ -27,7 +27,7 @@ pub enum Signal {
     Saved(bool),
     /// Says if the current command has changed.
     ///
-    /// This signal will be emitted when the records current command has changed. This includes
+    /// This signal will be emitted when the records cursor has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
     Cursor {
         /// The position of the old command.
