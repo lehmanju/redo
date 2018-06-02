@@ -68,13 +68,13 @@ pub trait Command<R> {
     ///     }
     /// }
     ///
-    /// fn main() -> Result<(), ()> {
+    /// fn main() -> Result<(), Error<String, Add>> {
     ///     let mut record = Record::default();
     ///
     ///     // The `a`, `b`, and `c` commands are merged.
-    ///     record.apply(Add("a".into())).unwrap();
-    ///     record.apply(Add("b".into())).unwrap();
-    ///     record.apply(Add("c".into())).unwrap();
+    ///     record.apply(Add("a".into()))?;
+    ///     record.apply(Add("b".into()))?;
+    ///     record.apply(Add("c".into()))?;
     ///     assert_eq!(record.as_receiver(), "abc");
     ///
     ///     // Calling `undo` once will undo all the merged commands.
