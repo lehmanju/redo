@@ -130,24 +130,24 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
     ///
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
     #[inline]
-    pub fn set_saved(&mut self) -> Option<()> {
-        self.get_mut().map(|record| record.set_saved())
+    pub fn set_saved(&mut self) {
+        self.get_mut().map(|record| record.set_saved());
     }
 
     /// Calls the [`set_unsaved`] method on the active record.
     ///
     /// [`set_unsaved`]: record/struct.Record.html#method.set_unsaved
     #[inline]
-    pub fn set_unsaved(&mut self) -> Option<()> {
-        self.get_mut().map(|record| record.set_unsaved())
+    pub fn set_unsaved(&mut self) {
+        self.get_mut().map(|record| record.set_unsaved());
     }
 
     /// Calls the [`is_saved`] method on the active record.
     ///
     /// [`is_saved`]: record/struct.Record.html#method.is_saved
     #[inline]
-    pub fn is_saved(&self) -> Option<bool> {
-        self.get().map(|record| record.is_saved())
+    pub fn is_saved(&self) -> bool {
+        self.get().map_or(false, |record| record.is_saved())
     }
 
     /// Calls the [`apply`] method on the active record.
@@ -174,12 +174,20 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
         self.get_mut().and_then(|record| record.redo())
     }
 
-    /// Calls the [`set_command`] method on the active record.
+    /// Calls the [`cursor`] method on the active record.
     ///
-    /// [`set_command`]: record/struct.Record.html#method.set_command
+    /// [`cursor`]: record/struct.Record.html#method.cursor
     #[inline]
-    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Error<R, C>>> {
-        self.get_mut().and_then(|record| record.set_command(index))
+    pub fn cursor(&self) -> Option<usize> {
+        self.get().map(|record| record.cursor())
+    }
+
+    /// Calls the [`set_cursor`] method on the active record.
+    ///
+    /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
+    #[inline]
+    pub fn set_cursor(&mut self, index: usize) -> Option<Result<(), Error<R, C>>> {
+        self.get_mut().and_then(|record| record.set_cursor(index))
     }
 
     /// Returns an iterator over the records.
