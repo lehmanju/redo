@@ -13,7 +13,7 @@ where the user modifies a receiver by applying commands on it.
 struct Add(char);
 
 impl Command<String> for Add {
-    type Error = MyError;
+    type Error = Box<error::Error>;
 
     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
         s.push(self.0);
@@ -21,12 +21,12 @@ impl Command<String> for Add {
     }
 
     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
-        self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
+        self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
         Ok(())
     }
 }
 
-fn main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Error<String, Add>> {
     let mut record = Record::default();
 
     record.apply(Add('a'))?;
