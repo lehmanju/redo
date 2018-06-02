@@ -825,7 +825,7 @@ mod tests {
     }
 
     #[test]
-    fn set_command() {
+    fn set_cursor() {
         let mut record = Record::default();
         record.apply(Add('a')).unwrap();
         record.apply(Add('b')).unwrap();
