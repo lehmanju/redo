@@ -221,25 +221,22 @@ impl<R, C: Command<R>> Record<R, C> {
         self.cursor < self.len()
     }
 
-    /// Marks the receiver as currently being in a saved state.
+    /// Marks the receiver as currently being in a saved or unsaved state.
     #[inline]
-    pub fn set_saved(&mut self) {
+    pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
-        self.saved = Some(self.cursor);
-        if let Some(ref mut f) = self.signals {
-            // Check if the receiver went from unsaved to saved.
-            if !was_saved { f(Signal::Saved(true)); }
-        }
-    }
-
-    /// Marks the receiver as no longer being in a saved state.
-    #[inline]
-    pub fn set_unsaved(&mut self) {
-        let was_saved = self.is_saved();
-        self.saved = None;
-        if let Some(ref mut f) = self.signals {
-            // Check if the receiver went from saved to unsaved.
-            if was_saved { f(Signal::Saved(false)); }
+        if saved {
+            self.saved = Some(self.cursor);
+            if let Some(ref mut f) = self.signals {
+                // Check if the receiver went from unsaved to saved.
+                if !was_saved { f(Signal::Saved(true)); }
+            }
+        } else {
+            self.saved = None;
+            if let Some(ref mut f) = self.signals {
+                // Check if the receiver went from saved to unsaved.
+                if was_saved { f(Signal::Saved(false)); }
+            }
         }
     }
 
@@ -435,9 +432,9 @@ impl<R, C: Command<R>> Record<R, C> {
         let redo = cursor > self.cursor;
         let f = if redo { Record::redo } else { Record::undo };
         while self.cursor != cursor {
-            if let Err(e) = f(self).unwrap() {
+            if let Err(err) = f(self).unwrap() {
                 self.signals = signals;
-                return Some(Err(e));
+                return Some(Err(err));
             }
         }
         // Add signals back.
