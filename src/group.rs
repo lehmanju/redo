@@ -142,6 +142,22 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
         self.get().map_or(false, |record| record.is_saved())
     }
 
+    /// Calls the [`cursor`] method on the active record.
+    ///
+    /// [`cursor`]: record/struct.Record.html#method.cursor
+    #[inline]
+    pub fn cursor(&self) -> Option<usize> {
+        self.get().map(|record| record.cursor())
+    }
+
+    /// Calls the [`set_cursor`] method on the active record.
+    ///
+    /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
+    #[inline]
+    pub fn set_cursor(&mut self, index: usize) -> Option<Result<(), Error<R, C>>> {
+        self.get_mut().and_then(|record| record.set_cursor(index))
+    }
+
     /// Calls the [`apply`] method on the active record.
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
@@ -164,22 +180,6 @@ impl<K: Hash + Eq, R, C: Command<R>, S: BuildHasher> Group<K, Record<R, C>, S> {
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Error<R, C>>> {
         self.get_mut().and_then(|record| record.redo())
-    }
-
-    /// Calls the [`cursor`] method on the active record.
-    ///
-    /// [`cursor`]: record/struct.Record.html#method.cursor
-    #[inline]
-    pub fn cursor(&self) -> Option<usize> {
-        self.get().map(|record| record.cursor())
-    }
-
-    /// Calls the [`set_cursor`] method on the active record.
-    ///
-    /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
-    #[inline]
-    pub fn set_cursor(&mut self, index: usize) -> Option<Result<(), Error<R, C>>> {
-        self.get_mut().and_then(|record| record.set_cursor(index))
     }
 
     /// Returns an iterator over the records.
