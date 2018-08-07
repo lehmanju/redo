@@ -90,7 +90,7 @@ for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 additional terms or conditions.
 
 [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
-[Record]: https://docs.rs/undo/latest/redo/struct.Record.html
-[History]: https://docs.rs/undo/latest/redo/struct.History.html
-[`merge!`]: https://docs.rs/undo/latest/redo/macro.merge.html
-[`merge`]: https://docs.rs/undo/latest/redo/trait.Command.html#method.method
+[Record]: https://docs.rs/redo/latest/redo/struct.Record.html
+[History]: https://docs.rs/redo/latest/redo/struct.History.html
+[`merge!`]: https://docs.rs/redo/latest/redo/macro.merge.html
+[`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.method
