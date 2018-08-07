@@ -93,4 +93,4 @@ additional terms or conditions.
 [Record]: https://docs.rs/redo/latest/redo/struct.Record.html
 [History]: https://docs.rs/redo/latest/redo/struct.History.html
 [`merge!`]: https://docs.rs/redo/latest/redo/macro.merge.html
-[`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.method
+[`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
