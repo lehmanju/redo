@@ -1,7 +1,6 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
-use std::marker::PhantomData;
 use {Command, Error, Record, RecordBuilder, Signal};
 
 /// A history of commands.
@@ -52,7 +51,7 @@ pub struct History<R, C: Command<R>> {
     next: usize,
     saved: Option<At>,
     record: Record<R, C>,
-    branches: FnvHashMap<usize, Branch<R, C>>,
+    branches: FnvHashMap<usize, Branch<C>>,
 }
 
 impl<R, C: Command<R>> History<R, C> {
@@ -199,7 +198,6 @@ impl<R, C: Command<R>> History<R, C> {
                         cursor: old,
                     },
                     commands,
-                    _marker: PhantomData,
                 },
             );
 
@@ -279,7 +277,6 @@ impl<R, C: Command<R>> History<R, C> {
                                 cursor: old,
                             },
                             commands,
-                            _marker: PhantomData,
                         },
                     );
                     self.set_root(id, old);
@@ -340,7 +337,6 @@ impl<R, C: Command<R>> History<R, C> {
                             cursor: old,
                         },
                         commands,
-                        _marker: PhantomData,
                     },
                 );
                 self.set_root(id, old);
@@ -444,7 +440,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     #[must_use]
-    fn create_path(&mut self, mut to: usize) -> Option<Vec<(usize, Branch<R, C>)>> {
+    fn create_path(&mut self, mut to: usize) -> Option<Vec<(usize, Branch<C>)>> {
         // Find the path from `dest` to `root`.
         let root = self.root;
         let visited = {
@@ -540,10 +536,9 @@ impl<R, C: Command<R> + Display> Display for History<R, C> {
 
 /// A branch in the history.
 #[derive(Debug)]
-struct Branch<R, C: Command<R>> {
+struct Branch<C> {
     parent: At,
     commands: VecDeque<C>,
-    _marker: PhantomData<R>,
 }
 
 /// The position in the tree.
