@@ -1,18 +1,46 @@
 //! An undo-redo library with static dispatch and manual command merging.
-//! It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern)
-//! where the user modifies a receiver by applying commands on it.
+//!
+//! It uses the [command pattern] where the user modifies the receiver by
+//! applying commands on it. Since each command knows how to undo and redo
+//! the changes it applies to the receiver, the state of the receiver can
+//! be rolled forwards or backwards by calling undo or redo in the correct order.
+//!
+//! The [Record] and [History] provides functionality to store and keep track
+//! of the applied commands, and makes it easy to undo and redo changes.
+//! The Record provides a stack based undo-redo functionality, while the
+//! History provides a tree based undo-redo functionality where you can
+//! jump between different branches.
+//!
+//! Commands can be merged using the [`merge!`] macro or the [`merge`] method.
+//! When two commands are merged, undoing and redoing them are done in a single step.
+//!
+//! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
+//! [Record]: struct.Record.html
+//! [History]: struct.History.html
+//! [`merge!`]: macro.merge.html
+//! [`merge`]: trait.Command.html#method.merge
 
-#![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
+#![forbid(unstable_features, bad_style, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    unused_import_braces,
+    unused_qualifications,
+    unsafe_code
+)]
 
-mod group;
+mod history;
+mod merge;
 mod record;
+mod signal;
 
-use std::error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::{
+    error::Error as StdError,
+    fmt::{self, Debug, Display, Formatter},
+};
 
-pub use group::{Group, GroupBuilder};
-pub use record::{Record, RecordBuilder, Signal};
+pub use history::{History, HistoryBuilder};
+pub use record::{Record, RecordBuilder};
+pub use signal::Signal;
 
 /// Base functionality for all commands.
 pub trait Command<R> {
@@ -89,7 +117,10 @@ pub trait Command<R> {
     /// }
     /// ```
     #[inline]
-    fn merge(&mut self, cmd: Self) -> Result<(), Self> where Self: Sized {
+    fn merge(&mut self, cmd: Self) -> Result<(), Self>
+    where
+        Self: Sized,
+    {
         Err(cmd)
     }
 }
@@ -97,7 +128,10 @@ pub trait Command<R> {
 /// An error which holds the command that caused it.
 pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
 
-impl<R, C: Command<R> + Debug> Debug for Error<R, C> where C::Error: Debug {
+impl<R, C: Command<R> + Debug> Debug for Error<R, C>
+where
+    C::Error: Debug,
+{
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_tuple("Error")
@@ -107,17 +141,20 @@ impl<R, C: Command<R> + Debug> Debug for Error<R, C> where C::Error: Debug {
     }
 }
 
-impl<R, C: Command<R>> Display for Error<R, C> where C::Error: Display {
+impl<R, C: Command<R>> Display for Error<R, C>
+where
+    C::Error: Display,
+{
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.1 as &Display).fmt(f)
+        (&self.1 as &dyn Display).fmt(f)
     }
 }
 
-impl<R, C: Command<R>> error::Error for Error<R, C>
-    where
-        C: Debug,
-        C::Error: error::Error,
+impl<R, C: Command<R>> StdError for Error<R, C>
+where
+    C: Debug,
+    C::Error: StdError,
 {
     #[inline]
     fn description(&self) -> &str {
@@ -125,7 +162,7 @@ impl<R, C: Command<R>> error::Error for Error<R, C>
     }
 
     #[inline]
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn StdError> {
         self.1.cause()
     }
 }
