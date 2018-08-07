@@ -28,6 +28,8 @@
     unsafe_code
 )]
 
+extern crate fnv;
+
 mod history;
 mod merge;
 mod record;

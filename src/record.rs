@@ -274,11 +274,11 @@ impl<R, C: Command<R>> Record<R, C> {
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn apply(&mut self, cmd: C) -> Result<impl Iterator<Item = C>, Error<R, C>> {
-        self.__apply(cmd).map(|v| v.into_iter())
+        self.__apply(cmd).map(|(_, v)| v.into_iter())
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, mut cmd: C) -> Result<VecDeque<C>, Error<R, C>> {
+    pub(crate) fn __apply(&mut self, mut cmd: C) -> Result<(bool, VecDeque<C>), Error<R, C>> {
         if let Err(err) = cmd.apply(&mut self.receiver) {
             return Err(Error(cmd, err));
         }
@@ -302,7 +302,7 @@ impl<R, C: Command<R>> Record<R, C> {
             Some(ref mut last) if !was_saved => last.merge(cmd).err(),
             _ => Some(cmd),
         };
-
+        let merged = cmd.is_none();
         // If commands are not merged push it onto the record.
         if let Some(cmd) = cmd {
             // If limit is reached, pop off the first command.
@@ -335,7 +335,7 @@ impl<R, C: Command<R>> Record<R, C> {
                 f(Signal::Saved(false));
             }
         }
-        Ok(v)
+        Ok((merged, v))
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
