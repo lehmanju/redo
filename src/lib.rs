@@ -113,7 +113,7 @@ pub trait Command<R> {
     ///
     ///     // Calling `redo` once will redo all the merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.into_receiver(), "abc");
+    ///     assert_eq!(record.as_receiver(), "abc");
     ///
     ///     Ok(())
     /// }

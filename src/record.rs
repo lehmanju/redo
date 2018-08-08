@@ -733,7 +733,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// #     }
     /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
+    /// #         self.0 = s.pop().ok_or(MyError("`s` is empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -754,7 +754,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// record.undo().unwrap()?;
     /// assert!(record.undo().is_none());
     ///
-    /// assert_eq!(record.into_receiver(), "a");
+    /// assert_eq!(record.as_receiver(), "a");
     /// # Ok(())
     /// # }
     /// ```
@@ -807,7 +807,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// #     }
     /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         self.0 = s.pop().ok_or(MyError("`String` is unexpectedly empty"))?;
+    /// #         self.0 = s.pop().ok_or(MyError("`s` is empty"))?;
     /// #         Ok(())
     /// #     }
     /// # }
