@@ -150,9 +150,7 @@ impl<R, C: Command<R>> Record<R, C> {
             self.cursor -= begin;
 
             // Check if the saved state has been removed.
-            if self.saved.map_or(false, |saved| saved > 0 && saved < begin) {
-                self.saved = None;
-            }
+            self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
 
             let new = self.cursor;
             let can_undo = self.can_undo();
@@ -236,11 +234,10 @@ impl<R, C: Command<R>> Record<R, C> {
         let old = self.cursor;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
-        let was_saved = self.is_saved();
 
         self.commands.clear();
-        self.cursor = 0;
         self.saved = if self.is_saved() { Some(0) } else { None };
+        self.cursor = 0;
 
         if let Some(ref mut f) = self.signal {
             // Emit signal if the cursor has changed.
@@ -254,10 +251,6 @@ impl<R, C: Command<R>> Record<R, C> {
             // Record can never redo after being cleared, check if you could redo before.
             if could_redo {
                 f(Signal::Redo(false));
-            }
-            // Check if the receiver went from unsaved to saved.
-            if !was_saved {
-                f(Signal::Saved(true));
             }
         }
     }
@@ -293,9 +286,7 @@ impl<R, C: Command<R>> Record<R, C> {
         debug_assert_eq!(self.cursor, self.len());
 
         // Check if the saved state was popped off.
-        if self.saved.map_or(false, |saved| saved > self.cursor) {
-            self.saved = None;
-        }
+        self.saved = self.saved.filter(|&saved| saved <= self.cursor);
 
         // Try to merge commands unless the receiver is in a saved state.
         let cmd = match self.commands.back_mut() {
