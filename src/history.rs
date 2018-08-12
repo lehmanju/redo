@@ -424,6 +424,12 @@ impl<R, C: Command<R>> History<R, C> {
         self.record.into_receiver()
     }
 
+    /// Returns an iterator over the commands in the current branch.
+    #[inline]
+    pub fn commands(&self) -> impl Iterator<Item = &C> {
+        self.record.commands()
+    }
+
     /// Sets the `root`.
     #[inline]
     fn set_root(&mut self, root: usize, cursor: usize) {
