@@ -5,7 +5,7 @@ use {Command, Error, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
-/// A history works mostly like a record but also provides branching, like [Vim]s undo-tree.
+/// A history works like the [Record] but also provides branching, like [vim]'s undo-tree.
 ///
 /// # Examples
 /// ```
@@ -30,21 +30,27 @@ use {Command, Error, Record, RecordBuilder, Signal};
 ///
 /// fn main() -> Result<(), Error<String, Add>> {
 ///     let mut history = History::default();
+///
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;
 ///     assert_eq!(history.as_receiver(), "abc");
+///
 ///     let root = history.root();
 ///     history.go_to(root, 1).unwrap()?;
+///     assert_eq!(history.as_receiver(), "a");
+///
 ///     let abc = history.apply(Add('f'))?.unwrap();
 ///     history.apply(Add('g'))?;
 ///     assert_eq!(history.as_receiver(), "afg");
+///
 ///     history.go_to(abc, 3).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "abc");
 ///     Ok(())
 /// }
 /// ```
 ///
+/// [Record]: struct.Record.html
 /// [Vim]: https://www.vim.org/
 #[derive(Debug)]
 pub struct History<R, C: Command<R>> {
@@ -110,6 +116,10 @@ impl<R, C: Command<R>> History<R, C> {
     }
 
     /// Sets the limit of the history and returns the new limit.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the history when new commands are applied. No limit is set by
+    /// default which means it may grow indefinitely.
     ///
     /// If `limit < len` the first commands will be removed until `len == limit`.
     /// However, if the current active command is going to be removed, the limit is instead
@@ -588,16 +598,14 @@ struct At {
     cursor: usize,
 }
 
-/// Builder for a history.
+/// Builder for a History.
 #[derive(Debug)]
 pub struct HistoryBuilder<R, C: Command<R>> {
     inner: RecordBuilder<R, C>,
 }
 
 impl<R, C: Command<R>> HistoryBuilder<R, C> {
-    /// Sets the specified [capacity] for the history.
-    ///
-    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    /// Sets the capacity for the history.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
         self.inner = self.inner.capacity(capacity);
@@ -606,9 +614,8 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
 
     /// Sets the `limit` for the history.
     ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the history when pushing new commands on to the stack. No limit is set by
-    /// default which means it may grow indefinitely.
+    /// # Panics
+    /// Panics if `limit` is `0`.
     #[inline]
     pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C> {
         self.inner = self.inner.limit(limit);
@@ -616,6 +623,7 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
     }
 
     /// Sets if the receiver is initially in a saved state.
+    /// By default the receiver is in a saved state.
     #[inline]
     pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C> {
         self.inner = self.inner.saved(saved);
@@ -623,14 +631,14 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
     }
 
     /// Decides how the signal should be handled when the state changes.
-    /// By default the history does nothing.
+    /// By default the history does not handle any signals.
     #[inline]
     pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R, C> {
         self.inner = self.inner.signal(f);
         self
     }
 
-    /// Creates the history.
+    /// Builds the history.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R, C> {
         History {

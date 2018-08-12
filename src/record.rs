@@ -38,21 +38,17 @@ use {Command, Error, Signal};
 ///     record.apply(Add('a'))?;
 ///     record.apply(Add('b'))?;
 ///     record.apply(Add('c'))?;
-///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
 ///     record.undo().unwrap()?;
 ///     record.undo().unwrap()?;
 ///     record.undo().unwrap()?;
-///
 ///     assert_eq!(record.as_receiver(), "");
 ///
 ///     record.redo().unwrap()?;
 ///     record.redo().unwrap()?;
 ///     record.redo().unwrap()?;
-///
 ///     assert_eq!(record.as_receiver(), "abc");
-///
 ///     Ok(())
 /// }
 /// ```
@@ -129,6 +125,10 @@ impl<R, C: Command<R>> Record<R, C> {
     }
 
     /// Sets the limit of the record and returns the new limit.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the record when new commands are applied. No limit is set by
+    /// default which means it may grow indefinitely.
     ///
     /// If `0 < limit < len` the first commands will be removed until `len == limit`.
     /// However, if the current active command is going to be removed, the limit is instead
@@ -680,75 +680,14 @@ pub struct RecordBuilder<R, C: Command<R>> {
 }
 
 impl<R, C: Command<R>> RecordBuilder<R, C> {
-    /// Sets the [capacity] for the record.
-    ///
-    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    /// Sets the capacity for the record.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
         self.capacity = capacity;
         self
     }
 
-    /// Sets the `limit` for the record.
-    ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the record when pushing new commands on to the stack. No limit is set by
-    /// default which means it may grow indefinitely.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
-    /// # use redo::*;
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct MyError(&'static str);
-    /// #
-    /// # impl Display for MyError {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
-    /// # }
-    /// #
-    /// # impl Error for MyError {
-    /// #     fn description(&self) -> &str { self.0 }
-    /// # }
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct Add(char);
-    /// #
-    /// # impl Command<String> for Add {
-    /// #     type Error = MyError;
-    /// #
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         self.0 = s.pop().ok_or(MyError("`s` is empty"))?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut record = Record::builder()
-    ///     .capacity(2)
-    ///     .limit(2)
-    ///     .default();
-    ///
-    /// record.apply(Add('a'))?;
-    /// record.apply(Add('b'))?;
-    /// record.apply(Add('c'))?; // 'a' is removed from the record since limit is 2.
-    ///
-    /// assert_eq!(record.as_receiver(), "abc");
-    ///
-    /// record.undo().unwrap()?;
-    /// record.undo().unwrap()?;
-    /// assert!(record.undo().is_none());
-    ///
-    /// assert_eq!(record.as_receiver(), "a");
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Sets the `limit` of the record.
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
@@ -760,6 +699,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     }
 
     /// Sets if the receiver is initially in a saved state.
+    /// By default the receiver is in a saved state.
     #[inline]
     pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C> {
         self.saved = saved;
@@ -767,71 +707,14 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     }
 
     /// Decides how different signals should be handled when the state changes.
-    /// By default the record does nothing.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
-    /// # use redo::*;
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct MyError(&'static str);
-    /// #
-    /// # impl Display for MyError {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self.0) }
-    /// # }
-    /// #
-    /// # impl Error for MyError {
-    /// #     fn description(&self) -> &str { self.0 }
-    /// # }
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct Add(char);
-    /// #
-    /// # impl Command<String> for Add {
-    /// #     type Error = MyError;
-    /// #
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), MyError> {
-    /// #         self.0 = s.pop().ok_or(MyError("`s` is empty"))?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// # let mut record =
-    /// Record::builder()
-    ///     .signal(|signal| {
-    ///         match signal {
-    ///             Signal::Undo(true) => println!("The record can undo."),
-    ///             Signal::Undo(false) => println!("The record can not undo."),
-    ///             Signal::Redo(true) => println!("The record can redo."),
-    ///             Signal::Redo(false) => println!("The record can not redo."),
-    ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
-    ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
-    ///             Signal::Cursor { old, new } => {
-    ///                 println!("The current command has changed from {} to {}.", old, new);
-    ///             },
-    ///             _ => {},
-    ///         }
-    ///     })
-    ///     .default();
-    /// # record.apply(Add('a'))?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// By default the record does not handle any signals.
     #[inline]
     pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R, C> {
         self.signal = Some(Box::new(f));
         self
     }
 
-    /// Creates the record.
+    /// Builds the record.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> Record<R, C> {
         Record {
@@ -876,13 +759,13 @@ mod tests {
     impl Command<String> for Add {
         type Error = Box<dyn Error>;
 
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            receiver.push(self.0);
+        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+            s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            self.0 = receiver.pop().ok_or("`receiver` is empty")?;
+        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+            self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }
     }
@@ -890,8 +773,8 @@ mod tests {
     #[derive(Debug)]
     struct JumpAdd(char, String);
 
-    impl JumpAdd {
-        fn new(c: char) -> JumpAdd {
+    impl From<char> for JumpAdd {
+        fn from(c: char) -> JumpAdd {
             JumpAdd(c, Default::default())
         }
     }
@@ -899,20 +782,20 @@ mod tests {
     impl Command<String> for JumpAdd {
         type Error = Box<dyn Error>;
 
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            self.1 = receiver.clone();
-            receiver.push(self.0);
+        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+            self.1 = s.clone();
+            s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            *receiver = self.1.clone();
+        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+            *s = self.1.clone();
             Ok(())
         }
 
-        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            *receiver = self.1.clone();
-            receiver.push(self.0);
+        fn redo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+            *s = self.1.clone();
+            s.push(self.0);
             Ok(())
         }
     }
@@ -1018,11 +901,11 @@ mod tests {
     #[test]
     fn jump_to() {
         let mut record = Record::default();
-        record.apply(JumpAdd::new('a')).unwrap();
-        record.apply(JumpAdd::new('b')).unwrap();
-        record.apply(JumpAdd::new('c')).unwrap();
-        record.apply(JumpAdd::new('d')).unwrap();
-        record.apply(JumpAdd::new('e')).unwrap();
+        record.apply(JumpAdd::from('a')).unwrap();
+        record.apply(JumpAdd::from('b')).unwrap();
+        record.apply(JumpAdd::from('c')).unwrap();
+        record.apply(JumpAdd::from('d')).unwrap();
+        record.apply(JumpAdd::from('e')).unwrap();
 
         record.jump_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);

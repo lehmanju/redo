@@ -26,7 +26,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-redo = "0.23"
+redo = "0.24"
 ```
 
 And this to `main.rs`:
@@ -55,21 +55,17 @@ fn main() -> Result<(), Error<String, Add>> {
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
-
     assert_eq!(record.as_receiver(), "abc");
 
     record.undo().unwrap()?;
     record.undo().unwrap()?;
     record.undo().unwrap()?;
-
     assert_eq!(record.as_receiver(), "");
 
     record.redo().unwrap()?;
     record.redo().unwrap()?;
     record.redo().unwrap()?;
-
     assert_eq!(record.as_receiver(), "abc");
-
     Ok(())
 }
 ```
