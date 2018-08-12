@@ -28,14 +28,16 @@
 ///
 /// fn main() -> Result<(), Error<String, Add>> {
 ///     let mut record = Record::default();
+///
 ///     let cmd = merge![Add("a".into()), Add("b".into()), Add("c".into())].unwrap();
 ///     record.apply(cmd)?;
 ///     assert_eq!(record.as_receiver(), "abc");
+///
 ///     record.undo().unwrap()?;
 ///     assert_eq!(record.as_receiver(), "");
+///
 ///     record.redo().unwrap()?;
 ///     assert_eq!(record.as_receiver(), "abc");
-///
 ///     Ok(())
 /// }
 /// ```

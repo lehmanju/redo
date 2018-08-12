@@ -105,6 +105,7 @@ pub trait Command<R> {
     ///     record.apply(Add("a".into()))?;
     ///     record.apply(Add("b".into()))?;
     ///     record.apply(Add("c".into()))?;
+    ///     assert_eq!(record.len(), 1);
     ///     assert_eq!(record.as_receiver(), "abc");
     ///
     ///     // Calling `undo` once will undo all the merged commands.
@@ -114,7 +115,6 @@ pub trait Command<R> {
     ///     // Calling `redo` once will redo all the merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "abc");
-    ///
     ///     Ok(())
     /// }
     /// ```
