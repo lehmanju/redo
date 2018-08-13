@@ -12,3 +12,4 @@ categories = ["data-structures"]
 
 [dependencies]
 fnv = "1"
+serde = { version = "1", optional = true, features = ["derive"] }

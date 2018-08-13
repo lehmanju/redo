@@ -20,15 +20,20 @@
 //! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
-#![forbid(unstable_features, bad_style, bare_trait_objects)]
 #![deny(
+    bad_style,
+    bare_trait_objects,
     missing_debug_implementations,
     unused_import_braces,
     unused_qualifications,
-    unsafe_code
+    unsafe_code,
+    unstable_features
 )]
 
 extern crate fnv;
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
 
 mod history;
 mod merge;

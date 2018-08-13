@@ -52,6 +52,7 @@ use {Command, Error, Record, RecordBuilder, Signal};
 ///
 /// [Record]: struct.Record.html
 /// [Vim]: https://www.vim.org/
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct History<R, C: Command<R>> {
     root: usize,
@@ -591,6 +592,7 @@ impl<R, C: Command<R> + Display> Display for History<R, C> {
 }
 
 /// A branch in the history.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 struct Branch<C> {
     parent: At,
@@ -598,6 +600,7 @@ struct Branch<C> {
 }
 
 /// The position in the tree.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 struct At {
     branch: usize,

@@ -55,12 +55,14 @@ use {Command, Error, Signal};
 ///
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Record<R, C: Command<R>> {
     pub(crate) commands: VecDeque<C>,
     receiver: R,
     cursor: usize,
     limit: usize,
     pub(crate) saved: Option<usize>,
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
 
