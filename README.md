@@ -32,11 +32,15 @@ redo = "0.24"
 And this to `main.rs`:
 
 ```rust
+extern crate redo;
+
+use redo::{self, Command, Record};
+
 #[derive(Debug)]
 struct Add(char);
 
 impl Command<String> for Add {
-    type Error = Box<dyn error::Error>;
+    type Error = Box<dyn Error>;
 
     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
         s.push(self.0);
@@ -49,7 +53,7 @@ impl Command<String> for Add {
     }
 }
 
-fn main() -> Result<(), Error<String, Add>> {
+fn main() -> Result<(), redo::Error<String, Add>> {
     let mut record = Record::default();
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
