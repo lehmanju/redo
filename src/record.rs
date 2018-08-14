@@ -34,7 +34,6 @@ use {Command, Error, Signal};
 ///
 /// fn main() -> Result<(), Error<String, Add>> {
 ///     let mut record = Record::default();
-///
 ///     record.apply(Add('a'))?;
 ///     record.apply(Add('b'))?;
 ///     record.apply(Add('c'))?;

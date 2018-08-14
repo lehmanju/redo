@@ -105,7 +105,6 @@ pub trait Command<R> {
     ///
     /// fn main() -> Result<(), Error<String, Add>> {
     ///     let mut record = Record::default();
-    ///
     ///     // The `a`, `b`, and `c` commands are merged.
     ///     record.apply(Add("a".into()))?;
     ///     record.apply(Add("b".into()))?;

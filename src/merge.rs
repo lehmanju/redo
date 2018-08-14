@@ -28,7 +28,6 @@
 ///
 /// fn main() -> Result<(), Error<String, Add>> {
 ///     let mut record = Record::default();
-///
 ///     let cmd = merge![Add("a".into()), Add("b".into()), Add("c".into())].unwrap();
 ///     record.apply(cmd)?;
 ///     assert_eq!(record.as_receiver(), "abc");
@@ -47,14 +46,14 @@ macro_rules! merge {
         let mut cmd = $cmd1;
         match cmd.merge($cmd2) {
             Ok(_) => Ok(cmd),
-            Err(err) => Err(err),
+            Err(cmd) => Err(cmd),
         }
     }};
     ($cmd1:expr, $cmd2:expr, $($tail:expr),+) => {{
         let mut cmd = $cmd1;
         match cmd.merge($cmd2) {
             Ok(_) => merge![cmd, $($tail),*],
-            Err(err) => Err(err),
+            Err(cmd) => Err(cmd),
         }
     }};
 }
