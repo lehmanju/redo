@@ -1,7 +1,7 @@
 extern crate redo;
 
-use std::{error::Error, fmt};
 use redo::{Command, History};
+use std::{error::Error, fmt};
 
 #[derive(Debug)]
 struct Add(char);

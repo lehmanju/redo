@@ -216,10 +216,11 @@ impl<R, C: Command<R>> History<R, C> {
     #[inline]
     pub fn apply(&mut self, cmd: C) -> Result<Option<usize>, Error<R, C>> {
         let cursor = self.cursor();
+        let saved = self.record.saved.filter(|&saved| saved > cursor);
         let (merged, commands) = self.record.__apply(cmd)?;
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
-            let root = self.root;
+            let root = self.root();
             self.remove_children(At {
                 branch: root,
                 cursor: 0,
@@ -247,7 +248,14 @@ impl<R, C: Command<R>> History<R, C> {
                     commands,
                 },
             );
+            self.record.saved = self.record.saved.or(saved);
             self.set_root(new, cursor);
+            match (self.record.saved, saved, self.saved) {
+                (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(new, old, cursor),
+                (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
+                (None, None, None) => (),
+                _ => unreachable!(),
+            }
             if let Some(ref mut f) = self.record.signal {
                 f(Signal::Branch { old, new })
             }
@@ -299,6 +307,7 @@ impl<R, C: Command<R>> History<R, C> {
 
         // Walk the path from `start` to `dest`.
         for (new, branch) in self.create_path(branch)? {
+            let old = self.root();
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
@@ -306,6 +315,7 @@ impl<R, C: Command<R>> History<R, C> {
             // Apply the commands in the branch and move older commands into their own branch.
             for cmd in branch.commands {
                 let cursor = self.cursor();
+                let saved = self.record.saved.filter(|&saved| saved > cursor);
                 let commands = match self.record.__apply(cmd) {
                     Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
@@ -322,7 +332,16 @@ impl<R, C: Command<R>> History<R, C> {
                             commands,
                         },
                     );
+                    self.record.saved = self.record.saved.or(saved);
                     self.set_root(new, cursor);
+                    match (self.record.saved, saved, self.saved) {
+                        (Some(_), None, None) | (None, None, Some(_)) => {
+                            self.swap_saved(new, old, cursor);
+                        }
+                        (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
+                        (None, None, None) => (),
+                        _ => unreachable!(),
+                    }
                 }
             }
         }
@@ -362,12 +381,14 @@ impl<R, C: Command<R>> History<R, C> {
 
         // Jump the path from `start` to `dest`.
         for (new, mut branch) in self.create_path(branch)? {
+            let old = self.root();
             // Jump to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }
 
             let cursor = self.cursor();
+            let saved = self.record.saved.filter(|&saved| saved > cursor);
             let mut commands = self.record.commands.split_off(cursor);
             self.record.commands.append(&mut branch.commands);
             // Handle new branch.
@@ -382,7 +403,16 @@ impl<R, C: Command<R>> History<R, C> {
                         commands,
                     },
                 );
+                self.record.saved = self.record.saved.or(saved);
                 self.set_root(new, cursor);
+                match (self.record.saved, saved, self.saved) {
+                    (Some(_), None, None) | (None, None, Some(_)) => {
+                        self.swap_saved(new, old, cursor);
+                    }
+                    (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
+                    (None, None, None) => (),
+                    _ => unreachable!(),
+                }
             }
         }
 
