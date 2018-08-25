@@ -11,5 +11,7 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
+bitflags = "1"
+colored = "1"
 fnv = "1"
 serde = { version = "1", optional = true, features = ["derive"] }

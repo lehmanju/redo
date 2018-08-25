@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt;
 use std::marker::PhantomData;
-use {Command, Error, Signal};
+use {Command, Display, Error, History, Signal};
 
 /// A record of commands.
 ///
@@ -621,6 +621,14 @@ impl<R, C: Command<R> + ToString> Record<R, C> {
     }
 }
 
+impl<R, C: Command<R> + fmt::Display> Record<R, C> {
+    /// Returns a structure for advanced display of the record.
+    #[inline]
+    pub fn display(&self) -> Display<Self> {
+        Display::from(self)
+    }
+}
+
 impl<R: Default, C: Command<R>> Default for Record<R, C> {
     #[inline]
     fn default() -> Record<R, C> {
@@ -649,9 +657,16 @@ impl<R, C: Command<R>> From<R> for Record<R, C> {
     }
 }
 
-impl<R: Debug, C: Command<R> + Debug> Debug for Record<R, C> {
+impl<R, C: Command<R>> From<History<R, C>> for Record<R, C> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn from(history: History<R, C>) -> Self {
+        history.record
+    }
+}
+
+impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for Record<R, C> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("commands", &self.commands)
             .field("receiver", &self.receiver)
@@ -662,17 +677,10 @@ impl<R: Debug, C: Command<R> + Debug> Debug for Record<R, C> {
     }
 }
 
-impl<R, C: Command<R> + Display> Display for Record<R, C> {
+impl<R, C: Command<R> + fmt::Display> fmt::Display for Record<R, C> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (i, cmd) in self.commands.iter().enumerate().rev() {
-            if i + 1 == self.cursor {
-                writeln!(f, "* {}", cmd)?;
-            } else {
-                writeln!(f, "  {}", cmd)?;
-            }
-        }
-        Ok(())
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.display() as &dyn fmt::Display).fmt(f)
     }
 }
 
@@ -743,9 +751,9 @@ impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
     }
 }
 
-impl<R: Debug, C: Command<R> + Debug> Debug for RecordBuilder<R, C> {
+impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for RecordBuilder<R, C> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("RecordBuilder")
             .field("receiver", &self.receiver)
             .field("capacity", &self.capacity)
