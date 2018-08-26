@@ -27,24 +27,26 @@
     unused_import_braces,
     unused_qualifications,
     unsafe_code,
-    unstable_features
+    unstable_features,
 )]
 
+#[macro_use]
+extern crate bitflags;
+extern crate colored;
 extern crate fnv;
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
 
+mod display;
 mod history;
 mod merge;
 mod record;
 mod signal;
 
-use std::{
-    error::Error as StdError,
-    fmt::{self, Debug, Display, Formatter},
-};
+use std::{error::Error as StdError, fmt};
 
+pub use display::Display;
 pub use history::{History, HistoryBuilder};
 pub use record::{Record, RecordBuilder};
 pub use signal::Signal;
@@ -134,12 +136,12 @@ pub trait Command<R> {
 /// An error which holds the command that caused it.
 pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
 
-impl<R, C: Command<R> + Debug> Debug for Error<R, C>
+impl<R, C: Command<R> + fmt::Debug> fmt::Debug for Error<R, C>
 where
-    C::Error: Debug,
+    C::Error: fmt::Debug,
 {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("Error")
             .field(&self.0)
             .field(&self.1)
@@ -147,19 +149,19 @@ where
     }
 }
 
-impl<R, C: Command<R>> Display for Error<R, C>
+impl<R, C: Command<R>> fmt::Display for Error<R, C>
 where
-    C::Error: Display,
+    C::Error: fmt::Display,
 {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.1 as &dyn Display).fmt(f)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.1 as &dyn fmt::Display).fmt(f)
     }
 }
 
 impl<R, C: Command<R>> StdError for Error<R, C>
 where
-    C: Debug,
+    C: fmt::Debug,
     C::Error: StdError,
 {
     #[inline]

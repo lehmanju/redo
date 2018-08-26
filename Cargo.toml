@@ -1,6 +1,6 @@
 [package]
 name = "redo"
-version = "0.24.3"
+version = "0.25.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo-redo library with static dispatch and manual command merging."
 documentation = "https://docs.rs/redo"
@@ -11,5 +11,7 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
+bitflags = "1"
+colored = "1"
 fnv = "1"
 serde = { version = "1", optional = true, features = ["derive"] }
