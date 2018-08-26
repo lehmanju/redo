@@ -619,10 +619,8 @@ impl<R, C: Command<R> + ToString> Record<R, C> {
             None
         }
     }
-}
 
-impl<R, C: Command<R> + fmt::Display> Record<R, C> {
-    /// Returns a structure for advanced display of the record.
+    /// Returns a structure for configurable formatting of the record.
     #[inline]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)

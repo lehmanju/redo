@@ -584,10 +584,8 @@ impl<R, C: Command<R> + ToString> History<R, C> {
     pub fn to_redo_string(&self) -> Option<String> {
         self.record.to_redo_string()
     }
-}
 
-impl<R, C: Command<R> + fmt::Display> History<R, C> {
-    /// Returns a structure for more advanced display of the history.
+    /// Returns a structure for configurable formatting of the record.
     #[inline]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
