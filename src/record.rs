@@ -650,14 +650,14 @@ impl<R, C: Command<R>> AsMut<R> for Record<R, C> {
 
 impl<R, C: Command<R>> From<R> for Record<R, C> {
     #[inline]
-    fn from(receiver: R) -> Self {
+    fn from(receiver: R) -> Record<R, C> {
         Record::new(receiver)
     }
 }
 
 impl<R, C: Command<R>> From<History<R, C>> for Record<R, C> {
     #[inline]
-    fn from(history: History<R, C>) -> Self {
+    fn from(history: History<R, C>) -> Record<R, C> {
         history.record
     }
 }
