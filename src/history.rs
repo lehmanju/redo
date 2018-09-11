@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 use std::fmt;
-use {Command, Display, Error, Record, RecordBuilder, Signal};
+use {Command, Display, Error, Meta, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -217,7 +217,7 @@ impl<R, C: Command<R>> History<R, C> {
     pub fn apply(&mut self, cmd: C) -> Result<Option<usize>, Error<R, C>> {
         let cursor = self.cursor();
         let saved = self.record.saved.filter(|&saved| saved > cursor);
-        let (merged, commands) = self.record.__apply(cmd)?;
+        let (merged, commands) = self.record.__apply(Meta::from(cmd))?;
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
@@ -621,7 +621,7 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for History<R, C> {
 #[derive(Debug)]
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
-    pub(crate) commands: VecDeque<C>,
+    pub(crate) commands: VecDeque<Meta<C>>,
 }
 
 /// The position in the tree.

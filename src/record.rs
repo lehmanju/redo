@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
-use {Command, Display, Error, History, Signal};
+use {Command, Display, Error, History, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -56,7 +56,7 @@ use {Command, Display, Error, History, Signal};
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Record<R, C: Command<R>> {
-    pub(crate) commands: VecDeque<C>,
+    pub(crate) commands: VecDeque<Meta<C>>,
     receiver: R,
     cursor: usize,
     limit: usize,
@@ -268,13 +268,17 @@ impl<R, C: Command<R>> Record<R, C> {
     /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn apply(&mut self, cmd: C) -> Result<impl Iterator<Item = C>, Error<R, C>> {
-        self.__apply(cmd).map(|(_, v)| v.into_iter())
+        self.__apply(Meta::from(cmd))
+            .map(|(_, v)| v.into_iter().map(|meta| meta.command))
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, mut cmd: C) -> Result<(bool, VecDeque<C>), Error<R, C>> {
-        if let Err(err) = cmd.apply(&mut self.receiver) {
-            return Err(Error(cmd, err));
+    pub(crate) fn __apply(
+        &mut self,
+        mut meta: Meta<C>,
+    ) -> Result<(bool, VecDeque<Meta<C>>), Error<R, C>> {
+        if let Err(error) = meta.apply(&mut self.receiver) {
+            return Err(Error { meta, error });
         }
 
         let old = self.cursor;
@@ -291,8 +295,8 @@ impl<R, C: Command<R>> Record<R, C> {
 
         // Try to merge commands unless the receiver is in a saved state.
         let cmd = match self.commands.back_mut() {
-            Some(ref mut last) if !was_saved => last.merge(cmd).err(),
-            _ => Some(cmd),
+            Some(ref mut last) if !was_saved => last.merge(meta).err(),
+            _ => Some(meta),
         };
         let merged = cmd.is_none();
         // If commands are not merged push it onto the record.
@@ -343,9 +347,11 @@ impl<R, C: Command<R>> Record<R, C> {
             return None;
         }
 
-        if let Err(err) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            let cmd = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error(cmd, err)));
+        if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
+            return Some(Err(Error {
+                meta: self.commands.remove(self.cursor - 1).unwrap(),
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();
@@ -389,9 +395,11 @@ impl<R, C: Command<R>> Record<R, C> {
             return None;
         }
 
-        if let Err(err) = self.commands[self.cursor].redo(&mut self.receiver) {
-            let cmd = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error(cmd, err)));
+        if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
+            return Some(Err(Error {
+                meta: self.commands.remove(self.cursor).unwrap(),
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();
@@ -589,7 +597,7 @@ impl<R, C: Command<R>> Record<R, C> {
     /// Returns an iterator over the commands in the record.
     #[inline]
     pub fn commands(&self) -> impl Iterator<Item = &C> {
-        self.commands.iter()
+        self.commands.iter().map(|meta| &meta.command)
     }
 }
 
@@ -601,7 +609,7 @@ impl<R, C: Command<R> + ToString> Record<R, C> {
     #[must_use]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.commands[self.cursor - 1].to_string())
+            Some(self.commands[self.cursor - 1].command.to_string())
         } else {
             None
         }
@@ -614,7 +622,7 @@ impl<R, C: Command<R> + ToString> Record<R, C> {
     #[must_use]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.commands[self.cursor].to_string())
+            Some(self.commands[self.cursor].command.to_string())
         } else {
             None
         }

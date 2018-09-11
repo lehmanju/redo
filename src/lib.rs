@@ -32,6 +32,7 @@
 
 #[macro_use]
 extern crate bitflags;
+extern crate chrono;
 extern crate colored;
 extern crate fnv;
 #[cfg(feature = "serde")]
@@ -44,6 +45,7 @@ mod merge;
 mod record;
 mod signal;
 
+use chrono::{DateTime, Local};
 use std::{error::Error as StdError, fmt};
 
 pub use display::Display;
@@ -125,16 +127,72 @@ pub trait Command<R> {
     /// }
     /// ```
     #[inline]
-    fn merge(&mut self, cmd: Self) -> Result<(), Self>
+    fn merge(&mut self, command: Self) -> Result<(), Self>
     where
         Self: Sized,
     {
-        Err(cmd)
+        Err(command)
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
+struct Meta<C> {
+    command: C,
+    timestamp: DateTime<Local>,
+}
+
+impl<C> From<C> for Meta<C> {
+    #[inline]
+    fn from(command: C) -> Self {
+        Meta {
+            command,
+            timestamp: Local::now(),
+        }
+    }
+}
+
+impl<R, C: Command<R>> Command<R> for Meta<C> {
+    type Error = C::Error;
+
+    #[inline]
+    fn apply(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+        self.command.apply(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+        self.command.undo(receiver)
+    }
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+        self.command.redo(receiver)
+    }
+
+    #[inline]
+    fn merge(&mut self, command: Self) -> Result<(), Self>
+    where
+        Self: Sized,
+    {
+        self.command
+            .merge(command.command)
+            .map_err(|command| Meta::from(command))
+    }
+}
+
+impl<C: fmt::Display> fmt::Display for Meta<C> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.command as &dyn fmt::Display).fmt(f)
     }
 }
 
 /// An error which holds the command that caused it.
-pub struct Error<R, C: Command<R>>(pub C, pub C::Error);
+pub struct Error<R, C: Command<R>> {
+    meta: Meta<C>,
+    error: C::Error,
+}
 
 impl<R, C: Command<R> + fmt::Debug> fmt::Debug for Error<R, C>
 where
@@ -142,9 +200,9 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("Error")
-            .field(&self.0)
-            .field(&self.1)
+        f.debug_struct("Error")
+            .field("meta", &self.meta)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -155,7 +213,7 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.1 as &dyn fmt::Display).fmt(f)
+        (&self.error as &dyn fmt::Display).fmt(f)
     }
 }
 
@@ -166,11 +224,11 @@ where
 {
     #[inline]
     fn description(&self) -> &str {
-        self.1.description()
+        self.error.description()
     }
 
     #[inline]
     fn cause(&self) -> Option<&dyn StdError> {
-        self.1.cause()
+        self.error.cause()
     }
 }

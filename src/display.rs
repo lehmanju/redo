@@ -101,7 +101,7 @@ impl<'a, R, C: Command<R>> Display<'a, Record<R, C>> {
     }
 }
 
-impl<'a, R, C: Command<R> + ToString> Display<'a, History<R, C>> {
+impl<'a, R, C: Command<R> + fmt::Display> Display<'a, History<R, C>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -187,7 +187,7 @@ impl<'a, T: 'a> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<'a, R, C: Command<R> + ToString> fmt::Display for Display<'a, Record<R, C>> {
+impl<'a, R, C: Command<R> + fmt::Display> fmt::Display for Display<'a, Record<R, C>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -201,7 +201,7 @@ impl<'a, R, C: Command<R> + ToString> fmt::Display for Display<'a, Record<R, C>>
     }
 }
 
-impl<'a, R, C: Command<R> + ToString> fmt::Display for Display<'a, History<R, C>> {
+impl<'a, R, C: Command<R> + fmt::Display> fmt::Display for Display<'a, History<R, C>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
