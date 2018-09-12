@@ -134,7 +134,7 @@ impl<R, C: Command<R>> History<R, C> {
         let diff = len - self.len();
         let root = self.root();
         for cursor in 0..diff {
-            self.remove_children(At {
+            self.rm_child(At {
                 branch: root,
                 cursor,
             });
@@ -203,7 +203,7 @@ impl<R, C: Command<R>> History<R, C> {
         self.branches.clear();
 
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: 0 })
+            f(Signal::Branch { old, new: 0 });
         }
     }
 
@@ -221,7 +221,7 @@ impl<R, C: Command<R>> History<R, C> {
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
-            self.remove_children(At {
+            self.rm_child(At {
                 branch: root,
                 cursor: 0,
             });
@@ -257,7 +257,7 @@ impl<R, C: Command<R>> History<R, C> {
                 _ => unreachable!(),
             }
             if let Some(ref mut f) = self.record.signal {
-                f(Signal::Branch { old, new })
+                f(Signal::Branch { old, new });
             }
             Ok(Some(old))
         } else {
@@ -306,17 +306,17 @@ impl<R, C: Command<R>> History<R, C> {
         }
 
         // Walk the path from `start` to `dest`.
-        for (new, branch) in self.create_path(branch)? {
+        for (new, branch) in self.mk_path(branch)? {
             let old = self.root();
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
-            for cmd in branch.commands {
+            for meta in branch.commands {
                 let cursor = self.cursor();
                 let saved = self.record.saved.filter(|&saved| saved > cursor);
-                let commands = match self.record.__apply(cmd) {
+                let commands = match self.record.__apply(meta) {
                     Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
                 };
@@ -345,12 +345,9 @@ impl<R, C: Command<R>> History<R, C> {
                 }
             }
         }
-
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
-        }
-
-        if let Some(ref mut f) = self.record.signal {
+        } else if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old: root,
                 new: self.root,
@@ -428,7 +425,7 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Remove all children of the command at position `at`.
     #[inline]
-    fn remove_children(&mut self, at: At) {
+    fn rm_child(&mut self, at: At) {
         let mut dead = FnvHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
@@ -457,18 +454,17 @@ impl<R, C: Command<R>> History<R, C> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     #[must_use]
-    fn create_path(&mut self, to: usize) -> Option<Vec<(usize, Branch<C>)>> {
-        let mut path = vec![];
-        let dest = self.branches.remove(&to)?;
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
+        let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
+        let mut path = vec![(to, dest)];
         while i != self.root() {
-            let branch = self.branches.remove(&i).unwrap();
-            let j = i;
-            i = branch.parent.branch;
-            path.push((j, branch));
+            dest = self.branches.remove(&i).unwrap();
+            to = i;
+            i = dest.parent.branch;
+            path.push((to, dest));
         }
-        path.push((to, dest));
-        Some(path)
+        Some(path.into_iter().rev())
     }
 }
 

@@ -194,6 +194,20 @@ pub struct Error<R, C: Command<R>> {
     error: C::Error,
 }
 
+impl<R, C: Command<R>> Error<R, C> {
+    /// Returns a reference to the command that caused the error.
+    #[inline]
+    pub fn command(&self) -> &C {
+        &self.meta.command
+    }
+
+    /// Returns the command that caused the error.
+    #[inline]
+    pub fn into_command(self) -> C {
+        self.meta.command
+    }
+}
+
 impl<R, C: Command<R> + fmt::Debug> fmt::Debug for Error<R, C>
 where
     C::Error: fmt::Debug,
