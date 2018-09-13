@@ -1,3 +1,5 @@
+use chrono::{DateTime, Local};
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
@@ -345,9 +347,7 @@ impl<R, C: Command<R>> Record<R, C> {
     pub fn undo(&mut self) -> Option<Result<(), Error<R, C>>> {
         if !self.can_undo() {
             return None;
-        }
-
-        if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
+        } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
             return Some(Err(Error {
                 meta: self.commands.remove(self.cursor - 1).unwrap(),
                 error,
@@ -393,9 +393,7 @@ impl<R, C: Command<R>> Record<R, C> {
     pub fn redo(&mut self) -> Option<Result<(), Error<R, C>>> {
         if !self.can_redo() {
             return None;
-        }
-
-        if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
+        } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
             return Some(Err(Error {
                 meta: self.commands.remove(self.cursor).unwrap(),
                 error,
@@ -493,6 +491,35 @@ impl<R, C: Command<R>> Record<R, C> {
             }
         }
         Some(Ok(()))
+    }
+
+    /// Go back or forward in time.
+    #[inline]
+    #[must_use]
+    pub fn time_travel(
+        &mut self,
+        to: impl Into<DateTime<Local>>,
+    ) -> Option<Result<(), Error<R, C>>> {
+        let to = to.into();
+        let cursor = match self.commands.as_slices() {
+            ([], []) => return None,
+            (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ok(cursor) | Err(cursor) => cursor,
+            },
+            ([], end) => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ok(cursor) | Err(cursor) => cursor,
+            },
+            (start, end) => match start.last().unwrap().timestamp.cmp(&to) {
+                Ordering::Less => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                    Ok(cursor) | Err(cursor) => cursor,
+                },
+                Ordering::Equal => start.len(),
+                Ordering::Greater => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                    Ok(cursor) | Err(cursor) => cursor,
+                },
+            },
+        };
+        self.go_to(cursor)
     }
 
     /// Returns a reference to the `receiver`.

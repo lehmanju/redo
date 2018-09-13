@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 use std::fmt;
@@ -201,13 +202,14 @@ impl<R, C: Command<R>> History<R, C> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch { old, new: 0 });
         }
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
+    ///
+    /// If a new branch is created, the old branch id is returned.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned together with the command.
@@ -356,6 +358,16 @@ impl<R, C: Command<R>> History<R, C> {
         Some(Ok(root))
     }
 
+    /// Go back or forward in time.
+    #[inline]
+    #[must_use]
+    pub fn time_travel(
+        &mut self,
+        to: impl Into<DateTime<Local>>,
+    ) -> Option<Result<(), Error<R, C>>> {
+        self.record.time_travel(to)
+    }
+
     /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
@@ -455,6 +467,7 @@ impl<R, C: Command<R>> History<R, C> {
     #[inline]
     #[must_use]
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
+        debug_assert_ne!(self.root(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
         let mut path = vec![(to, dest)];
