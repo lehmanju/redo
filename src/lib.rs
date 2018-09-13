@@ -41,7 +41,6 @@ extern crate serde;
 
 mod display;
 mod history;
-mod merge;
 mod record;
 mod signal;
 
@@ -101,9 +100,9 @@ pub trait Command<R> {
     ///         Ok(())
     ///     }
     ///
-    ///     fn merge(&mut self, Add(s): Self) -> Result<(), Self> {
+    ///     fn merge(&mut self, Add(s): Self) -> Merged<Self> {
     ///         self.0.push_str(&s);
-    ///         Ok(())
+    ///         Merged::Yes
     ///     }
     /// }
     ///
@@ -127,12 +126,23 @@ pub trait Command<R> {
     /// }
     /// ```
     #[inline]
-    fn merge(&mut self, command: Self) -> Result<(), Self>
+    fn merge(&mut self, command: Self) -> Merged<Self>
     where
         Self: Sized,
     {
-        Err(command)
+        Merged::No(command)
     }
+}
+
+/// The result of merging two commands.
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Merged<C> {
+    /// The commands have been merged.
+    Yes,
+    /// The commands have not been merged.
+    No(C),
+    /// The two commands cancels each other out. This removes both commands.
+    Annul,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -171,13 +181,15 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     }
 
     #[inline]
-    fn merge(&mut self, command: Self) -> Result<(), Self>
+    fn merge(&mut self, command: Self) -> Merged<Self>
     where
         Self: Sized,
     {
-        self.command
-            .merge(command.command)
-            .map_err(|command| Meta::from(command))
+        match self.command.merge(command.command) {
+            Merged::Yes => Merged::Yes,
+            Merged::No(command) => Merged::No(Meta::from(command)),
+            Merged::Annul => Merged::Annul,
+        }
     }
 }
 

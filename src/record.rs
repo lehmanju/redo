@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
-use {Command, Display, Error, History, Meta, Signal};
+use {Command, Display, Error, History, Merged, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -296,22 +296,29 @@ impl<R, C: Command<R>> Record<R, C> {
         self.saved = self.saved.filter(|&saved| saved <= self.cursor);
 
         // Try to merge commands unless the receiver is in a saved state.
-        let cmd = match self.commands.back_mut() {
-            Some(ref mut last) if !was_saved => last.merge(meta).err(),
-            _ => Some(meta),
+        let merged = match self.commands.back_mut() {
+            Some(ref mut last) if !was_saved => last.merge(meta),
+            _ => Merged::No(meta),
         };
-        let merged = cmd.is_none();
-        // If commands are not merged push it onto the record.
-        if let Some(cmd) = cmd {
-            // If limit is reached, pop off the first command.
-            if self.limit == self.cursor {
-                self.commands.pop_front();
-                self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
-            } else {
-                self.cursor += 1;
+        let merged_or_annulled = match merged {
+            Merged::Yes => true,
+            Merged::Annul => {
+                self.commands.pop_back();
+                true
             }
-            self.commands.push_back(cmd);
-        }
+            // If commands are not merged or annulled push it onto the record.
+            Merged::No(meta) => {
+                // If limit is reached, pop off the first command.
+                if self.limit == self.cursor {
+                    self.commands.pop_front();
+                    self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+                } else {
+                    self.cursor += 1;
+                }
+                self.commands.push_back(meta);
+                false
+            }
+        };
 
         debug_assert_eq!(self.cursor, self.len());
         if let Some(ref mut f) = self.signal {
@@ -333,7 +340,7 @@ impl<R, C: Command<R>> Record<R, C> {
                 f(Signal::Saved(false));
             }
         }
-        Ok((merged, v))
+        Ok((merged_or_annulled, v))
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
@@ -515,7 +522,7 @@ impl<R, C: Command<R>> Record<R, C> {
                 },
                 Ordering::Equal => start.len(),
                 Ordering::Greater => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                    Ok(cursor) | Err(cursor) => cursor,
+                    Ok(cursor) | Err(cursor) => start.len() + cursor,
                 },
             },
         };
