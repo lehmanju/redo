@@ -1,6 +1,6 @@
 [package]
 name = "redo"
-version = "0.25.0"
+version = "0.26.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo-redo library with static dispatch and manual command merging."
 documentation = "https://docs.rs/redo"
