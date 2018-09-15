@@ -98,9 +98,9 @@ pub trait Command<R> {
     ///         Ok(())
     ///     }
     ///
-    ///     fn merge(&mut self, Add(s): Self) -> Merged<Self> {
+    ///     fn merge(&mut self, Add(s): Self) -> Merge<Self> {
     ///         self.0.push_str(&s);
-    ///         Merged::Yes
+    ///         Merge::Yes
     ///     }
     /// }
     ///
@@ -124,17 +124,17 @@ pub trait Command<R> {
     /// }
     /// ```
     #[inline]
-    fn merge(&mut self, command: Self) -> Merged<Self>
+    fn merge(&mut self, command: Self) -> Merge<Self>
     where
         Self: Sized,
     {
-        Merged::No(command)
+        Merge::No(command)
     }
 }
 
 /// The result of merging two commands.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub enum Merged<C> {
+pub enum Merge<C> {
     /// The commands have been merged.
     Yes,
     /// The commands have not been merged.
@@ -179,14 +179,14 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     }
 
     #[inline]
-    fn merge(&mut self, command: Self) -> Merged<Self>
+    fn merge(&mut self, command: Self) -> Merge<Self>
     where
         Self: Sized,
     {
         match self.command.merge(command.command) {
-            Merged::Yes => Merged::Yes,
-            Merged::No(command) => Merged::No(Meta::from(command)),
-            Merged::Annul => Merged::Annul,
+            Merge::Yes => Merge::Yes,
+            Merge::No(command) => Merge::No(Meta::from(command)),
+            Merge::Annul => Merge::Annul,
         }
     }
 }

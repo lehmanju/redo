@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
-use {Command, Display, Error, History, Merged, Meta, Signal};
+use {Command, Display, Error, History, Merge, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -298,16 +298,16 @@ impl<R, C: Command<R>> Record<R, C> {
         // Try to merge commands unless the receiver is in a saved state.
         let merged = match self.commands.back_mut() {
             Some(ref mut last) if !was_saved => last.merge(meta),
-            _ => Merged::No(meta),
+            _ => Merge::No(meta),
         };
         let merged_or_annulled = match merged {
-            Merged::Yes => true,
-            Merged::Annul => {
+            Merge::Yes => true,
+            Merge::Annul => {
                 self.commands.pop_back();
                 true
             }
             // If commands are not merged or annulled push it onto the record.
-            Merged::No(meta) => {
+            Merge::No(meta) => {
                 // If limit is reached, pop off the first command.
                 if self.limit == self.cursor {
                     self.commands.pop_front();
