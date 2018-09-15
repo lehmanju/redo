@@ -32,6 +32,7 @@
 
 #[macro_use]
 extern crate bitflags;
+#[cfg(feature = "chrono")]
 extern crate chrono;
 extern crate colored;
 extern crate fnv;
@@ -44,6 +45,7 @@ mod history;
 mod record;
 mod signal;
 
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
 use std::{error::Error as StdError, fmt};
 
@@ -147,6 +149,7 @@ pub enum Merge<C> {
 #[derive(Debug)]
 struct Meta<C> {
     command: C,
+    #[cfg(feature = "chrono")]
     timestamp: DateTime<Local>,
 }
 
@@ -155,6 +158,7 @@ impl<C> From<C> for Meta<C> {
     fn from(command: C) -> Self {
         Meta {
             command,
+            #[cfg(feature = "chrono")]
             timestamp: Local::now(),
         }
     }

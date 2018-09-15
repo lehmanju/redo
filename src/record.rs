@@ -1,4 +1,6 @@
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
+#[cfg(feature = "chrono")]
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
@@ -503,6 +505,7 @@ impl<R, C: Command<R>> Record<R, C> {
     /// Go back or forward in time.
     #[inline]
     #[must_use]
+    #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
         to: impl Into<DateTime<Local>>,

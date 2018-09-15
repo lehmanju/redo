@@ -1,3 +1,4 @@
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
@@ -355,6 +356,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// Go back or forward in time.
     #[inline]
     #[must_use]
+    #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
         to: impl Into<DateTime<Local>>,
