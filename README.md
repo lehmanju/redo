@@ -17,7 +17,7 @@ The Record provides a stack based undo-redo functionality, while the
 History provides a tree based undo-redo functionality where you can
 jump between different branches.
 
-Commands can be merged using the [`merge!`] macro or the [`merge`] method.
+Commands can be merged using the [`merge`] method.
 When two commands are merged, undoing and redoing them are done in a single step.
 
 ## Examples
@@ -91,5 +91,4 @@ additional terms or conditions.
 [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
 [Record]: https://docs.rs/redo/latest/redo/struct.Record.html
 [History]: https://docs.rs/redo/latest/redo/struct.History.html
-[`merge!`]: https://docs.rs/redo/latest/redo/macro.merge.html
 [`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
