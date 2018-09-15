@@ -746,36 +746,6 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
-    struct JumpAdd(char, String);
-
-    impl From<char> for JumpAdd {
-        fn from(c: char) -> JumpAdd {
-            JumpAdd(c, Default::default())
-        }
-    }
-
-    impl Command<String> for JumpAdd {
-        type Error = Box<dyn Error>;
-
-        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-            self.1 = s.clone();
-            s.push(self.0);
-            Ok(())
-        }
-
-        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-            *s = self.1.clone();
-            Ok(())
-        }
-
-        fn redo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-            *s = self.1.clone();
-            s.push(self.0);
-            Ok(())
-        }
-    }
-
     #[test]
     fn set_limit() {
         let mut record = Record::default();

@@ -135,10 +135,7 @@ impl<R, C: Command<R>> History<R, C> {
         let diff = len - self.len();
         let root = self.root();
         for cursor in 0..diff {
-            self.rm_child(At {
-                branch: root,
-                cursor,
-            });
+            self.rm_child(root, cursor);
         }
         for branch in self
             .branches
@@ -223,10 +220,7 @@ impl<R, C: Command<R>> History<R, C> {
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
-            self.rm_child(At {
-                branch: root,
-                cursor: 0,
-            });
+            self.rm_child(root, 0);
             for branch in self
                 .branches
                 .values_mut()
@@ -437,13 +431,13 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Remove all children of the command at position `at`.
     #[inline]
-    fn rm_child(&mut self, at: At) {
+    fn rm_child(&mut self, branch: usize, cursor: usize) {
         let mut dead = FnvHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
             .branches
             .iter()
-            .filter(|&(&id, child)| child.parent == at && dead.insert(id))
+            .filter(|&(&id, child)| child.parent == At { branch, cursor } && dead.insert(id))
             .map(|(&id, _)| id)
             .collect::<Vec<_>>();
         // Add all the children of dead branches so they are removed too.
@@ -650,36 +644,6 @@ mod tests {
 
         fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
-            Ok(())
-        }
-    }
-
-    #[derive(Debug)]
-    struct JumpAdd(char, String);
-
-    impl From<char> for JumpAdd {
-        fn from(c: char) -> JumpAdd {
-            JumpAdd(c, Default::default())
-        }
-    }
-
-    impl Command<String> for JumpAdd {
-        type Error = Box<dyn Error>;
-
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            self.1 = receiver.clone();
-            receiver.push(self.0);
-            Ok(())
-        }
-
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            *receiver = self.1.clone();
-            Ok(())
-        }
-
-        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
-            *receiver = self.1.clone();
-            receiver.push(self.0);
             Ok(())
         }
     }

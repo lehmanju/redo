@@ -78,8 +78,6 @@ pub trait Command<R> {
 
     /// Used for manual merging of two commands.
     ///
-    /// Returns `Ok` if commands was merged and `Err` if not.
-    ///
     /// # Examples
     /// ```
     /// # use redo::*;
