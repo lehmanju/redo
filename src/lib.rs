@@ -11,13 +11,12 @@
 //! History provides a tree based undo-redo functionality where you can
 //! jump between different branches.
 //!
-//! Commands can be merged using the [`merge!`] macro or the [`merge`] method.
+//! Commands can be merged using the [`merge`] method.
 //! When two commands are merged, undoing and redoing them are done in a single step.
 //!
 //! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
-//! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
 #![deny(
