@@ -1,5 +1,5 @@
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local};
+use chrono::{DateTime, TimeZone};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 use std::fmt;
@@ -357,9 +357,9 @@ impl<R, C: Command<R>> History<R, C> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel(
+    pub fn time_travel<Tz: TimeZone>(
         &mut self,
-        to: impl Into<DateTime<Local>>,
+        to: impl AsRef<DateTime<Tz>>,
     ) -> Option<Result<(), Error<R, C>>> {
         self.record.time_travel(to)
     }

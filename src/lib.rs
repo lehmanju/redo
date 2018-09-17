@@ -46,7 +46,7 @@ mod record;
 mod signal;
 
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use std::{error::Error as StdError, fmt};
 
 pub use display::Display;
@@ -150,7 +150,7 @@ pub enum Merge<C> {
 struct Meta<C> {
     command: C,
     #[cfg(feature = "chrono")]
-    timestamp: DateTime<Local>,
+    timestamp: DateTime<Utc>,
 }
 
 impl<C> From<C> for Meta<C> {
@@ -159,7 +159,7 @@ impl<C> From<C> for Meta<C> {
         Meta {
             command,
             #[cfg(feature = "chrono")]
-            timestamp: Local::now(),
+            timestamp: Utc::now(),
         }
     }
 }
