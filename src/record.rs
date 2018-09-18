@@ -261,7 +261,6 @@ impl<R, C: Command<R>> Record<R, C> {
     }
 
     /// Pushes the command on top of the record and executes its [`apply`] method.
-    /// The command is merged with the previous top command if [`merge`] does not return `None`.
     ///
     /// All commands above the active one are removed and returned as an iterator.
     ///
