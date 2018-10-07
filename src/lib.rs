@@ -19,14 +19,16 @@
 //! [History]: struct.History.html
 //! [`merge`]: trait.Command.html#method.merge
 
+#![doc(html_root_url = "https://docs.rs/redo/0.28.0")]
 #![deny(
     bad_style,
     bare_trait_objects,
     missing_debug_implementations,
+    missing_docs,
     unused_import_braces,
     unused_qualifications,
     unsafe_code,
-    unstable_features,
+    unstable_features
 )]
 
 #[macro_use]
@@ -34,7 +36,7 @@ extern crate bitflags;
 #[cfg(feature = "chrono")]
 extern crate chrono;
 extern crate colored;
-extern crate fnv;
+extern crate rustc_hash;
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
@@ -141,6 +143,14 @@ pub enum Merge<C> {
     No(C),
     /// The two commands cancels each other out. This removes both commands.
     Annul,
+}
+
+/// A position in a history tree.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub(crate) struct At {
+    pub(crate) branch: usize,
+    pub(crate) cursor: usize,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

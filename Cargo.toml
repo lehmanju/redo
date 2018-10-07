@@ -1,6 +1,6 @@
 [package]
 name = "redo"
-version = "0.27.1"
+version = "0.28.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo-redo library with static dispatch and manual command merging."
 documentation = "https://docs.rs/redo"
@@ -14,8 +14,5 @@ categories = ["data-structures"]
 bitflags = "1"
 chrono = { version = "0.4.6", optional = true, features = ["serde"] }
 colored = "1"
-fnv = "1"
+rustc-hash = "1"
 serde = { version = "1", optional = true, features = ["derive"] }
-
-[features]
-default = ["chrono"]

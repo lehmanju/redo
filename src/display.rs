@@ -1,9 +1,8 @@
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Local, TimeZone};
 use colored::{Color, Colorize};
-use history::At;
 use std::fmt::{self, Write};
-use {Command, History, Meta, Record};
+use {At, Command, History, Meta, Record};
 
 /// Configurable display formatting of structures.
 #[derive(Copy, Clone, Debug)]
@@ -139,7 +138,8 @@ impl<'a, R, C: Command<R> + fmt::Display> Display<'a, History<R, C>> {
                 .map(|saved| At {
                     branch: self.data.root(),
                     cursor: saved,
-                }).or(self.data.saved),
+                })
+                .or(self.data.saved),
         )?;
         if self.view.contains(View::DETAILED) {
             writeln!(f)?;

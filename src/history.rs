@@ -1,9 +1,9 @@
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 use std::fmt;
-use {Command, Display, Error, Meta, Record, RecordBuilder, Signal};
+use {At, Command, Display, Error, Meta, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -60,7 +60,7 @@ pub struct History<R, C: Command<R>> {
     next: usize,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<R, C>,
-    pub(crate) branches: FnvHashMap<usize, Branch<C>>,
+    pub(crate) branches: FxHashMap<usize, Branch<C>>,
 }
 
 impl<R, C: Command<R>> History<R, C> {
@@ -72,7 +72,7 @@ impl<R, C: Command<R>> History<R, C> {
             next: 1,
             saved: None,
             record: Record::new(receiver),
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 
@@ -212,7 +212,7 @@ impl<R, C: Command<R>> History<R, C> {
         self.record.clear();
         self.branches.clear();
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: 0 });
+            f(Signal::Root { old, new: 0 });
         }
     }
 
@@ -265,7 +265,7 @@ impl<R, C: Command<R>> History<R, C> {
                 _ => unreachable!(),
             }
             if let Some(ref mut f) = self.record.signal {
-                f(Signal::Branch { old, new });
+                f(Signal::Root { old, new });
             }
             Ok(Some(old))
         } else {
@@ -356,7 +356,7 @@ impl<R, C: Command<R>> History<R, C> {
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
         } else if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch {
+            f(Signal::Root {
                 old: root,
                 new: self.root,
             });
@@ -445,7 +445,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// Remove all children of the command at position `at`.
     #[inline]
     fn rm_child(&mut self, branch: usize, cursor: usize) {
-        let mut dead = FnvHashSet::default();
+        let mut dead = FxHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
             .branches
@@ -550,7 +550,7 @@ impl<R, C: Command<R>> From<Record<R, C>> for History<R, C> {
             next: 1,
             saved: None,
             record,
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 }
@@ -568,14 +568,6 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for History<R, C> {
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
     pub(crate) commands: VecDeque<Meta<C>>,
-}
-
-/// The position in the tree.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) struct At {
-    pub(crate) branch: usize,
-    pub(crate) cursor: usize,
 }
 
 /// Builder for a History.
@@ -626,7 +618,7 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
             next: 1,
             saved: None,
             record: self.inner.build(receiver),
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 }
