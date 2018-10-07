@@ -3,7 +3,7 @@ use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::fmt;
-use {At, Command, Display, Error, Meta, Record, RecordBuilder, Signal};
+use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -378,6 +378,18 @@ impl<R, C: Command<R>> History<R, C> {
         to: impl AsRef<DateTime<Tz>>,
     ) -> Option<Result<(), Error<R, C>>> {
         self.record.time_travel(to)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C>, C> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<History<R, C>, C> {
+        Queue::from(self)
     }
 
     /// Returns a reference to the `receiver`.

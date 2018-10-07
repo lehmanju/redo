@@ -41,8 +41,10 @@ extern crate rustc_hash;
 #[macro_use]
 extern crate serde;
 
+mod checkpoint;
 mod display;
 mod history;
+mod queue;
 mod record;
 mod signal;
 
@@ -50,8 +52,10 @@ mod signal;
 use chrono::{DateTime, Utc};
 use std::{error::Error as StdError, fmt};
 
+pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use history::{History, HistoryBuilder};
+pub use queue::Queue;
 pub use record::{Record, RecordBuilder};
 pub use signal::Signal;
 
@@ -148,9 +152,9 @@ pub enum Merge<C> {
 /// A position in a history tree.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) struct At {
-    pub(crate) branch: usize,
-    pub(crate) cursor: usize,
+struct At {
+    branch: usize,
+    cursor: usize,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

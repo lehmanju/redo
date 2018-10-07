@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
-use {Command, Display, Error, History, Merge, Meta, Signal};
+use {Checkpoint, Command, Display, Error, History, Merge, Meta, Queue, Signal};
 
 /// A record of commands.
 ///
@@ -493,6 +493,18 @@ impl<R, C: Command<R>> Record<R, C> {
             },
         };
         self.go_to(cursor)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C>, C> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<Record<R, C>, C> {
+        Queue::from(self)
     }
 
     /// Returns a reference to the `receiver`.
