@@ -217,6 +217,14 @@ pub struct Error<R, C: Command<R>> {
 }
 
 impl<R, C: Command<R>> Error<R, C> {
+    /// Returns a new error.
+    #[inline]
+    fn new(meta: Meta<C>, error: C::Error) -> Error<R, C> {
+        Error { meta, error }
+    }
+}
+
+impl<R, C: Command<R>> Error<R, C> {
     /// Returns a reference to the command that caused the error.
     #[inline]
     pub fn command(&self) -> &C {
