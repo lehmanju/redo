@@ -418,10 +418,16 @@ impl<R, C: Command<R>> History<R, C> {
         self.record.commands()
     }
 
+    /// Returns an iterator over the branches in the history, excluding the root branch.
+    #[inline]
+    pub fn branches(&self) -> impl Iterator<Item = &usize> {
+        self.branches.keys()
+    }
+
     /// Sets the `root`.
     #[inline]
     fn set_root(&mut self, root: usize, cursor: usize) {
-        let old = self.root;
+        let old = self.root();
         self.root = root;
         debug_assert_ne!(old, root);
         // Handle the child branches.
