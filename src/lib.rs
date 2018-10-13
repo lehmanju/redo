@@ -17,7 +17,7 @@
 //! [Display]: struct.Display.html
 //! [`merge`]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/redo/0.28.0")]
+#![doc(html_root_url = "https://docs.rs/redo/0.28.1")]
 #![deny(
     bad_style,
     bare_trait_objects,
