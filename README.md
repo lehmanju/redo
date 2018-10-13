@@ -3,21 +3,17 @@
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
-An undo-redo library with static dispatch and manual command merging.
+Provides undo-redo functionality with static dispatch and manual command merging.
 
-It uses the [command pattern] where the user modifies the receiver by
-applying commands on it. Since each command knows how to undo and redo
-the changes it applies to the receiver, the state of the receiver can
-be rolled forwards or backwards by calling undo or redo in the correct order.
-
-The [Record] and [History] provides functionality to store and keep track
-of the applied commands, and makes it easy to undo and redo changes.
-The Record provides a stack based undo-redo functionality, while the
-History provides a tree based undo-redo functionality where you can
-jump between different branches.
-
-Commands can be merged using the [`merge`] method.
-When two commands are merged, undoing and redoing them are done in a single step.
+* [Record] provides a stack based undo-redo functionality.
+* [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
+* [Queue] wraps a [Record] or [History] and provides batch queue functionality.
+* [Checkpoint] wraps a [Record] or [History] and provides checkpoint functionality.
+* Commands can be merged using the [`merge`] method.
+  When two commands are merged, undoing and redoing them are done in a single step.
+* Configurable display formatting is provided through the [Display] structure.
+* Time stamps and time travel is provided when the `chrono` feature is enabled.
+* Serialization and deserialization is provided when the `serde` feature is enabled.
 
 ## Examples
 
@@ -87,7 +83,9 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
 
-[command pattern]: https://en.wikipedia.org/wiki/Command_pattern
 [Record]: https://docs.rs/redo/latest/redo/struct.Record.html
 [History]: https://docs.rs/redo/latest/redo/struct.History.html
+[Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
+[Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
+[Display]: https://docs.rs/undo/latest/undo/struct.Display.html
 [`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
