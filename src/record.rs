@@ -152,14 +152,12 @@ impl<R, C: Command<R>> Record<R, C> {
             let old = self.cursor();
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
-
             let begin = usize::min(old, self.len() - limit);
             self.commands = self.commands.split_off(begin);
             self.limit = NonZeroUsize::new(self.len()).unwrap();
             self.cursor -= begin;
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
-
             let new = self.cursor();
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
@@ -241,7 +239,6 @@ impl<R, C: Command<R>> Record<R, C> {
         let old = self.cursor();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
-
         self.commands.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.cursor = 0;
