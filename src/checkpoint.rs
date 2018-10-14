@@ -179,12 +179,27 @@ impl<'a, R, C: Command<R>> Checkpoint<'a, Record<R, C>, C> {
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
     }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.inner.as_mut_receiver()
+    }
 }
 
 impl<'a, R, C: Command<R>> AsRef<R> for Checkpoint<'a, Record<R, C>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
+    }
+}
+
+impl<'a, R, C: Command<R>> AsMut<R> for Checkpoint<'a, Record<R, C>, C> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.inner.as_mut()
     }
 }
 
@@ -298,12 +313,27 @@ impl<'a, R, C: Command<R>> Checkpoint<'a, History<R, C>, C> {
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
     }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.inner.as_mut_receiver()
+    }
 }
 
 impl<'a, R, C: Command<R>> AsRef<R> for Checkpoint<'a, History<R, C>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
+    }
+}
+
+impl<'a, R, C: Command<R>> AsMut<R> for Checkpoint<'a, History<R, C>, C> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.inner.as_mut()
     }
 }
 

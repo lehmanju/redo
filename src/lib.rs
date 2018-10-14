@@ -1,5 +1,5 @@
 //! Provides undo-redo functionality with static dispatch and manual command merging.
-//! 
+//!
 //! * [Record] provides a stack based undo-redo functionality.
 //! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and provides batch queue functionality.
@@ -44,7 +44,6 @@ mod display;
 mod history;
 mod queue;
 mod record;
-mod signal;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -55,7 +54,6 @@ pub use display::Display;
 pub use history::{History, HistoryBuilder};
 pub use queue::Queue;
 pub use record::{Record, RecordBuilder};
-pub use signal::Signal;
 
 /// Base functionality for all commands.
 pub trait Command<R> {
@@ -134,6 +132,46 @@ pub trait Command<R> {
     {
         Merge::No(command)
     }
+}
+
+/// The signal sent when the record, the history, or the receiver changes.
+///
+/// When one of these states changes, they will send a corresponding signal to the user.
+/// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
+/// signal to tell the user.
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Signal {
+    /// Says if the record can undo.
+    ///
+    /// This signal will be emitted when the records ability to undo changes.
+    Undo(bool),
+    /// Says if the record can redo.
+    ///
+    /// This signal will be emitted when the records ability to redo changes.
+    Redo(bool),
+    /// Says if the receiver is in a saved state.
+    ///
+    /// This signal will be emitted when the record enters or leaves its receivers saved state.
+    Saved(bool),
+    /// Says if the current command has changed.
+    ///
+    /// This signal will be emitted when the cursor has changed. This includes
+    /// when two commands have been merged, in which case `old == new`.
+    Cursor {
+        /// The old cursor.
+        old: usize,
+        /// The new cursor.
+        new: usize,
+    },
+    /// Says if the current branch, or root, has changed.
+    ///
+    /// This is only emitted from `History`.
+    Root {
+        /// The old root.
+        old: usize,
+        /// The new root.
+        new: usize,
+    },
 }
 
 /// The result of merging two commands.
