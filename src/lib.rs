@@ -17,7 +17,7 @@
 //! [Display]: struct.Display.html
 //! [`merge`]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/redo/0.28.2")]
+#![doc(html_root_url = "https://docs.rs/redo/0.28.3")]
 #![deny(
     bad_style,
     bare_trait_objects,
@@ -113,11 +113,9 @@ pub trait Command<R> {
     ///     record.apply(Add("b".into()))?;
     ///     record.apply(Add("c".into()))?;
     ///     assert_eq!(record.as_receiver(), "abc");
-    ///
     ///     // Calling `undo` once will undo all the merged commands.
     ///     record.undo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "");
-    ///
     ///     // Calling `redo` once will redo all the merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "abc");
