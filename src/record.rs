@@ -259,7 +259,6 @@ impl<R, C: Command<R>> Record<R, C> {
     /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    /// [`merge`]: trait.Command.html#method.merge
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<(), Error<R, C>> {
         self.__apply(Meta::from(command)).map(|(_, _)| ())
