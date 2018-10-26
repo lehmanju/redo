@@ -29,7 +29,6 @@
     unstable_features
 )]
 
-#[macro_use]
 extern crate bitflags;
 #[cfg(feature = "chrono")]
 extern crate chrono;
