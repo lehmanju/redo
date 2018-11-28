@@ -29,7 +29,7 @@ And this to `main.rs`:
 ```rust
 extern crate redo;
 
-use redo::{self, Command, Record};
+use redo::{Command, Record};
 
 #[derive(Debug)]
 struct Add(char);
@@ -48,7 +48,7 @@ impl Command<String> for Add {
     }
 }
 
-fn main() -> Result<(), redo::Error<String, Add>> {
+fn main() -> redo::Result<String, Add> {
     let mut record = Record::default();
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;

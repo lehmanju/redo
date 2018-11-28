@@ -1,4 +1,4 @@
-use {Checkpoint, Command, Error, History, Record};
+use {Checkpoint, Command, History, Record, Result};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -16,7 +16,7 @@ enum Action<C> {
 /// # Examples
 /// ```
 /// # use std::error;
-/// # use redo::*;
+/// # use redo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -34,7 +34,7 @@ enum Action<C> {
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Error<String, Add>> {
+/// fn main() -> redo::Result<String, Add> {
 ///     let mut record = Record::default();
 ///     {
 ///         let mut queue = record.queue();
@@ -100,7 +100,7 @@ impl<'a, R, C: Command<R>> Queue<'a, Record<R, C>, C> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), Error<R, C>> {
+    pub fn commit(self) -> Result<R, C> {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -177,7 +177,7 @@ impl<'a, R, C: Command<R>> Queue<'a, History<R, C>, C> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), Error<R, C>> {
+    pub fn commit(self) -> Result<R, C> {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,

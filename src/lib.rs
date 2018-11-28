@@ -46,13 +46,17 @@ mod record;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
-use std::{error::Error as StdError, fmt};
+use std::fmt;
+use std::result::Result as StdResult;
 
 pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use history::{History, HistoryBuilder};
 pub use queue::Queue;
 pub use record::{Record, RecordBuilder};
+
+/// A specialized Result type for undo-redo operations.
+pub type Result<R, C> = StdResult<(), Error<R, C>>;
 
 /// Base functionality for all commands.
 pub trait Command<R> {
@@ -61,11 +65,11 @@ pub trait Command<R> {
 
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+    fn apply(&mut self, receiver: &mut R) -> StdResult<(), Self::Error>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+    fn undo(&mut self, receiver: &mut R) -> StdResult<(), Self::Error>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -74,7 +78,7 @@ pub trait Command<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Error> {
+    fn redo(&mut self, receiver: &mut R) -> StdResult<(), Self::Error> {
         self.apply(receiver)
     }
 
@@ -82,7 +86,7 @@ pub trait Command<R> {
     ///
     /// # Examples
     /// ```
-    /// # use redo::*;
+    /// # use redo::{Command, Merge, Record};
     /// #[derive(Debug)]
     /// struct Add(String);
     ///
@@ -106,7 +110,7 @@ pub trait Command<R> {
     ///     }
     /// }
     ///
-    /// fn main() -> Result<(), Error<String, Add>> {
+    /// fn main() -> redo::Result<String, Add> {
     ///     let mut record = Record::default();
     ///     // The `a`, `b`, and `c` commands are merged.
     ///     record.apply(Add("a".into()))?;
@@ -213,17 +217,17 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     type Error = C::Error;
 
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn apply(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
         self.command.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn undo(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
         self.command.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn redo(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
         self.command.redo(receiver)
     }
 
@@ -298,10 +302,10 @@ where
     }
 }
 
-impl<R, C: Command<R>> StdError for Error<R, C>
+impl<R, C: Command<R>> std::error::Error for Error<R, C>
 where
     C: fmt::Debug,
-    C::Error: StdError,
+    C::Error: std::error::Error,
 {
     #[inline]
     fn description(&self) -> &str {
@@ -309,7 +313,7 @@ where
     }
 
     #[inline]
-    fn cause(&self) -> Option<&dyn StdError> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         self.error.cause()
     }
 }

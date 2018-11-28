@@ -3,7 +3,7 @@ use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::fmt;
-use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Signal};
+use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
 
 /// A history of commands.
 ///
@@ -12,7 +12,7 @@ use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder
 /// # Examples
 /// ```
 /// # use std::error;
-/// # use redo::*;
+/// # use redo::{Command, History};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -30,7 +30,7 @@ use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Error<String, Add>> {
+/// fn main() -> redo::Result<String, Add> {
 ///     let mut history = History::default();
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
@@ -179,7 +179,7 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<(), Error<R, C>>> {
+    pub fn revert(&mut self) -> Option<Result<R, C>> {
         if self.is_saved() {
             self.record.revert()
         } else {
@@ -221,12 +221,12 @@ impl<R, C: Command<R>> History<R, C> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: C) -> Result<(), Error<R, C>> {
+    pub fn apply(&mut self, command: C) -> Result<R, C> {
         self.__apply(Meta::from(command)).map(|_| ())
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, meta: Meta<C>) -> Result<bool, Error<R, C>> {
+    pub(crate) fn __apply(&mut self, meta: Meta<C>) -> std::result::Result<bool, Error<R, C>> {
         let cursor = self.cursor();
         let saved = self.record.saved.filter(|&saved| saved > cursor);
         let (merged, commands) = self.record.__apply(meta)?;
@@ -282,7 +282,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R, C>>> {
+    pub fn undo(&mut self) -> Option<Result<R, C>> {
         self.record.undo()
     }
 
@@ -295,7 +295,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R, C>>> {
+    pub fn redo(&mut self) -> Option<Result<R, C>> {
         self.record.redo()
     }
 
@@ -308,7 +308,7 @@ impl<R, C: Command<R>> History<R, C> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R, C>>> {
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R, C>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(cursor);
@@ -373,7 +373,7 @@ impl<R, C: Command<R>> History<R, C> {
     pub fn time_travel<Tz: TimeZone>(
         &mut self,
         to: impl AsRef<DateTime<Tz>>,
-    ) -> Option<Result<(), Error<R, C>>> {
+    ) -> Option<Result<R, C>> {
         self.record.time_travel(to)
     }
 
