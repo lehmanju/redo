@@ -47,7 +47,6 @@ mod record;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use std::fmt;
-use std::result::Result as StdResult;
 
 pub use checkpoint::Checkpoint;
 pub use display::Display;
@@ -56,7 +55,7 @@ pub use queue::Queue;
 pub use record::{Record, RecordBuilder};
 
 /// A specialized Result type for undo-redo operations.
-pub type Result<R, C> = StdResult<(), Error<R, C>>;
+pub type Result<R, C> = std::result::Result<(), Error<R, C>>;
 
 /// Base functionality for all commands.
 pub trait Command<R> {
@@ -65,11 +64,11 @@ pub trait Command<R> {
 
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> StdResult<(), Self::Error>;
+    fn apply(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> StdResult<(), Self::Error>;
+    fn undo(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -78,7 +77,7 @@ pub trait Command<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> StdResult<(), Self::Error> {
+    fn redo(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error> {
         self.apply(receiver)
     }
 
@@ -217,17 +216,17 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     type Error = C::Error;
 
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
+    fn apply(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
         self.command.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
+    fn undo(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
         self.command.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> StdResult<(), <Self as Command<R>>::Error> {
+    fn redo(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
         self.command.redo(receiver)
     }
 

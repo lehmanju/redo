@@ -146,12 +146,12 @@ impl<'a, R, C: Command<R> + fmt::Display> Display<'a, History<R, C>> {
             .iter()
             .filter(|(_, branch)| branch.parent == at)
         {
-            for (j, meta) in branch.commands.iter().enumerate().rev() {
+            for (j, cmd) in branch.commands.iter().enumerate().rev() {
                 let at = At {
                     branch: i,
                     cursor: j + branch.parent.cursor + 1,
                 };
-                self.fmt_graph(f, at, meta, level + 1)?;
+                self.fmt_graph(f, at, cmd, level + 1)?;
             }
             for j in 0..level {
                 self.view.edge(f, j)?;
@@ -181,12 +181,12 @@ impl<'a, T: 'a> From<&'a T> for Display<'a, T> {
 impl<'a, R, C: Command<R> + fmt::Display> fmt::Display for Display<'a, Record<R, C>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, meta) in self.data.commands.iter().enumerate().rev() {
+        for (i, cmd) in self.data.commands.iter().enumerate().rev() {
             let at = At {
                 branch: 0,
                 cursor: i + 1,
             };
-            self.fmt_list(f, at, meta)?;
+            self.fmt_list(f, at, cmd)?;
         }
         Ok(())
     }
@@ -195,15 +195,15 @@ impl<'a, R, C: Command<R> + fmt::Display> fmt::Display for Display<'a, Record<R,
 impl<'a, R, C: Command<R> + fmt::Display> fmt::Display for Display<'a, History<R, C>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, meta) in self.data.record.commands.iter().enumerate().rev() {
+        for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
             let at = At {
                 branch: self.data.root(),
                 cursor: i + 1,
             };
             if self.view.contains(View::GRAPH) {
-                self.fmt_graph(f, at, meta, 0)?;
+                self.fmt_graph(f, at, cmd, 0)?;
             } else {
-                self.fmt_list(f, at, meta, 0)?;
+                self.fmt_list(f, at, cmd, 0)?;
             }
         }
         Ok(())
@@ -243,7 +243,7 @@ impl View {
                 }
                 writeln!(f, "{}", line.trim())?;
             }
-        } else if let Some(line) = lines.map(|s| s.trim()).find(|s| !s.is_empty()) {
+        } else if let Some(line) = lines.map(str::trim).find(|s| !s.is_empty()) {
             f.write_str(&line)?;
         }
         Ok(())
