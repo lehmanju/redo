@@ -1,3 +1,4 @@
+use crate::{Checkpoint, Command, Display, Error, History, Merge, Meta, Queue, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "chrono")]
@@ -6,7 +7,6 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
-use {Checkpoint, Command, Display, Error, History, Merge, Meta, Queue, Result, Signal};
 
 #[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
@@ -699,8 +699,8 @@ impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for RecordBuilder<R, 
 
 #[cfg(test)]
 mod tests {
+    use crate::{Command, Record};
     use std::error::Error;
-    use {Command, Record};
 
     #[derive(Debug)]
     struct Add(char);

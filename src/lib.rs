@@ -48,11 +48,11 @@ mod record;
 use chrono::{DateTime, Utc};
 use std::fmt;
 
-pub use checkpoint::Checkpoint;
-pub use display::Display;
-pub use history::{History, HistoryBuilder};
-pub use queue::Queue;
-pub use record::{Record, RecordBuilder};
+pub use self::checkpoint::Checkpoint;
+pub use self::display::Display;
+pub use self::history::{History, HistoryBuilder};
+pub use self::queue::Queue;
+pub use self::record::{Record, RecordBuilder};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<R, C> = std::result::Result<(), Error<R, C>>;

@@ -27,8 +27,6 @@ redo = "0.29"
 And this to `main.rs`:
 
 ```rust
-extern crate redo;
-
 use redo::{Command, Record};
 
 #[derive(Debug)]

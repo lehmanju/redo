@@ -1,9 +1,11 @@
+use crate::{
+    At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Result, Signal,
+};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::fmt;
-use {At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
 
 /// A history of commands.
 ///
@@ -652,8 +654,8 @@ impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{Command, History};
     use std::error::Error;
-    use {Command, History};
 
     #[derive(Debug)]
     struct Add(char);
