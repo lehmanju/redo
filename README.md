@@ -64,7 +64,7 @@ fn main() -> redo::Result<String, Add> {
 }
 ```
 
-## License
+### License
 
 Licensed under either of
 
