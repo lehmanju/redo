@@ -61,6 +61,53 @@ impl<'a, T, C> From<&'a mut T> for Queue<'a, T, C> {
     }
 }
 
+impl<'a, T, C> Queue<'a, T, C> {
+    /// Returns a queue.
+    #[inline]
+    pub fn new(inner: &'a mut T) -> Queue<'a, T, C> {
+        Queue {
+            inner,
+            queue: Vec::new(),
+        }
+    }
+
+    /// Returns a queue with the given capacity.
+    #[inline]
+    pub fn with_capacity(inner: &'a mut T, capacity: usize) -> Queue<'a, T, C> {
+        Queue {
+            inner,
+            queue: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Reserves capacity for at least `additional` more commands in the queue.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.queue.reserve(additional);
+    }
+
+    /// Returns the capacity of the queue.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.queue.capacity()
+    }
+
+    /// Returns the number of commands in the queue.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Returns `true` if the queue is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+}
+
 impl<T, C> Queue<'_, T, C> {
     /// Queues an `apply` action.
     #[inline]
