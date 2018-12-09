@@ -16,13 +16,12 @@ enum Action<C> {
 ///
 /// # Examples
 /// ```
-/// # use std::error;
 /// # use redo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Error = Box<dyn error::Error>;
+///     type Error = &'static str;
 ///
 ///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
 ///         s.push(self.0);

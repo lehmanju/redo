@@ -13,13 +13,12 @@ use std::fmt;
 ///
 /// # Examples
 /// ```
-/// # use std::error;
 /// # use redo::{Command, History};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Error = Box<dyn error::Error>;
+///     type Error = &'static str;
 ///
 ///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
 ///         s.push(self.0);
@@ -655,20 +654,19 @@ impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
 #[cfg(test)]
 mod tests {
     use crate::{Command, History};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        type Error = Box<dyn Error>;
+        type Error = &'static str;
 
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Self::Error> {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Self::Error> {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }

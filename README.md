@@ -33,7 +33,7 @@ use redo::{Command, Record};
 struct Add(char);
 
 impl Command<String> for Add {
-    type Error = Box<dyn Error>;
+    type Error = &'static str;
 
     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
         s.push(self.0);

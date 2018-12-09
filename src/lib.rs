@@ -29,15 +29,6 @@
     unstable_features
 )]
 
-extern crate bitflags;
-#[cfg(feature = "chrono")]
-extern crate chrono;
-extern crate colored;
-extern crate rustc_hash;
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-
 mod checkpoint;
 mod display;
 mod history;

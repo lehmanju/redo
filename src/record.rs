@@ -21,13 +21,12 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 ///
 /// # Examples
 /// ```
-/// # use std::error;
 /// # use redo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     type Error = Box<dyn error::Error>;
+///     type Error = &'static str;
 ///
 ///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
 ///         s.push(self.0);
@@ -700,20 +699,19 @@ impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for RecordBuilder<R, 
 #[cfg(test)]
 mod tests {
     use crate::{Command, Record};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        type Error = Box<dyn Error>;
+        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+        fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+        fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }
