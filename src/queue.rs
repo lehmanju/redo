@@ -71,15 +71,6 @@ impl<'a, T, C> Queue<'a, T, C> {
         }
     }
 
-    /// Returns a queue with the given capacity.
-    #[inline]
-    pub fn with_capacity(inner: &'a mut T, capacity: usize) -> Queue<'a, T, C> {
-        Queue {
-            inner,
-            queue: Vec::with_capacity(capacity),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the queue.
     ///
     /// # Panics

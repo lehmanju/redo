@@ -72,15 +72,6 @@ impl<'a, T, C> Checkpoint<'a, T, C> {
         }
     }
 
-    /// Returns a checkpoint with the given capacity.
-    #[inline]
-    pub fn with_capacity(inner: &'a mut T, capacity: usize) -> Checkpoint<'a, T, C> {
-        Checkpoint {
-            inner,
-            stack: Vec::with_capacity(capacity),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the checkpoint.
     ///
     /// # Panics
