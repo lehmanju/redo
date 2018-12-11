@@ -37,6 +37,8 @@ mod record;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
+#[cfg(feature = "chrono")]
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use self::checkpoint::Checkpoint;

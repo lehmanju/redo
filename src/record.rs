@@ -2,6 +2,8 @@ use crate::{Checkpoint, Command, Display, Error, History, Merge, Meta, Queue, Re
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "chrono")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "chrono")]
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
