@@ -621,6 +621,25 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for Record<R, C> {
 }
 
 /// Builder for a record.
+///
+/// # Examples
+/// ```
+/// # use redo::{Command, Record};
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = ();
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// # }
+/// # fn foo() -> Record<String, Add> {
+/// let record = Record::builder()
+///     .capacity(100)
+///     .limit(100)
+///     .saved(false)
+///     .default();
+/// # record
+/// # }
+/// ```
 pub struct RecordBuilder<R, C: Command<R>> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,

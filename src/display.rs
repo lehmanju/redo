@@ -362,7 +362,13 @@ impl View {
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<impl TimeZone>) -> fmt::Result {
         let local = Local.from_utc_datetime(&timestamp.naive_utc());
         if self.contains(View::COLORED) {
-            write!(f, " {}{}{}", "[".yellow(), local.to_rfc2822().yellow(), "]".yellow())
+            write!(
+                f,
+                " {}{}{}",
+                "[".yellow(),
+                local.to_rfc2822().yellow(),
+                "]".yellow()
+            )
         } else {
             write!(f, " [{}]", local.to_rfc2822())
         }

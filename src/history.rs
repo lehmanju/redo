@@ -590,6 +590,25 @@ pub(crate) struct Branch<C> {
 }
 
 /// Builder for a History.
+///
+/// # Examples
+/// ```
+/// # use redo::{Command, History};
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = ();
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// # }
+/// # fn foo() -> History<String, Add> {
+/// let history = History::builder()
+///     .capacity(100)
+///     .limit(100)
+///     .saved(false)
+///     .default();
+/// # history
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct HistoryBuilder<R, C: Command<R>> {
     inner: RecordBuilder<R, C>,
