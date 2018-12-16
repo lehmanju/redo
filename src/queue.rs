@@ -97,9 +97,7 @@ impl<'a, T, C> Queue<'a, T, C> {
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
-}
 
-impl<T, C> Queue<'_, T, C> {
     /// Queues an `apply` action.
     #[inline]
     pub fn apply(&mut self, command: C) {

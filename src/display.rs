@@ -6,6 +6,29 @@ use colored::{Color, Colorize};
 use std::fmt::{self, Write};
 
 /// Configurable display formatting of structures.
+///
+/// # Examples
+/// ```
+/// # use std::fmt::{self, Display, Formatter};
+/// # use redo::{Command, History};
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = ();
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// # }
+/// # impl Display for Add {
+/// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { Ok(()) }
+/// # }
+/// # fn foo() -> History<String, Add> {
+/// let history = History::default();
+/// println!(
+///     "{}",
+///     history.display().graph(true).colored(true).ligatures(true)
+/// );
+/// # history
+/// # }
+/// ```
 #[derive(Copy, Clone, Debug)]
 pub struct Display<'a, T> {
     data: &'a T,
