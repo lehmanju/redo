@@ -132,6 +132,29 @@ pub trait Command<R> {
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
+///
+/// # Examples
+/// ```
+/// # use redo::{Command, Record, Signal};
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = ();
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// # }
+/// # fn foo() -> Record<String, Add> {
+/// let record = Record::builder()
+///     .connect(|signal| match signal {
+///         Signal::Undo(on) => println!("undo: {}", on),
+///         Signal::Redo(on) => println!("redo: {}", on),
+///         Signal::Saved(on) => println!("saved: {}", on),
+///         Signal::Cursor { old, new } => println!("cursor: {} -> {}", old, new),
+///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
+///     })
+///     .default();
+/// # record
+/// # }
+/// ```
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
