@@ -152,7 +152,10 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn connect(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+    pub fn connect<F>(&mut self, f: impl Into<Option<F>>)
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
         self.record.connect(f);
     }
 
@@ -643,11 +646,10 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
 
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
-    #[inline]
-    pub fn connect(
-        mut self,
-        f: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> HistoryBuilder<R, C> {
+    pub fn connect<F>(mut self, f: impl Into<Option<F>>) -> HistoryBuilder<R, C>
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
         self.inner = self.inner.connect(f);
         self
     }

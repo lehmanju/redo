@@ -177,8 +177,11 @@ impl<R, C: Command<R>> Record<R, C> {
 
     /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn connect(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
-        self.signal = Some(Box::new(f));
+    pub fn connect<F>(&mut self, f: impl Into<Option<F>>)
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
+        self.signal = f.into().map(|f| Box::new(f) as _);
     }
 
     /// Returns `true` if the record can undo.
@@ -678,8 +681,11 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// Decides how different signals should be handled when the state changes.
     /// By default the record does not handle any signals.
     #[inline]
-    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R, C> {
-        self.signal = Some(Box::new(f));
+    pub fn connect<F>(mut self, f: impl Into<Option<F>>) -> RecordBuilder<R, C>
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
+        self.signal = f.into().map(|f| Box::new(f) as _);
         self
     }
 
