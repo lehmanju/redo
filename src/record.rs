@@ -495,6 +495,21 @@ impl<R, C: Command<R>> Record<R, C> {
         self.go_to(cursor)
     }
 
+    /// Applies each command in the iterator.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`apply`] the error is returned together with the command
+    /// and the remaining commands in the iterator are discarded.
+    ///
+    /// [`apply`]: trait.Command.html#tymethod.apply
+    #[inline]
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<R, C> {
+        for command in commands {
+            self.apply(command)?;
+        }
+        Ok(())
+    }
+
     /// Returns a checkpoint.
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C>, C> {

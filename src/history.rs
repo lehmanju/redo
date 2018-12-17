@@ -384,6 +384,21 @@ impl<R, C: Command<R>> History<R, C> {
         self.record.time_travel(to)
     }
 
+    /// Applies each command in the iterator.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`apply`] the error is returned together with the command
+    /// and the remaining commands in the iterator are discarded.
+    ///
+    /// [`apply`]: trait.Command.html#tymethod.apply
+    #[inline]
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<R, C> {
+        for command in commands {
+            self.apply(command)?;
+        }
+        Ok(())
+    }
+
     /// Returns a checkpoint.
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<R, C>, C> {
