@@ -352,7 +352,7 @@ impl<R, C: Command<R>> History<R, C> {
                         (Some(_), None, None) | (None, None, Some(_)) => {
                             self.swap_saved(new, old, cursor);
                         }
-                        (Some(_), Some(_), None) => {
+                        (None, Some(_), None) => {
                             self.record.saved = saved;
                             self.swap_saved(old, new, cursor);
                         }
