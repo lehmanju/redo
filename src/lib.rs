@@ -135,15 +135,15 @@ pub trait Command<R> {
 ///
 /// # Examples
 /// ```
-/// # use redo::{Command, Record, Signal};
+/// # use redo::{Command, History, Signal};
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     type Error = ();
 /// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
 /// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
 /// # }
-/// # fn foo() -> Record<String, Add> {
-/// let record = Record::builder()
+/// # fn foo() -> History<String, Add> {
+/// let history = History::builder()
 ///     .connect(|signal| match signal {
 ///         Signal::Undo(on) => println!("undo: {}", on),
 ///         Signal::Redo(on) => println!("redo: {}", on),
@@ -152,7 +152,7 @@ pub trait Command<R> {
 ///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
 ///     })
 ///     .default();
-/// # record
+/// # history
 /// # }
 /// ```
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
