@@ -5,15 +5,21 @@
 
 Provides undo-redo functionality with static dispatch and manual command merging.
 
+## Contents
+
 * [Record] provides a stack based undo-redo functionality.
 * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and provides batch queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and provides checkpoint functionality.
-* Commands can be merged using the [`merge`] method.
+* Commands can be merged using the [merge] method.
   When two commands are merged, undoing and redoing them are done in a single step.
 * Configurable display formatting is provided through the [Display] structure.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
+
+## Differences between the undo and redo crates
+
+TODO
 
 ## Examples
 
@@ -84,4 +90,4 @@ additional terms or conditions.
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [Display]: https://docs.rs/undo/latest/undo/struct.Display.html
-[`merge`]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
+[merge]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge

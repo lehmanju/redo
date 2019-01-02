@@ -1,21 +1,76 @@
 //! Provides undo-redo functionality with static dispatch and manual command merging.
 //!
+//! # Contents
+//!
 //! * [Record] provides a stack based undo-redo functionality.
 //! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and provides batch queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and provides checkpoint functionality.
-//! * Commands can be merged using the [`merge`] method.
+//! * Commands can be merged using the [merge] method.
 //!   When two commands are merged, undoing and redoing them are done in a single step.
 //! * Configurable display formatting is provided through the [Display] structure.
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //! * Serialization and deserialization is provided when the `serde` feature is enabled.
+//!
+//! # Differences between the undo and redo crates
+//!
+//! TODO
+//!
+//! # Examples
+//!
+//! Add this to `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! redo = "0.29"
+//! ```
+//!
+//! And this to `main.rs`:
+//!
+//! ```
+//! use redo::{Command, Record};
+//!
+//! #[derive(Debug)]
+//! struct Add(char);
+//!
+//! impl Command<String> for Add {
+//!     type Error = &'static str;
+//!
+//!     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+//!         s.push(self.0);
+//!         Ok(())
+//!     }
+//!
+//!     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+//!         self.0 = s.pop().ok_or("`s` is empty")?;
+//!         Ok(())
+//!     }
+//! }
+//!
+//! fn main() -> redo::Result<String, Add> {
+//!     let mut record = Record::default();
+//!     record.apply(Add('a'))?;
+//!     record.apply(Add('b'))?;
+//!     record.apply(Add('c'))?;
+//!     assert_eq!(record.as_receiver(), "abc");
+//!     record.undo().unwrap()?;
+//!     record.undo().unwrap()?;
+//!     record.undo().unwrap()?;
+//!     assert_eq!(record.as_receiver(), "");
+//!     record.redo().unwrap()?;
+//!     record.redo().unwrap()?;
+//!     record.redo().unwrap()?;
+//!     assert_eq!(record.as_receiver(), "abc");
+//!     Ok(())
+//! }
+//! ```
 //!
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
 //! [Display]: struct.Display.html
-//! [`merge`]: trait.Command.html#method.merge
+//! [merge]: trait.Command.html#method.merge
 
 #![doc(html_root_url = "https://docs.rs/redo/0.29.8")]
 #![deny(
