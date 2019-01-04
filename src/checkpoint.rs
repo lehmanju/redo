@@ -119,7 +119,6 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
     ///
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
-    #[must_use]
     pub fn undo(&mut self) -> Option<Result<R, C>> {
         match self.inner.undo() {
             Some(Ok(_)) => {
@@ -134,7 +133,6 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
     ///
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
-    #[must_use]
     pub fn redo(&mut self) -> Option<Result<R, C>> {
         match self.inner.redo() {
             Some(Ok(_)) => {
@@ -149,7 +147,6 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
     ///
     /// [`go_to`]: struct.Record.html#method.go_to
     #[inline]
-    #[must_use]
     pub fn go_to(&mut self, cursor: usize) -> Option<Result<R, C>> {
         let old = self.inner.cursor();
         match self.inner.go_to(cursor) {
@@ -266,7 +263,6 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     ///
     /// [`undo`]: struct.History.html#method.undo
     #[inline]
-    #[must_use]
     pub fn undo(&mut self) -> Option<Result<R, C>> {
         match self.inner.undo() {
             Some(Ok(_)) => {
@@ -281,7 +277,6 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     ///
     /// [`redo`]: struct.History.html#method.redo
     #[inline]
-    #[must_use]
     pub fn redo(&mut self) -> Option<Result<R, C>> {
         match self.inner.redo() {
             Some(Ok(_)) => {
@@ -296,7 +291,6 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     ///
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
-    #[must_use]
     pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R, C>> {
         let root = self.inner.root();
         let old = self.inner.cursor();

@@ -287,7 +287,6 @@ impl<R, C: Command<R>> History<R, C> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    #[must_use]
     pub fn undo(&mut self) -> Option<Result<R, C>> {
         self.record.undo()
     }
@@ -300,7 +299,6 @@ impl<R, C: Command<R>> History<R, C> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    #[must_use]
     pub fn redo(&mut self) -> Option<Result<R, C>> {
         self.record.redo()
     }
@@ -313,7 +311,6 @@ impl<R, C: Command<R>> History<R, C> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    #[must_use]
     pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R, C>> {
         let root = self.root;
         if root == branch {
@@ -374,7 +371,6 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Go back or forward in time.
     #[inline]
-    #[must_use]
     #[cfg(feature = "chrono")]
     pub fn time_travel<Tz: TimeZone>(
         &mut self,
@@ -509,7 +505,6 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Create a path between the current branch and the `to` branch.
     #[inline]
-    #[must_use]
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
         debug_assert_ne!(self.root(), to);
         let mut dest = self.branches.remove(&to)?;
@@ -530,7 +525,6 @@ impl<R, C: Command<R> + ToString> History<R, C> {
     ///
     /// [`undo`]: struct.History.html#method.undo
     #[inline]
-    #[must_use]
     pub fn to_undo_string(&self) -> Option<String> {
         self.record.to_undo_string()
     }
@@ -539,7 +533,6 @@ impl<R, C: Command<R> + ToString> History<R, C> {
     ///
     /// [`redo`]: struct.History.html#method.redo
     #[inline]
-    #[must_use]
     pub fn to_redo_string(&self) -> Option<String> {
         self.record.to_redo_string()
     }
