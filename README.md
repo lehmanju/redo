@@ -17,17 +17,13 @@ Provides undo-redo functionality with static dispatch and manual command merging
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 
-## Differences between the undo and redo crates
-
-TODO
-
 ## Examples
 
 Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-redo = "0.29"
+redo = "0.30"
 ```
 
 And this to `main.rs`:
