@@ -379,7 +379,7 @@ where
     }
 
     #[inline]
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        self.error.cause()
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.error.source()
     }
 }

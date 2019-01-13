@@ -465,11 +465,8 @@ impl<R, C: Command<R>> Record<R, C> {
     /// Go back or forward in time.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(
-        &mut self,
-        to: impl AsRef<DateTime<Tz>>,
-    ) -> Option<Result<R, C>> {
-        let to = Utc.from_utc_datetime(&to.as_ref().naive_utc());
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result<R, C>> {
+        let to = Utc.from_utc_datetime(&to.naive_utc());
         let cursor = match self.commands.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
