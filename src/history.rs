@@ -4,7 +4,7 @@ use crate::{
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
-#[cfg(feature = "chrono")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fmt;

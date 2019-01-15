@@ -88,7 +88,7 @@ mod record;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
-#[cfg(feature = "chrono")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -321,14 +321,6 @@ impl<C: fmt::Display> fmt::Display for Meta<C> {
 pub struct Error<R, C: Command<R>> {
     meta: Meta<C>,
     error: C::Error,
-}
-
-impl<R, C: Command<R>> Error<R, C> {
-    /// Returns a new error.
-    #[inline]
-    fn new(meta: Meta<C>, error: C::Error) -> Error<R, C> {
-        Error { meta, error }
-    }
 }
 
 impl<R, C: Command<R>> Error<R, C> {

@@ -1,7 +1,7 @@
 use crate::{Checkpoint, Command, Display, Error, History, Merge, Meta, Queue, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
-#[cfg(feature = "chrono")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "chrono")]
 use std::cmp::Ordering;
@@ -274,7 +274,7 @@ impl<R, C: Command<R>> Record<R, C> {
         mut meta: Meta<C>,
     ) -> std::result::Result<(bool, VecDeque<Meta<C>>), Error<R, C>> {
         if let Err(error) = meta.apply(&mut self.receiver) {
-            return Err(Error::new(meta, error));
+            return Err(Error { meta, error });
         }
         let cursor = self.cursor();
         let could_undo = self.can_undo();
@@ -339,9 +339,11 @@ impl<R, C: Command<R>> Record<R, C> {
     pub fn undo(&mut self) -> Option<Result<R, C>> {
         if !self.can_undo() {
             return None;
-        } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error::new(meta, error)));
+        }
+        let index = self.cursor - 1;
+        if let Err(error) = self.commands[index].undo(&mut self.receiver) {
+            let meta = self.commands.remove(index).unwrap();
+            return Some(Err(Error { meta, error }));
         }
         let was_saved = self.is_saved();
         let old = self.cursor();
@@ -377,9 +379,11 @@ impl<R, C: Command<R>> Record<R, C> {
     pub fn redo(&mut self) -> Option<Result<R, C>> {
         if !self.can_redo() {
             return None;
-        } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error::new(meta, error)));
+        }
+        let index = self.cursor;
+        if let Err(error) = self.commands[index].redo(&mut self.receiver) {
+            let meta = self.commands.remove(index).unwrap();
+            return Some(Err(Error { meta, error }));
         }
         let was_saved = self.is_saved();
         let old = self.cursor();
