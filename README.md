@@ -7,8 +7,9 @@ Provides undo-redo functionality with static dispatch and manual command merging
 
 ## Contents
 
-* [Record] provides a stack based undo-redo functionality.
-* [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
+* [Record] provides stack based undo-redo functionality.
+* [Timeline] provides stack based undo-redo functionality that can be used with `no_std`.
+* [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
 * Commands can be merged using the [merge] method.
@@ -82,6 +83,7 @@ for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 additional terms or conditions.
 
 [Record]: https://docs.rs/redo/latest/redo/struct.Record.html
+[Timeline]: https://docs.rs/redo/latest/redo/struct.Timeline.html
 [History]: https://docs.rs/redo/latest/redo/struct.History.html
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html

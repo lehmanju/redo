@@ -254,7 +254,7 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     pub fn apply(&mut self, command: C) -> Result<R, C> {
         let root = self.inner.root();
         let old = self.inner.cursor();
-        self.inner.__apply(Meta::from(command))?;
+        self.inner.apply(command)?;
         self.stack.push(Action::GoTo(root, old));
         Ok(())
     }

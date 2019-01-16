@@ -3,6 +3,7 @@
 //! # Contents
 //!
 //! * [Record] provides a stack based undo-redo functionality.
+//! * [Timeline] provides stack based undo-redo functionality that can be used with `no_std`.
 //! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
@@ -62,12 +63,14 @@
 //! ```
 //!
 //! [Record]: struct.Record.html
+//! [Timeline]: struct.Timeline.html
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
 //! [Display]: struct.Display.html
 //! [merge]: trait.Command.html#method.merge
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![doc(html_root_url = "https://docs.rs/redo/0.30.1")]
 #![deny(
     bad_style,
@@ -75,16 +78,25 @@
     missing_debug_implementations,
     missing_docs,
     unused_import_braces,
-    unused_qualifications,
     unsafe_code,
     unstable_features
 )]
 
+#[cfg(feature = "std")]
 mod checkpoint;
+#[cfg(feature = "std")]
 mod display;
+#[cfg(feature = "std")]
 mod history;
+#[cfg(feature = "std")]
 mod queue;
+#[cfg(feature = "std")]
 mod record;
+mod result;
+mod timeline;
+
+#[cfg(not(feature = "std"))]
+extern crate core as std;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -92,14 +104,18 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use self::checkpoint::Checkpoint;
-pub use self::display::Display;
-pub use self::history::{History, HistoryBuilder};
-pub use self::queue::Queue;
-pub use self::record::{Record, RecordBuilder};
-
-/// A specialized Result type for undo-redo operations.
-pub type Result<R, C> = std::result::Result<(), Error<R, C>>;
+#[cfg(feature = "std")]
+pub use self::{
+    checkpoint::Checkpoint,
+    display::Display,
+    history::{History, HistoryBuilder},
+    queue::Queue,
+    record::{Record, RecordBuilder},
+};
+pub use self::{
+    result::{Error, Result},
+    timeline::Timeline,
+};
 
 /// Base functionality for all commands.
 pub trait Command<R> {
@@ -314,64 +330,5 @@ impl<C: fmt::Display> fmt::Display for Meta<C> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)
-    }
-}
-
-/// An error which holds the command that caused it.
-pub struct Error<R, C: Command<R>> {
-    meta: Meta<C>,
-    error: C::Error,
-}
-
-impl<R, C: Command<R>> Error<R, C> {
-    /// Returns a reference to the command that caused the error.
-    #[inline]
-    pub fn command(&self) -> &C {
-        &self.meta.command
-    }
-
-    /// Returns the command that caused the error.
-    #[inline]
-    pub fn into_command(self) -> C {
-        self.meta.command
-    }
-}
-
-impl<R, C: Command<R> + fmt::Debug> fmt::Debug for Error<R, C>
-where
-    C::Error: fmt::Debug,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Error")
-            .field("meta", &self.meta)
-            .field("error", &self.error)
-            .finish()
-    }
-}
-
-impl<R, C: Command<R>> fmt::Display for Error<R, C>
-where
-    C::Error: fmt::Display,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.error as &dyn fmt::Display).fmt(f)
-    }
-}
-
-impl<R, C: Command<R>> std::error::Error for Error<R, C>
-where
-    C: fmt::Debug,
-    C::Error: std::error::Error,
-{
-    #[inline]
-    fn description(&self) -> &str {
-        self.error.description()
-    }
-
-    #[inline]
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.error.source()
     }
 }
