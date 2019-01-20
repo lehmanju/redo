@@ -299,7 +299,7 @@ impl<R, C: Command<R>> Record<R, C> {
             // If commands are not merged or annulled push it onto the record.
             Merge::No(meta) => {
                 // If limit is reached, pop off the first command.
-                if self.limit.get() == self.cursor {
+                if self.limit() == self.cursor() {
                     self.commands.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
