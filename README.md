@@ -1,11 +1,12 @@
-# redo
+<img src="https://raw.githubusercontent.com/evenorog/redo/nightly/redo.svg?sanitize=true" alt="redo" width="100%">
+
 [![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
 Provides undo-redo functionality with static dispatch and manual command merging.
 
-## Contents
+# Contents
 
 * [Record] provides stack based undo-redo functionality.
 * [Timeline] provides stack based undo-redo functionality that can be used with `no_std`.
@@ -18,7 +19,7 @@ Provides undo-redo functionality with static dispatch and manual command merging
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 
-## Examples
+# Examples
 
 Add this to `Cargo.toml`:
 
@@ -67,7 +68,7 @@ fn main() -> redo::Result<String, Add> {
 }
 ```
 
-### License
+## License
 
 Licensed under either of
 

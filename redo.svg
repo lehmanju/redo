@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+    <text fill="#2574c4" dominant-baseline="text-before-edge" font-size="135">
+        red<tspan alignment-baseline="text-before-edge" fill="#fc7500">↻</tspan>
+    </text>
+</svg>
