@@ -172,16 +172,20 @@ impl<R, C: Command<R>> Record<R, C> {
                 }
             }
         }
-        self.limit.get()
+        self.limit()
     }
 
     /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous signal handler is returned if it exists.
     #[inline]
-    pub fn connect<F>(&mut self, f: impl Into<Option<F>>)
-    where
-        F: FnMut(Signal) + Send + Sync + 'static,
-    {
-        self.signal = f.into().map(|f| Box::new(f) as _);
+    pub fn connect(
+        &mut self,
+        f: impl FnMut(Signal) + Send + Sync + 'static,
+    ) -> Option<impl FnMut(Signal) + Send + Sync + 'static> {
+        self.signal
+            .replace(Box::new(f))
+            .map(|mut f| move |signal| f(signal))
     }
 
     /// Returns `true` if the record can undo.
@@ -265,7 +269,7 @@ impl<R, C: Command<R>> Record<R, C> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<R, C> {
-        self.__apply(Meta::from(command)).map(|(_, _)| ())
+        self.__apply(Meta::from(command)).map(|_| ())
     }
 
     #[inline]
@@ -688,14 +692,11 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
         self
     }
 
-    /// Decides how different signals should be handled when the state changes.
+    /// Decides how the signal should be handled when the state changes.
     /// By default the record does not handle any signals.
     #[inline]
-    pub fn connect<F>(mut self, f: impl Into<Option<F>>) -> RecordBuilder<R, C>
-    where
-        F: FnMut(Signal) + Send + Sync + 'static,
-    {
-        self.signal = f.into().map(|f| Box::new(f) as _);
+    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R, C> {
+        self.signal = Some(Box::new(f));
         self
     }
 

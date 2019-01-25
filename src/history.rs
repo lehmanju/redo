@@ -150,12 +150,18 @@ impl<R, C: Command<R>> History<R, C> {
     }
 
     /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous signal handler is returned if it exists.
     #[inline]
-    pub fn connect<F>(&mut self, f: impl Into<Option<F>>)
+    pub fn connect(
+        &mut self,
+        f: impl FnMut(Signal) + Send + Sync + 'static,
+    ) -> Option<impl FnMut(Signal) + Send + Sync + 'static>
     where
-        F: FnMut(Signal) + Send + Sync + 'static,
+        C: 'static,
+        R: 'static,
     {
-        self.record.connect(f);
+        self.record.connect(f)
     }
 
     /// Returns `true` if the history can undo.
@@ -644,10 +650,11 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
 
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
-    pub fn connect<F>(mut self, f: impl Into<Option<F>>) -> HistoryBuilder<R, C>
-    where
-        F: FnMut(Signal) + Send + Sync + 'static,
-    {
+    #[inline]
+    pub fn connect(
+        mut self,
+        f: impl FnMut(Signal) + Send + Sync + 'static,
+    ) -> HistoryBuilder<R, C> {
         self.inner = self.inner.connect(f);
         self
     }
