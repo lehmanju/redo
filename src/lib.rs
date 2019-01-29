@@ -70,7 +70,7 @@
 //! [merge]: trait.Command.html#method.merge
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![doc(html_root_url = "https://docs.rs/redo/0.30.1")]
+#![doc(html_root_url = "https://docs.rs/redo/0.31.0")]
 #![deny(
     bad_style,
     bare_trait_objects,
