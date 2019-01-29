@@ -3,7 +3,6 @@
 //! # Contents
 //!
 //! * [Record] provides a stack based undo-redo functionality.
-//! * [Timeline] provides stack based undo-redo functionality that can be used with `no_std`.
 //! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
@@ -104,6 +103,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+pub use self::result::{Error, Result};
 #[cfg(feature = "std")]
 pub use self::{
     checkpoint::Checkpoint,
@@ -111,10 +111,6 @@ pub use self::{
     history::{History, HistoryBuilder},
     queue::Queue,
     record::{Record, RecordBuilder},
-};
-pub use self::{
-    result::{Error, Result},
-    timeline::Timeline,
 };
 
 /// Base functionality for all commands.
@@ -277,7 +273,7 @@ struct At {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Meta<C> {
     command: C,
     #[cfg(feature = "chrono")]

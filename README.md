@@ -9,7 +9,6 @@ Provides undo-redo functionality with static dispatch and manual command merging
 # Contents
 
 * [Record] provides stack based undo-redo functionality.
-* [Timeline] provides stack based undo-redo functionality that can be used with `no_std`.
 * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
