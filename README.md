@@ -32,7 +32,6 @@ And this to `main.rs`:
 ```rust
 use redo::{Command, Record};
 
-#[derive(Debug)]
 struct Add(char);
 
 impl Command<String> for Add {
@@ -49,7 +48,7 @@ impl Command<String> for Add {
     }
 }
 
-fn main() -> redo::Result<String, Add> {
+fn main() -> Result<(), &'static str> {
     let mut record = Record::default();
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;

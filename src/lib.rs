@@ -26,7 +26,6 @@
 //! ```
 //! use redo::{Command, Record};
 //!
-//! #[derive(Debug)]
 //! struct Add(char);
 //!
 //! impl Command<String> for Add {
@@ -43,7 +42,7 @@
 //!     }
 //! }
 //!
-//! fn main() -> redo::Result<String, Add> {
+//! fn main() -> Result<(), &'static str> {
 //!     let mut record = Record::default();
 //!     record.apply(Add('a'))?;
 //!     record.apply(Add('b'))?;
@@ -91,7 +90,6 @@ mod history;
 mod queue;
 #[cfg(feature = "std")]
 mod record;
-mod result;
 mod timeline;
 
 #[cfg(not(feature = "std"))]
@@ -103,7 +101,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use self::result::{Error, Result};
 #[cfg(feature = "std")]
 pub use self::{
     checkpoint::Checkpoint,
@@ -120,11 +117,11 @@ pub trait Command<R> {
 
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -133,7 +130,7 @@ pub trait Command<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> std::result::Result<(), Self::Error> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Error> {
         self.apply(receiver)
     }
 
@@ -142,7 +139,6 @@ pub trait Command<R> {
     /// # Examples
     /// ```
     /// # use redo::{Command, Merge, Record};
-    /// #[derive(Debug)]
     /// struct Add(String);
     ///
     /// impl Command<String> for Add {
@@ -165,7 +161,7 @@ pub trait Command<R> {
     ///     }
     /// }
     ///
-    /// fn main() -> redo::Result<String, Add> {
+    /// fn main() -> Result<(), ()> {
     ///     let mut record = Record::default();
     ///     // The `a`, `b`, and `c` commands are merged.
     ///     record.apply(Add("a".into()))?;
@@ -295,17 +291,17 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     type Error = C::Error;
 
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
         self.command.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
         self.command.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> std::result::Result<(), <Self as Command<R>>::Error> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
         self.command.redo(receiver)
     }
 

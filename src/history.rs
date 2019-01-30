@@ -1,6 +1,4 @@
-use crate::{
-    At, Checkpoint, Command, Display, Error, Meta, Queue, Record, RecordBuilder, Result, Signal,
-};
+use crate::{At, Checkpoint, Command, Display, Meta, Queue, Record, RecordBuilder, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
@@ -18,7 +16,6 @@ use std::fmt;
 /// # Examples
 /// ```
 /// # use redo::{Command, History};
-/// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
@@ -35,7 +32,7 @@ use std::fmt;
 ///     }
 /// }
 ///
-/// fn main() -> redo::Result<String, Add> {
+/// fn main() -> Result<(), &'static str> {
 ///     let mut history = History::default();
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
@@ -191,7 +188,7 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<R, C>> {
+    pub fn revert(&mut self) -> Option<Result<(), C::Error>> {
         if self.is_saved() {
             self.record.revert()
         } else {
@@ -229,16 +226,17 @@ impl<R, C: Command<R>> History<R, C> {
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: C) -> Result<R, C> {
+    pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
         self.__apply(Meta::from(command)).map(|_| ())
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, meta: Meta<C>) -> std::result::Result<bool, Error<R, C>> {
+    pub(crate) fn __apply(&mut self, meta: Meta<C>) -> std::result::Result<bool, C::Error> {
         let cursor = self.cursor();
         let saved = self.record.saved.filter(|&saved| saved > cursor);
         let (merged, commands) = self.record.__apply(meta)?;
@@ -286,38 +284,42 @@ impl<R, C: Command<R>> History<R, C> {
         Ok(merged)
     }
 
-    /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
+    /// Calls the [`undo`] method for the active command
+    /// and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<R, C>> {
+    pub fn undo(&mut self) -> Option<Result<(), C::Error>> {
         self.record.undo()
     }
 
-    /// Calls the [`redo`] method for the active command and sets the next one as the
-    /// new active one.
+    /// Calls the [`redo`] method for the active command
+    /// and sets the next one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`redo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<R, C>> {
+    pub fn redo(&mut self) -> Option<Result<(), C::Error>> {
         self.record.redo()
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `cursor` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R, C>> {
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), C::Error>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(cursor);
@@ -378,19 +380,19 @@ impl<R, C: Command<R>> History<R, C> {
     /// Go back or forward in time.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result<R, C>> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result<(), C::Error>> {
         self.record.time_travel(to)
     }
 
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command
+    /// If an error occur when executing [`apply`] the error is returned
     /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<R, C> {
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<(), C::Error> {
         for command in commands {
             self.apply(command)?;
         }
