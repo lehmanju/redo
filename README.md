@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/evenorog/redo/nightly/redo.svg?sanitize=true" alt="redo" width="100%">
+<img src="https://raw.githubusercontent.com/evenorog/redo/master/redo.svg?sanitize=true" alt="redo" width="100%">
 
 [![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
