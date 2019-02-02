@@ -10,5 +10,5 @@ use serde::{Deserialize, Serialize};
 struct Timeline<R, C: Command<R>> {
     commands: [C; 32],
     receiver: R,
-    cursor: usize,
+    current: usize,
 }

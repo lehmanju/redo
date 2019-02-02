@@ -146,9 +146,9 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
     ///
     /// [`go_to`]: struct.Record.html#method.go_to
     #[inline]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), C::Error>> {
-        let old = self.inner.cursor();
-        match self.inner.go_to(cursor) {
+    pub fn go_to(&mut self, current: usize) -> Option<Result<(), C::Error>> {
+        let old = self.inner.current();
+        match self.inner.go_to(current) {
             Some(Ok(_)) => {
                 self.stack.push(Action::GoTo(0, old));
                 Some(Ok(()))
@@ -181,8 +181,8 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
                     if let Some(Err(error)) = self.inner.undo() {
                         return Err(error);
                     }
-                    let cursor = self.inner.cursor();
-                    self.inner.commands.truncate(cursor);
+                    let current = self.inner.current();
+                    self.inner.commands.truncate(current);
                     self.inner.commands.append(&mut v);
                 }
                 Action::Undo => {
@@ -195,8 +195,8 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
                         return Err(error);
                     }
                 }
-                Action::GoTo(_, cursor) => {
-                    if let Some(Err(error)) = self.inner.go_to(cursor) {
+                Action::GoTo(_, current) => {
+                    if let Some(Err(error)) = self.inner.go_to(current) {
                         return Err(error);
                     }
                 }
@@ -253,7 +253,7 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
         let root = self.inner.root();
-        let old = self.inner.cursor();
+        let old = self.inner.current();
         self.inner.apply(command)?;
         self.stack.push(Action::GoTo(root, old));
         Ok(())
@@ -291,10 +291,10 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     ///
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), C::Error>> {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<(), C::Error>> {
         let root = self.inner.root();
-        let old = self.inner.cursor();
-        match self.inner.go_to(branch, cursor) {
+        let old = self.inner.current();
+        match self.inner.go_to(branch, current) {
             Some(Ok(_)) => {
                 self.stack.push(Action::GoTo(root, old));
                 Some(Ok(()))
@@ -334,8 +334,8 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
                         return Err(error);
                     }
                 }
-                Action::GoTo(branch, cursor) => {
-                    if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
+                Action::GoTo(branch, current) => {
+                    if let Some(Err(error)) = self.inner.go_to(branch, current) {
                         return Err(error);
                     }
                 }

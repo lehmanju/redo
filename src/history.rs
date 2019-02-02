@@ -133,15 +133,15 @@ impl<R, C: Command<R>> History<R, C> {
         let limit = self.record.set_limit(limit);
         let diff = len - self.len();
         let root = self.root();
-        for cursor in 0..diff {
-            self.rm_child(root, cursor);
+        for current in 0..diff {
+            self.rm_child(root, current);
         }
         for branch in self
             .branches
             .values_mut()
             .filter(|branch| branch.parent.branch == root)
         {
-            branch.parent.cursor -= diff;
+            branch.parent.current -= diff;
         }
         limit
     }
@@ -193,7 +193,7 @@ impl<R, C: Command<R>> History<R, C> {
             self.record.revert()
         } else {
             self.saved
-                .and_then(|saved| self.go_to(saved.branch, saved.cursor))
+                .and_then(|saved| self.go_to(saved.branch, saved.current))
         }
     }
 
@@ -205,8 +205,8 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Returns the position of the current command.
     #[inline]
-    pub fn cursor(&self) -> usize {
-        self.record.cursor()
+    pub fn current(&self) -> usize {
+        self.record.current()
     }
 
     /// Removes all commands from the history without undoing them.
@@ -237,11 +237,11 @@ impl<R, C: Command<R>> History<R, C> {
 
     #[inline]
     pub(crate) fn __apply(&mut self, meta: Meta<C>) -> std::result::Result<bool, C::Error> {
-        let cursor = self.cursor();
-        let saved = self.record.saved.filter(|&saved| saved > cursor);
+        let current = self.current();
+        let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(meta)?;
         // Check if the limit has been reached.
-        if !merged && cursor == self.cursor() {
+        if !merged && current == self.current() {
             let root = self.root();
             self.rm_child(root, 0);
             for branch in self
@@ -249,7 +249,7 @@ impl<R, C: Command<R>> History<R, C> {
                 .values_mut()
                 .filter(|branch| branch.parent.branch == root)
             {
-                branch.parent.cursor -= 1;
+                branch.parent.current -= 1;
             }
         }
         // Handle new branch.
@@ -262,17 +262,17 @@ impl<R, C: Command<R>> History<R, C> {
                 Branch {
                     parent: At {
                         branch: new,
-                        cursor,
+                        current,
                     },
                     commands,
                 },
             );
-            self.set_root(new, cursor);
+            self.set_root(new, current);
             match (self.record.saved, saved, self.saved) {
-                (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(new, old, cursor),
+                (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(new, old, current),
                 (None, Some(_), None) => {
                     self.record.saved = saved;
-                    self.swap_saved(old, new, cursor);
+                    self.swap_saved(old, new, current);
                 }
                 (None, None, None) => (),
                 _ => unreachable!(),
@@ -310,7 +310,7 @@ impl<R, C: Command<R>> History<R, C> {
         self.record.redo()
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `cursor` is reached.
+    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned
@@ -319,22 +319,22 @@ impl<R, C: Command<R>> History<R, C> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), C::Error>> {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<(), C::Error>> {
         let root = self.root;
         if root == branch {
-            return self.record.go_to(cursor);
+            return self.record.go_to(current);
         }
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
             let old = self.root();
-            // Walk to `branch.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
+            // Walk to `branch.current` either by undoing or redoing.
+            if let Err(err) = self.record.go_to(branch.parent.current).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
             for meta in branch.commands {
-                let cursor = self.cursor();
-                let saved = self.record.saved.filter(|&saved| saved > cursor);
+                let current = self.current();
+                let saved = self.record.saved.filter(|&saved| saved > current);
                 let commands = match self.record.__apply(meta) {
                     Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
@@ -346,19 +346,19 @@ impl<R, C: Command<R>> History<R, C> {
                         Branch {
                             parent: At {
                                 branch: new,
-                                cursor,
+                                current,
                             },
                             commands,
                         },
                     );
-                    self.set_root(new, cursor);
+                    self.set_root(new, current);
                     match (self.record.saved, saved, self.saved) {
                         (Some(_), None, None) | (None, None, Some(_)) => {
-                            self.swap_saved(new, old, cursor);
+                            self.swap_saved(new, old, current);
                         }
                         (None, Some(_), None) => {
                             self.record.saved = saved;
-                            self.swap_saved(old, new, cursor);
+                            self.swap_saved(old, new, current);
                         }
                         (None, None, None) => (),
                         _ => unreachable!(),
@@ -366,7 +366,7 @@ impl<R, C: Command<R>> History<R, C> {
                 }
             }
         }
-        if let Err(err) = self.record.go_to(cursor)? {
+        if let Err(err) = self.record.go_to(current)? {
             return Some(Err(err));
         } else if let Some(ref mut f) = self.record.signal {
             f(Signal::Root {
@@ -439,7 +439,7 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Sets the `root`.
     #[inline]
-    fn set_root(&mut self, root: usize, cursor: usize) {
+    fn set_root(&mut self, root: usize, current: usize) {
         let old = self.root();
         self.root = root;
         debug_assert_ne!(old, root);
@@ -447,7 +447,7 @@ impl<R, C: Command<R>> History<R, C> {
         for branch in self
             .branches
             .values_mut()
-            .filter(|branch| branch.parent.branch == old && branch.parent.cursor <= cursor)
+            .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
         {
             branch.parent.branch = root;
         }
@@ -455,11 +455,11 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Swap the saved state if needed.
     #[inline]
-    fn swap_saved(&mut self, old: usize, new: usize, cursor: usize) {
+    fn swap_saved(&mut self, old: usize, new: usize, current: usize) {
         debug_assert_ne!(old, new);
-        if let Some(At { cursor: saved, .. }) = self
+        if let Some(At { current: saved, .. }) = self
             .saved
-            .filter(|at| at.branch == new && at.cursor <= cursor)
+            .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
             self.record.saved = Some(saved);
@@ -469,7 +469,7 @@ impl<R, C: Command<R>> History<R, C> {
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
                 branch: old,
-                cursor: saved,
+                current: saved,
             });
             self.record.saved = None;
             if let Some(ref mut f) = self.record.signal {
@@ -480,12 +480,12 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Remove all children of the command at the given position.
     #[inline]
-    fn rm_child(&mut self, branch: usize, cursor: usize) {
+    fn rm_child(&mut self, branch: usize, current: usize) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(_, child)| child.parent == At { branch, cursor })
+            .filter(|&(_, child)| child.parent == At { branch, current })
             .map(|(&id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {

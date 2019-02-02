@@ -207,7 +207,7 @@ pub trait Command<R> {
 ///         Signal::Undo(on) => println!("undo: {}", on),
 ///         Signal::Redo(on) => println!("redo: {}", on),
 ///         Signal::Saved(on) => println!("saved: {}", on),
-///         Signal::Cursor { old, new } => println!("cursor: {} -> {}", old, new),
+///         Signal::Current { old, new } => println!("current: {} -> {}", old, new),
 ///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
 ///     })
 ///     .default();
@@ -230,12 +230,12 @@ pub enum Signal {
     Saved(bool),
     /// Says if the current command has changed.
     ///
-    /// This signal will be emitted when the cursor has changed. This includes
+    /// This signal will be emitted when the current command has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
-    Cursor {
-        /// The old cursor.
+    Current {
+        /// The old current command.
         old: usize,
-        /// The new cursor.
+        /// The new current command.
         new: usize,
     },
     /// Says if the current branch, or root, has changed.
@@ -265,7 +265,7 @@ pub enum Merge<C> {
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 struct At {
     branch: usize,
-    cursor: usize,
+    current: usize,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

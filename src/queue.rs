@@ -132,8 +132,8 @@ impl<T, C> Extend<C> for Queue<'_, T, C> {
 impl<R, C: Command<R>> Queue<'_, Record<R, C>, C> {
     /// Queues a `go_to` action.
     #[inline]
-    pub fn go_to(&mut self, cursor: usize) {
-        self.queue.push(Action::GoTo(0, cursor));
+    pub fn go_to(&mut self, current: usize) {
+        self.queue.push(Action::GoTo(0, current));
     }
 
     /// Applies the actions that is queued.
@@ -155,8 +155,8 @@ impl<R, C: Command<R>> Queue<'_, Record<R, C>, C> {
                         return Err(error);
                     }
                 }
-                Action::GoTo(_, cursor) => {
-                    if let Some(Err(error)) = self.inner.go_to(cursor) {
+                Action::GoTo(_, current) => {
+                    if let Some(Err(error)) = self.inner.go_to(current) {
                         return Err(error);
                     }
                 }
@@ -209,8 +209,8 @@ impl<R, C: Command<R>> AsMut<R> for Queue<'_, Record<R, C>, C> {
 impl<R, C: Command<R>> Queue<'_, History<R, C>, C> {
     /// Queues a `go_to` action.
     #[inline]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) {
-        self.queue.push(Action::GoTo(branch, cursor));
+    pub fn go_to(&mut self, branch: usize, current: usize) {
+        self.queue.push(Action::GoTo(branch, current));
     }
 
     /// Applies the actions that is queued.
@@ -232,8 +232,8 @@ impl<R, C: Command<R>> Queue<'_, History<R, C>, C> {
                         return Err(error);
                     }
                 }
-                Action::GoTo(branch, cursor) => {
-                    if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
+                Action::GoTo(branch, current) => {
+                    if let Some(Err(error)) = self.inner.go_to(branch, current) {
                         return Err(error);
                     }
                 }
