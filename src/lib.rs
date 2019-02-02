@@ -1,5 +1,10 @@
 //! Provides undo-redo functionality with static dispatch and manual command merging.
 //!
+//! It is an implementation of the command pattern, where all modifications are done
+//! by creating objects of commands that applies the modifications. All commands knows
+//! how to undo the changes it applies, and by using the provided data structures
+//! it is easy to apply, undo, and redo changes made to a receiver.
+//!
 //! # Contents
 //!
 //! * [Record] provides a stack based undo-redo functionality.
@@ -18,7 +23,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! redo = "0.30"
+//! redo = "0.31"
 //! ```
 //!
 //! And this to `main.rs`:

@@ -1,18 +1,10 @@
 use crate::{Command, History, Meta, Queue, Record};
 use std::collections::VecDeque;
 
-/// An action that can be applied to a Record or History.
-#[derive(Debug)]
-enum Action<C> {
-    Apply(VecDeque<Meta<C>>),
-    Undo,
-    Redo,
-    GoTo(usize, usize),
-}
-
 /// A checkpoint wrapper.
 ///
-/// Wraps a Record or History and gives it checkpoint functionality.
+/// Wraps a record or history and gives it checkpoint functionality.
+/// This allows the record or history to cancel all changes made since creating the checkpoint.
 ///
 /// # Examples
 /// ```
@@ -383,6 +375,15 @@ impl<R, C: Command<R>> AsMut<R> for Checkpoint<'_, History<R, C>, C> {
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
+}
+
+/// An action that can be applied to a Record or History.
+#[derive(Debug)]
+enum Action<C> {
+    Apply(VecDeque<Meta<C>>),
+    Undo,
+    Redo,
+    GoTo(usize, usize),
 }
 
 #[cfg(test)]
