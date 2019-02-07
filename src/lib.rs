@@ -189,6 +189,18 @@ pub trait Command<R> {
     {
         Merge::No(command)
     }
+
+    /// Says if the command is dead.
+    ///
+    /// A dead command will be removed the next time it becomes the current command.
+    /// This can be used to remove command if for example executing it caused an error,
+    /// and it needs to be removed.
+    ///
+    /// This flag will be checked before applying, undoing, and redoing the command.
+    #[inline]
+    fn is_dead(&self) -> bool {
+        false
+    }
 }
 
 /// The signal sent when the record, the history, or the receiver changes.
@@ -320,6 +332,11 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
             Merge::No(command) => Merge::No(Meta::from(command)),
             Merge::Annul => Merge::Annul,
         }
+    }
+
+    #[inline]
+    fn is_dead(&self) -> bool {
+        self.command.is_dead()
     }
 }
 
