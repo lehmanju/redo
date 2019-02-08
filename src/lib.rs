@@ -7,6 +7,7 @@
 //!
 //! # Contents
 //!
+//! * [Command] provides the base functionality for all commands.
 //! * [Record] provides a stack based undo-redo functionality.
 //! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
@@ -65,6 +66,7 @@
 //! }
 //! ```
 //!
+//! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
 //! [Timeline]: struct.Timeline.html
 //! [History]: struct.History.html
@@ -195,8 +197,6 @@ pub trait Command<R> {
     /// A dead command will be removed the next time it becomes the current command.
     /// This can be used to remove command if for example executing it caused an error,
     /// and it needs to be removed.
-    ///
-    /// This flag will be checked before applying, undoing, and redoing the command.
     #[inline]
     fn is_dead(&self) -> bool {
         false
