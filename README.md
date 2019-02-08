@@ -11,6 +11,9 @@ by creating objects of commands that applies the modifications. All commands kno
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a receiver.
 
+This library provides more or less the same functionality as the [undo] library but is more focused on
+performance and control instead of ease of use.
+
 # Contents
 
 * [Command] provides the base functionality for all commands.
@@ -18,11 +21,18 @@ it is easy to apply, undo, and redo changes made to a receiver.
 * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-* Commands can be merged using the [merge] method.
-  When two commands are merged, undoing and redoing them are done in a single step.
 * Configurable display formatting is provided through the [Display] structure.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
+
+# Concepts
+
+* Commands can be merged into a single command by implementing the [merge] method on the command.
+  This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
+  merged into larger changes that can be undone and redone in a single step.
+* The receiver can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+  when it changes.
+* The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 
 # Examples
 
@@ -95,3 +105,4 @@ additional terms or conditions.
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [Display]: https://docs.rs/undo/latest/undo/struct.Display.html
 [merge]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
+[undo]: https://github.com/evenorog/undo
