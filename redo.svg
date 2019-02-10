@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg">
+    <text dx="3" fill="#1b5c9e" dominant-baseline="text-before-edge" font-size="135">
+        red<tspan alignment-baseline="text-before-edge" fill="#d66705">↻</tspan>
+    </text>
     <text fill="#2574c4" dominant-baseline="text-before-edge" font-size="135">
         red<tspan alignment-baseline="text-before-edge" fill="#fc7500">↻</tspan>
     </text>
