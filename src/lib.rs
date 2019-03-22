@@ -86,7 +86,6 @@
 //! [merge]: trait.Command.html#method.merge
 //! [undo]: https://github.com/evenorog/undo
 
-#![cfg_attr(not(feature = "std"), no_std)]
 #![doc(html_root_url = "https://docs.rs/redo/latest")]
 #![deny(
     bad_style,
@@ -98,20 +97,11 @@
     unstable_features
 )]
 
-#[cfg(feature = "std")]
 mod checkpoint;
-#[cfg(feature = "std")]
 mod display;
-#[cfg(feature = "std")]
 mod history;
-#[cfg(feature = "std")]
 mod queue;
-#[cfg(feature = "std")]
 mod record;
-mod timeline;
-
-#[cfg(not(feature = "std"))]
-extern crate core as std;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -119,7 +109,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[cfg(feature = "std")]
 pub use self::{
     checkpoint::Checkpoint,
     display::Display,

@@ -8,7 +8,7 @@ repository = "https://github.com/evenorog/redo"
 readme = "README.md"
 license = "MIT/Apache-2.0"
 keywords = ["undo", "redo"]
-categories = ["data-structures", "rust-patterns", "no-std"]
+categories = ["data-structures", "rust-patterns"]
 exclude = ["/.travis.yml"]
 edition = "2018"
 
@@ -20,8 +20,7 @@ rustc-hash = "1"
 serde = { version = "1", optional = true, features = ["derive"] }
 
 [features]
-default = ["std"]
-std = []
+default = []
 
 [badges]
 travis-ci = { repository = "evenorog/redo" }

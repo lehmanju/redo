@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/evenorog/redo/master/redo.svg?sanitize=true" alt="redo" width="100%">
+![redo](redo.svg)
 
 [![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
@@ -10,9 +10,8 @@ It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a receiver.
-
 This library provides more or less the same functionality as the [undo] library but is more focused on
-performance and control instead of ease of use.
+performance instead of ease of use.
 
 # Contents
 
