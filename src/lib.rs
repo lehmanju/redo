@@ -4,15 +4,16 @@
 //! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a receiver.
-//!
-//! This library provides more or less the same functionality as the [undo] library but is more focused on
-//! performance and control instead of ease of use.
+//! Both linear and non-linear undo-redo functionality is provided through
+//! the [Record] and [History] data structures.
+//! This library provides more or less the same functionality as the [undo] library
+//! but is more focused on performance and control instead of ease of use.
 //!
 //! # Contents
 //!
 //! * [Command] provides the base functionality for all commands.
-//! * [Record] provides a stack based undo-redo functionality.
-//! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
+//! * [Record] provides linear undo-redo functionality.
+//! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
 //! * Configurable display formatting is provided through the [Display] structure.

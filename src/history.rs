@@ -38,7 +38,6 @@ use std::fmt;
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;
 ///     let abc = history.root();
-///     assert_eq!(history.as_receiver(), "abc");
 ///     history.go_to(abc, 1).unwrap()?;
 ///     history.apply(Add('f'))?;
 ///     history.apply(Add('g'))?;
@@ -151,8 +150,8 @@ impl<R, C: Command<R>> History<R, C> {
     #[inline]
     pub fn connect(
         &mut self,
-        slot: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> Option<impl FnMut(Signal) + Send + Sync + 'static>
+        slot: impl FnMut(Signal) + 'static,
+    ) -> Option<impl FnMut(Signal) + 'static>
     where
         C: 'static,
         R: 'static,
@@ -610,12 +609,11 @@ pub(crate) struct Branch<C> {
 /// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
 /// # }
 /// # fn foo() -> History<String, Add> {
-/// let history = History::builder()
+/// History::builder()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
-///     .default();
-/// # history
+///     .default()
 /// # }
 /// ```
 #[derive(Debug)]
@@ -652,10 +650,7 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
     #[inline]
-    pub fn connect(
-        mut self,
-        slot: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> HistoryBuilder<R, C> {
+    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> HistoryBuilder<R, C> {
         self.inner = self.inner.connect(slot);
         self
     }

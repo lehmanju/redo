@@ -68,7 +68,7 @@ pub struct Record<R, C: Command<R>> {
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub(crate) slot: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
+    pub(crate) slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
 impl<R, C: Command<R>> Record<R, C> {
@@ -180,8 +180,8 @@ impl<R, C: Command<R>> Record<R, C> {
     #[inline]
     pub fn connect(
         &mut self,
-        slot: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> Option<impl FnMut(Signal) + Send + Sync + 'static> {
+        slot: impl FnMut(Signal) + 'static,
+    ) -> Option<impl FnMut(Signal) + 'static> {
         self.slot
             .replace(Box::new(slot))
             .map(|mut slot| move |signal| slot(signal))
@@ -663,12 +663,11 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for Record<R, C> {
 /// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
 /// # }
 /// # fn foo() -> Record<String, Add> {
-/// let record = Record::builder()
+/// Record::builder()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
-///     .default();
-/// # record
+///     .default()
 /// # }
 /// ```
 pub struct RecordBuilder<R, C: Command<R>> {
@@ -677,7 +676,7 @@ pub struct RecordBuilder<R, C: Command<R>> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
+    slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
 impl<R, C: Command<R>> RecordBuilder<R, C> {
@@ -709,10 +708,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the record does not handle any signals.
     #[inline]
-    pub fn connect(
-        mut self,
-        slot: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> RecordBuilder<R, C> {
+    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> RecordBuilder<R, C> {
         self.slot = Some(Box::new(slot));
         self
     }
