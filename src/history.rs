@@ -50,12 +50,12 @@ use std::fmt;
 ///
 /// [Record]: struct.Record.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
-pub struct History<R, C: Command<R>> {
+#[derive(Clone, Debug)]
+pub struct History<R, C: Command<R>, F = fn(Signal)> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
-    pub(crate) record: Record<R, C>,
+    pub(crate) record: Record<R, C, F>,
     pub(crate) branches: FxHashMap<usize, Branch<C>>,
 }
 
@@ -71,10 +71,12 @@ impl<R, C: Command<R>> History<R, C> {
             branches: FxHashMap::default(),
         }
     }
+}
 
+impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Returns a builder for a history.
     #[inline]
-    pub fn builder() -> HistoryBuilder<R, C> {
+    pub fn builder() -> HistoryBuilder<R, C, F> {
         HistoryBuilder {
             inner: Record::builder(),
         }
@@ -144,18 +146,9 @@ impl<R, C: Command<R>> History<R, C> {
         limit
     }
 
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
+    /// Sets how the signal should be handled when the state changes and returns the old slot.
     #[inline]
-    pub fn connect(
-        &mut self,
-        slot: impl FnMut(Signal) + 'static,
-    ) -> Option<impl FnMut(Signal) + 'static>
-    where
-        C: 'static,
-        R: 'static,
-    {
+    pub fn connect(&mut self, slot: F) -> F {
         self.record.connect(slot)
     }
 
@@ -216,9 +209,7 @@ impl<R, C: Command<R>> History<R, C> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Root { old, new: 0 });
-        }
+        (self.record.slot)(Signal::Root { old, new: 0 });
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -275,9 +266,7 @@ impl<R, C: Command<R>> History<R, C> {
                 (None, None, None) => (),
                 _ => unreachable!(),
             }
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Root { old, new });
-            }
+            (self.record.slot)(Signal::Root { old, new });
         }
         Ok(merged)
     }
@@ -366,12 +355,11 @@ impl<R, C: Command<R>> History<R, C> {
         }
         if let Err(err) = self.record.go_to(current)? {
             return Some(Err(err));
-        } else if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Root {
-                old: root,
-                new: self.root,
-            });
         }
+        (self.record.slot)(Signal::Root {
+            old: root,
+            new: self.root,
+        });
         Some(Ok(()))
     }
 
@@ -399,13 +387,13 @@ impl<R, C: Command<R>> History<R, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
         Queue::from(self)
     }
 
@@ -461,18 +449,14 @@ impl<R, C: Command<R>> History<R, C> {
         {
             self.saved = None;
             self.record.saved = Some(saved);
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Saved(true));
-            }
+            (self.record.slot)(Signal::Saved(true));
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
                 branch: old,
                 current: saved,
             });
             self.record.saved = None;
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Saved(false));
-            }
+            (self.record.slot)(Signal::Saved(false));
         }
     }
 
@@ -517,7 +501,7 @@ impl<R, C: Command<R>> History<R, C> {
     }
 }
 
-impl<R, C: Command<R> + ToString> History<R, C> {
+impl<R, C: Command<R> + ToString, F: FnMut(Signal)> History<R, C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -548,14 +532,14 @@ impl<R: Default, C: Command<R>> Default for History<R, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for History<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for History<R, C, F> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for History<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for History<R, C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.as_mut_receiver()
@@ -569,9 +553,9 @@ impl<R, C: Command<R>> From<R> for History<R, C> {
     }
 }
 
-impl<R, C: Command<R>> From<Record<R, C>> for History<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> From<Record<R, C, F>> for History<R, C, F> {
     #[inline]
-    fn from(record: Record<R, C>) -> Self {
+    fn from(record: Record<R, C, F>) -> Self {
         History {
             root: 0,
             next: 1,
@@ -582,7 +566,7 @@ impl<R, C: Command<R>> From<Record<R, C>> for History<R, C> {
     }
 }
 
-impl<R, C: Command<R> + fmt::Display> fmt::Display for History<R, C> {
+impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for History<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -591,7 +575,7 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for History<R, C> {
 
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
     pub(crate) commands: VecDeque<Meta<C>>,
@@ -617,44 +601,11 @@ pub(crate) struct Branch<C> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct HistoryBuilder<R, C: Command<R>> {
-    inner: RecordBuilder<R, C>,
+pub struct HistoryBuilder<R, C: Command<R>, F = fn(Signal)> {
+    inner: RecordBuilder<R, C, F>,
 }
 
 impl<R, C: Command<R>> HistoryBuilder<R, C> {
-    /// Sets the capacity for the history.
-    #[inline]
-    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
-        self.inner = self.inner.capacity(capacity);
-        self
-    }
-
-    /// Sets the `limit` for the history.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
-    #[inline]
-    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C> {
-        self.inner = self.inner.limit(limit);
-        self
-    }
-
-    /// Sets if the receiver is initially in a saved state.
-    /// By default the receiver is in a saved state.
-    #[inline]
-    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C> {
-        self.inner = self.inner.saved(saved);
-        self
-    }
-
-    /// Decides how the signal should be handled when the state changes.
-    /// By default the history does not handle any signals.
-    #[inline]
-    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> HistoryBuilder<R, C> {
-        self.inner = self.inner.connect(slot);
-        self
-    }
-
     /// Builds the history.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R, C> {
@@ -668,11 +619,58 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
     }
 }
 
+impl<R, C: Command<R>, F: FnMut(Signal)> HistoryBuilder<R, C, F> {
+    /// Sets the capacity for the history.
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C, F> {
+        self.inner = self.inner.capacity(capacity);
+        self
+    }
+
+    /// Sets the `limit` for the history.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
+    #[inline]
+    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C, F> {
+        self.inner = self.inner.limit(limit);
+        self
+    }
+
+    /// Sets if the receiver is initially in a saved state.
+    /// By default the receiver is in a saved state.
+    #[inline]
+    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C, F> {
+        self.inner = self.inner.saved(saved);
+        self
+    }
+
+    /// Builds the history with the slot.
+    #[inline]
+    pub fn build_with_slot(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
+        History {
+            root: 0,
+            next: 1,
+            saved: None,
+            record: self.inner.build_with_slot(receiver, slot),
+            branches: FxHashMap::default(),
+        }
+    }
+}
+
 impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
     /// Creates the history with a default `receiver`.
     #[inline]
     pub fn default(self) -> History<R, C> {
         self.build(R::default())
+    }
+}
+
+impl<R: Default, C: Command<R>, F: FnMut(Signal)> HistoryBuilder<R, C, F> {
+    /// Creates the history with a default `receiver`.
+    #[inline]
+    pub fn default_with_slot(self, slot: F) -> History<R, C, F> {
+        self.build_with_slot(R::default(), slot)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, History, Record};
+use crate::{Checkpoint, Command, History, Record, Signal};
 
 /// A command queue wrapper.
 ///
@@ -121,7 +121,7 @@ impl<T, C> Extend<C> for Queue<'_, T, C> {
     }
 }
 
-impl<R, C: Command<R>> Queue<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -159,13 +159,13 @@ impl<R, C: Command<R>> Queue<'_, Record<R, C>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
         self.inner.queue()
     }
 
@@ -184,21 +184,21 @@ impl<R, C: Command<R>> Queue<'_, Record<R, C>, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for Queue<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Queue<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for Queue<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Queue<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-impl<R, C: Command<R>> Queue<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -236,13 +236,13 @@ impl<R, C: Command<R>> Queue<'_, History<R, C>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
         self.inner.queue()
     }
 
@@ -261,14 +261,14 @@ impl<R, C: Command<R>> Queue<'_, History<R, C>, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for Queue<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Queue<'_, History<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for Queue<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Queue<'_, History<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
@@ -276,7 +276,7 @@ impl<R, C: Command<R>> AsMut<R> for Queue<'_, History<R, C>, C> {
 }
 
 /// An action that can be applied to a Record or History.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Action<C> {
     Apply(C),
     Undo,

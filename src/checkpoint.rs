@@ -1,4 +1,4 @@
-use crate::{Command, History, Meta, Queue, Record};
+use crate::{Command, History, Meta, Queue, Record, Signal};
 use std::collections::VecDeque;
 
 /// A checkpoint wrapper.
@@ -95,7 +95,7 @@ impl<'a, T, C> Checkpoint<'a, T, C> {
     pub fn commit(self) {}
 }
 
-impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> Checkpoint<'_, Record<R, C, F>, C> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
@@ -199,13 +199,13 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
         self.inner.queue()
     }
 
@@ -224,21 +224,21 @@ impl<R, C: Command<R>> Checkpoint<'_, Record<R, C>, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for Checkpoint<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Checkpoint<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for Checkpoint<'_, Record<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Checkpoint<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> Checkpoint<'_, History<R, C, F>, C> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
@@ -338,13 +338,13 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
         self.inner.queue()
     }
 
@@ -363,14 +363,14 @@ impl<R, C: Command<R>> Checkpoint<'_, History<R, C>, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for Checkpoint<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Checkpoint<'_, History<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for Checkpoint<'_, History<R, C>, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Checkpoint<'_, History<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
@@ -378,7 +378,7 @@ impl<R, C: Command<R>> AsMut<R> for Checkpoint<'_, History<R, C>, C> {
 }
 
 /// An action that can be applied to a Record or History.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Action<C> {
     Apply(VecDeque<Meta<C>>),
     Undo,

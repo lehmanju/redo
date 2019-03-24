@@ -8,6 +8,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
+use std::mem;
 use std::num::NonZeroUsize;
 
 #[allow(unsafe_code)]
@@ -61,14 +62,15 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Record<R, C: Command<R>> {
+#[derive(Clone, Debug)]
+pub struct Record<R, C: Command<R>, F = fn(Signal)> {
     pub(crate) commands: VecDeque<Meta<C>>,
     receiver: R,
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub(crate) slot: Option<Box<dyn FnMut(Signal)>>,
+    pub(crate) slot: F,
 }
 
 impl<R, C: Command<R>> Record<R, C> {
@@ -81,20 +83,22 @@ impl<R, C: Command<R>> Record<R, C> {
             current: 0,
             limit: MAX_LIMIT,
             saved: Some(0),
-            slot: None,
+            slot: |_| (),
         }
     }
+}
 
+impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Returns a builder for a record.
     #[inline]
-    pub fn builder() -> RecordBuilder<R, C> {
+    pub fn builder() -> RecordBuilder<R, C, F> {
         RecordBuilder {
             commands: PhantomData,
             receiver: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
-            slot: None,
+            slot: PhantomData,
         }
     }
 
@@ -159,32 +163,23 @@ impl<R, C: Command<R>> Record<R, C> {
             let new = self.current();
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
-            if let Some(ref mut slot) = self.slot {
-                if old != new {
-                    slot(Signal::Current { old, new });
-                }
-                if could_undo != can_undo {
-                    slot(Signal::Undo(can_undo));
-                }
-                if was_saved != is_saved {
-                    slot(Signal::Saved(is_saved));
-                }
+            if old != new {
+                (self.slot)(Signal::Current { old, new });
+            }
+            if could_undo != can_undo {
+                (self.slot)(Signal::Undo(can_undo));
+            }
+            if was_saved != is_saved {
+                (self.slot)(Signal::Saved(is_saved));
             }
         }
         self.limit()
     }
 
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
+    /// Sets how the signal should be handled when the state changes and returns the old slot.
     #[inline]
-    pub fn connect(
-        &mut self,
-        slot: impl FnMut(Signal) + 'static,
-    ) -> Option<impl FnMut(Signal) + 'static> {
-        self.slot
-            .replace(Box::new(slot))
-            .map(|mut slot| move |signal| slot(signal))
+    pub fn connect(&mut self, slot: F) -> F {
+        mem::replace(&mut self.slot, slot)
     }
 
     /// Returns `true` if the record can undo.
@@ -205,17 +200,13 @@ impl<R, C: Command<R>> Record<R, C> {
         let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.current());
-            if let Some(ref mut slot) = self.slot {
-                if !was_saved {
-                    slot(Signal::Saved(true));
-                }
+            if !was_saved {
+                (self.slot)(Signal::Saved(true));
             }
         } else {
             self.saved = None;
-            if let Some(ref mut slot) = self.slot {
-                if was_saved {
-                    slot(Signal::Saved(false));
-                }
+            if was_saved {
+                (self.slot)(Signal::Saved(false));
             }
         }
     }
@@ -247,16 +238,14 @@ impl<R, C: Command<R>> Record<R, C> {
         self.commands.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
-        if let Some(ref mut slot) = self.slot {
-            if old != 0 {
-                slot(Signal::Current { old, new: 0 });
-            }
-            if could_undo {
-                slot(Signal::Undo(false));
-            }
-            if could_redo {
-                slot(Signal::Redo(false));
-            }
+        if old != 0 {
+            (self.slot)(Signal::Current { old, new: 0 });
+        }
+        if could_undo {
+            (self.slot)(Signal::Undo(false));
+        }
+        if could_redo {
+            (self.slot)(Signal::Redo(false));
         }
     }
 
@@ -317,21 +306,19 @@ impl<R, C: Command<R>> Record<R, C> {
             }
         };
         debug_assert_eq!(self.current(), self.len());
-        if let Some(ref mut slot) = self.slot {
-            // We emit this signal even if the commands might have been merged.
-            slot(Signal::Current {
-                old: current,
-                new: self.current,
-            });
-            if could_redo {
-                slot(Signal::Redo(false));
-            }
-            if !could_undo {
-                slot(Signal::Undo(true));
-            }
-            if was_saved {
-                slot(Signal::Saved(false));
-            }
+        // We emit this signal even if the commands might have been merged.
+        (self.slot)(Signal::Current {
+            old: current,
+            new: self.current,
+        });
+        if could_redo {
+            (self.slot)(Signal::Redo(false));
+        }
+        if !could_undo {
+            (self.slot)(Signal::Undo(true));
+        }
+        if was_saved {
+            (self.slot)(Signal::Saved(false));
         }
         Ok((merged_or_annulled, v))
     }
@@ -364,20 +351,18 @@ impl<R, C: Command<R>> Record<R, C> {
         self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
-            if old == len {
-                slot(Signal::Redo(true));
-            }
-            if old == 1 {
-                slot(Signal::Undo(false));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
+        (self.slot)(Signal::Current {
+            old,
+            new: self.current,
+        });
+        if old == len {
+            (self.slot)(Signal::Redo(true));
+        }
+        if old == 1 {
+            (self.slot)(Signal::Undo(false));
+        }
+        if was_saved != is_saved {
+            (self.slot)(Signal::Saved(is_saved));
         }
         Some(Ok(()))
     }
@@ -409,20 +394,18 @@ impl<R, C: Command<R>> Record<R, C> {
         self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
-            if old == len - 1 {
-                slot(Signal::Redo(false));
-            }
-            if old == 0 {
-                slot(Signal::Undo(true));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
+        (self.slot)(Signal::Current {
+            old,
+            new: self.current,
+        });
+        if old == len - 1 {
+            (self.slot)(Signal::Redo(false));
+        }
+        if old == 0 {
+            (self.slot)(Signal::Undo(true));
+        }
+        if was_saved != is_saved {
+            (self.slot)(Signal::Saved(is_saved));
         }
         Some(Ok(()))
     }
@@ -444,8 +427,6 @@ impl<R, C: Command<R>> Record<R, C> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         let old = self.current();
-        // Temporarily remove slot so they are not called each iteration.
-        let slot = self.slot.take();
         while self.current() != current {
             // Decide if we need to undo or redo to reach current.
             let f = if current > self.current() {
@@ -454,31 +435,26 @@ impl<R, C: Command<R>> Record<R, C> {
                 Record::undo
             };
             if let Err(err) = f(self).unwrap() {
-                self.slot = slot;
                 return Some(Err(err));
             }
         }
-        // Add slot back.
-        self.slot = slot;
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            if old != self.current {
-                slot(Signal::Current {
-                    old,
-                    new: self.current,
-                });
-            }
-            if could_undo != can_undo {
-                slot(Signal::Undo(can_undo));
-            }
-            if could_redo != can_redo {
-                slot(Signal::Redo(can_redo));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
+        if old != self.current {
+            (self.slot)(Signal::Current {
+                old,
+                new: self.current,
+            });
+        }
+        if could_undo != can_undo {
+            (self.slot)(Signal::Undo(can_undo));
+        }
+        if could_redo != can_redo {
+            (self.slot)(Signal::Redo(can_redo));
+        }
+        if was_saved != is_saved {
+            (self.slot)(Signal::Saved(is_saved));
         }
         Some(Ok(()))
     }
@@ -527,13 +503,13 @@ impl<R, C: Command<R>> Record<R, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C>, C> {
+    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
         Queue::from(self)
     }
 
@@ -564,7 +540,7 @@ impl<R, C: Command<R>> Record<R, C> {
     }
 }
 
-impl<R, C: Command<R> + ToString> Record<R, C> {
+impl<R, C: Command<R> + ToString, F: FnMut(Signal)> Record<R, C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -603,14 +579,14 @@ impl<R: Default, C: Command<R>> Default for Record<R, C> {
     }
 }
 
-impl<R, C: Command<R>> AsRef<R> for Record<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Record<R, C, F> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<R, C: Command<R>> AsMut<R> for Record<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Record<R, C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.as_mut_receiver()
@@ -624,27 +600,14 @@ impl<R, C: Command<R>> From<R> for Record<R, C> {
     }
 }
 
-impl<R, C: Command<R>> From<History<R, C>> for Record<R, C> {
+impl<R, C: Command<R>, F: FnMut(Signal)> From<History<R, C, F>> for Record<R, C, F> {
     #[inline]
-    fn from(history: History<R, C>) -> Record<R, C> {
+    fn from(history: History<R, C, F>) -> Record<R, C, F> {
         history.record
     }
 }
 
-impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for Record<R, C> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Record")
-            .field("commands", &self.commands)
-            .field("receiver", &self.receiver)
-            .field("current", &self.current)
-            .field("limit", &self.limit)
-            .field("saved", &self.saved)
-            .finish()
-    }
-}
-
-impl<R, C: Command<R> + fmt::Display> fmt::Display for Record<R, C> {
+impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for Record<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -670,49 +633,17 @@ impl<R, C: Command<R> + fmt::Display> fmt::Display for Record<R, C> {
 ///     .default()
 /// # }
 /// ```
-pub struct RecordBuilder<R, C: Command<R>> {
+#[derive(Debug)]
+pub struct RecordBuilder<R, C: Command<R>, F = fn(Signal)> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: Option<Box<dyn FnMut(Signal)>>,
+    slot: PhantomData<F>,
 }
 
 impl<R, C: Command<R>> RecordBuilder<R, C> {
-    /// Sets the capacity for the record.
-    #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
-        self.capacity = capacity;
-        self
-    }
-
-    /// Sets the `limit` of the record.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
-    #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C> {
-        self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
-        self
-    }
-
-    /// Sets if the receiver is initially in a saved state.
-    /// By default the receiver is in a saved state.
-    #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C> {
-        self.saved = saved;
-        self
-    }
-
-    /// Decides how the signal should be handled when the state changes.
-    /// By default the record does not handle any signals.
-    #[inline]
-    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> RecordBuilder<R, C> {
-        self.slot = Some(Box::new(slot));
-        self
-    }
-
     /// Builds the record.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> Record<R, C> {
@@ -722,7 +653,47 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: self.slot,
+            slot: |_| (),
+        }
+    }
+}
+
+impl<R, C: Command<R>, F: FnMut(Signal)> RecordBuilder<R, C, F> {
+    /// Sets the capacity for the record.
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C, F> {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Sets the `limit` of the record.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
+    #[inline]
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C, F> {
+        self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
+        self
+    }
+
+    /// Sets if the receiver is initially in a saved state.
+    /// By default the receiver is in a saved state.
+    #[inline]
+    pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C, F> {
+        self.saved = saved;
+        self
+    }
+
+    /// Builds the record with the slot.
+    #[inline]
+    pub fn build_with_slot(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
+        Record {
+            commands: VecDeque::with_capacity(self.capacity),
+            receiver: receiver.into(),
+            current: 0,
+            limit: self.limit,
+            saved: if self.saved { Some(0) } else { None },
+            slot,
         }
     }
 }
@@ -735,15 +706,11 @@ impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
     }
 }
 
-impl<R: fmt::Debug, C: Command<R> + fmt::Debug> fmt::Debug for RecordBuilder<R, C> {
+impl<R: Default, C: Command<R>, F: FnMut(Signal)> RecordBuilder<R, C, F> {
+    /// Creates the record with a default `receiver`.
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("RecordBuilder")
-            .field("receiver", &self.receiver)
-            .field("capacity", &self.capacity)
-            .field("limit", &self.limit)
-            .field("saved", &self.saved)
-            .finish()
+    pub fn default_with_slot(self, slot: F) -> Record<R, C, F> {
+        self.build_with_slot(R::default(), slot)
     }
 }
 
