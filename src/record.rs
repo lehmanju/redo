@@ -69,7 +69,6 @@ pub struct Record<R, C: Command<R>, F = fn(Signal)> {
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
-    #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) slot: F,
 }
 
