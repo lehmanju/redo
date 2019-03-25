@@ -1,4 +1,4 @@
-![redo](redo.svg)
+![redo](https://raw.githubusercontent.com/evenorog/redo/master/redo.svg?sanitize=true)
 
 [![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
@@ -41,7 +41,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-redo = "0.31"
+redo = "0.32"
 ```
 
 And this to `main.rs`:
