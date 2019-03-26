@@ -36,7 +36,7 @@ use crate::{Checkpoint, Command, History, Record, Signal};
 ///     Ok(())
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Queue<'a, T, C> {
     inner: &'a mut T,
     queue: Vec<Action<C>>,
@@ -276,7 +276,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Queue<'_, History<R, C, F>
 }
 
 /// An action that can be applied to a Record or History.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
     Apply(C),
     Undo,

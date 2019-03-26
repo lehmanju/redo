@@ -62,7 +62,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Record<R, C: Command<R>, F = fn(Signal)> {
     pub(crate) commands: VecDeque<Meta<C>>,
     receiver: R,
@@ -160,14 +160,14 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
             let new = self.current();
-            let can_undo = self.can_undo();
-            let is_saved = self.is_saved();
             if old != new {
                 (self.slot)(Signal::Current { old, new });
             }
+            let can_undo = self.can_undo();
             if could_undo != can_undo {
                 (self.slot)(Signal::Undo(can_undo));
             }
+            let is_saved = self.is_saved();
             if was_saved != is_saved {
                 (self.slot)(Signal::Saved(is_saved));
             }
@@ -348,18 +348,17 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             return Some(Err(error));
         }
         self.current -= 1;
-        let len = self.len();
-        let is_saved = self.is_saved();
         (self.slot)(Signal::Current {
             old,
             new: self.current,
         });
-        if old == len {
+        if old == self.len() {
             (self.slot)(Signal::Redo(true));
         }
         if old == 1 {
             (self.slot)(Signal::Undo(false));
         }
+        let is_saved = self.is_saved();
         if was_saved != is_saved {
             (self.slot)(Signal::Saved(is_saved));
         }
@@ -391,18 +390,17 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             return Some(Err(error));
         }
         self.current += 1;
-        let len = self.len();
-        let is_saved = self.is_saved();
         (self.slot)(Signal::Current {
             old,
             new: self.current,
         });
-        if old == len - 1 {
+        if old == self.len() - 1 {
             (self.slot)(Signal::Redo(false));
         }
         if old == 0 {
             (self.slot)(Signal::Undo(true));
         }
+        let is_saved = self.is_saved();
         if was_saved != is_saved {
             (self.slot)(Signal::Saved(is_saved));
         }
@@ -437,21 +435,21 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
                 return Some(Err(err));
             }
         }
-        let can_undo = self.can_undo();
-        let can_redo = self.can_redo();
-        let is_saved = self.is_saved();
         if old != self.current {
             (self.slot)(Signal::Current {
                 old,
                 new: self.current,
             });
         }
+        let can_undo = self.can_undo();
         if could_undo != can_undo {
             (self.slot)(Signal::Undo(can_undo));
         }
+        let can_redo = self.can_redo();
         if could_redo != can_redo {
             (self.slot)(Signal::Redo(can_redo));
         }
+        let is_saved = self.is_saved();
         if was_saved != is_saved {
             (self.slot)(Signal::Saved(is_saved));
         }
@@ -632,7 +630,8 @@ impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for Record<
 ///     .default()
 /// # }
 /// ```
-#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct RecordBuilder<R, C: Command<R>, F = fn(Signal)> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,

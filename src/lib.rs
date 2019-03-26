@@ -209,6 +209,7 @@ pub trait Command<R> {
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
@@ -245,6 +246,7 @@ pub enum Signal {
 }
 
 /// The result of merging two commands.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Merge<C> {
     /// The commands have been merged.
@@ -264,7 +266,7 @@ struct At {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 struct Meta<C> {
     command: C,
     #[cfg(feature = "chrono")]

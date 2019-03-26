@@ -575,7 +575,7 @@ impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for History
 
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
     pub(crate) commands: VecDeque<Meta<C>>,
@@ -600,7 +600,8 @@ pub(crate) struct Branch<C> {
 ///     .default()
 /// # }
 /// ```
-#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct HistoryBuilder<R, C: Command<R>, F = fn(Signal)> {
     inner: RecordBuilder<R, C, F>,
 }

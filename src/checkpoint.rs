@@ -37,7 +37,7 @@ use std::collections::VecDeque;
 ///     Ok(())
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Checkpoint<'a, T, C> {
     inner: &'a mut T,
     stack: Vec<Action<C>>,
@@ -378,7 +378,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Checkpoint<'_, History<R, 
 }
 
 /// An action that can be applied to a Record or History.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
     Apply(VecDeque<Meta<C>>),
     Undo,
