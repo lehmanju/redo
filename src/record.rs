@@ -25,38 +25,34 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// # Examples
 /// ```
 /// # use redo::{Command, Record};
-/// struct Add(char);
-///
-/// impl Command<String> for Add {
-///     type Error = &'static str;
-///
-///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
-///         s.push(self.0);
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
-///         Ok(())
-///     }
-/// }
-///
-/// fn main() -> Result<(), &'static str> {
-///     let mut record = Record::default();
-///     record.apply(Add('a'))?;
-///     record.apply(Add('b'))?;
-///     record.apply(Add('c'))?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     record.undo().unwrap()?;
-///     record.undo().unwrap()?;
-///     record.undo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "");
-///     record.redo().unwrap()?;
-///     record.redo().unwrap()?;
-///     record.redo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     Ok(())
-/// }
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> Result<(), &'static str> {
+/// let mut record = Record::default();
+/// record.apply(Add('a'))?;
+/// record.apply(Add('b'))?;
+/// record.apply(Add('c'))?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// record.undo().unwrap()?;
+/// record.undo().unwrap()?;
+/// record.undo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "");
+/// record.redo().unwrap()?;
+/// record.redo().unwrap()?;
+/// record.redo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html

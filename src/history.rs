@@ -16,36 +16,32 @@ use std::fmt;
 /// # Examples
 /// ```
 /// # use redo::{Command, History};
-/// struct Add(char);
-///
-/// impl Command<String> for Add {
-///     type Error = &'static str;
-///
-///     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
-///         s.push(self.0);
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
-///         Ok(())
-///     }
-/// }
-///
-/// fn main() -> Result<(), &'static str> {
-///     let mut history = History::default();
-///     history.apply(Add('a'))?;
-///     history.apply(Add('b'))?;
-///     history.apply(Add('c'))?;
-///     let abc = history.root();
-///     history.go_to(abc, 1).unwrap()?;
-///     history.apply(Add('f'))?;
-///     history.apply(Add('g'))?;
-///     assert_eq!(history.as_receiver(), "afg");
-///     history.go_to(abc, 3).unwrap()?;
-///     assert_eq!(history.as_receiver(), "abc");
-///     Ok(())
-/// }
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> Result<(), &'static str> {
+/// let mut history = History::default();
+/// history.apply(Add('a'))?;
+/// history.apply(Add('b'))?;
+/// history.apply(Add('c'))?;
+/// let abc = history.root();
+/// history.go_to(abc, 1).unwrap()?;
+/// history.apply(Add('f'))?;
+/// history.apply(Add('g'))?;
+/// assert_eq!(history.as_receiver(), "afg");
+/// history.go_to(abc, 3).unwrap()?;
+/// assert_eq!(history.as_receiver(), "abc");
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [Record]: struct.Record.html
@@ -221,14 +217,9 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
-        self.__apply(Meta::from(command)).map(|_| ())
-    }
-
-    #[inline]
-    pub(crate) fn __apply(&mut self, meta: Meta<C>) -> std::result::Result<bool, C::Error> {
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
-        let (merged, commands) = self.record.__apply(meta)?;
+        let (merged, commands) = self.record.__apply(Meta::from(command))?;
         // Check if the limit has been reached.
         if !merged && current == self.current() {
             let root = self.root();
@@ -268,7 +259,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
             }
             (self.record.slot)(Signal::Root { old, new });
         }
-        Ok(merged)
+        Ok(())
     }
 
     /// Calls the [`undo`] method for the active command
