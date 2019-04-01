@@ -19,9 +19,6 @@ colored = "1"
 rustc-hash = "1"
 serde = { version = "1", optional = true, features = ["derive"] }
 
-[features]
-default = []
-
 [badges]
 travis-ci = { repository = "evenorog/redo" }
 maintenance = { status = "actively-developed" }

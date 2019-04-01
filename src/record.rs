@@ -8,7 +8,6 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem;
 use std::num::NonZeroUsize;
 
 #[allow(unsafe_code)]
@@ -65,7 +64,7 @@ pub struct Record<R, C: Command<R>, F = fn(Signal)> {
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
-    pub(crate) slot: F,
+    pub(crate) slot: Option<F>,
 }
 
 impl<R, C: Command<R>> Record<R, C> {
@@ -78,7 +77,7 @@ impl<R, C: Command<R>> Record<R, C> {
             current: 0,
             limit: MAX_LIMIT,
             saved: Some(0),
-            slot: |_| (),
+            slot: None,
         }
     }
 }
@@ -156,25 +155,61 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
             let new = self.current();
-            if old != new {
-                (self.slot)(Signal::Current { old, new });
-            }
             let can_undo = self.can_undo();
-            if could_undo != can_undo {
-                (self.slot)(Signal::Undo(can_undo));
-            }
             let is_saved = self.is_saved();
-            if was_saved != is_saved {
-                (self.slot)(Signal::Saved(is_saved));
+            if let Some(ref mut slot) = self.slot {
+                if old != new {
+                    slot(Signal::Current { old, new });
+                }
+                if could_undo != can_undo {
+                    slot(Signal::Undo(can_undo));
+                }
+                if was_saved != is_saved {
+                    slot(Signal::Saved(is_saved));
+                }
             }
         }
         self.limit()
     }
 
-    /// Sets how the signal should be handled when the state changes and returns the old slot.
+    /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous slot is returned if it exists.
     #[inline]
-    pub fn connect(&mut self, slot: F) -> F {
-        mem::replace(&mut self.slot, slot)
+    pub fn connect(&mut self, slot: F) -> Option<F> {
+        self.slot.replace(slot)
+    }
+
+    /// Creates a new record that uses the provided slot.
+    #[inline]
+    pub fn set_and_connect<G>(self, slot: G) -> Record<R, C, G> {
+        Record {
+            commands: self.commands,
+            receiver: self.receiver,
+            current: self.current,
+            limit: self.limit,
+            saved: self.saved,
+            slot: Some(slot),
+        }
+    }
+
+    /// Creates a new record by taking a closure that maps the current slot.
+    #[inline]
+    pub fn map_and_connect<G>(self, f: impl FnOnce(F) -> G) -> Record<R, C, G> {
+        Record {
+            commands: self.commands,
+            receiver: self.receiver,
+            current: self.current,
+            limit: self.limit,
+            saved: self.saved,
+            slot: self.slot.map(f),
+        }
+    }
+
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<F> {
+        self.slot.take()
     }
 
     /// Returns `true` if the record can undo.
@@ -195,13 +230,17 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.current());
-            if !was_saved {
-                (self.slot)(Signal::Saved(true));
+            if let Some(ref mut slot) = self.slot {
+                if !was_saved {
+                    slot(Signal::Saved(true));
+                }
             }
         } else {
             self.saved = None;
-            if was_saved {
-                (self.slot)(Signal::Saved(false));
+            if let Some(ref mut slot) = self.slot {
+                if was_saved {
+                    slot(Signal::Saved(false));
+                }
             }
         }
     }
@@ -233,14 +272,16 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         self.commands.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
-        if old != 0 {
-            (self.slot)(Signal::Current { old, new: 0 });
-        }
-        if could_undo {
-            (self.slot)(Signal::Undo(false));
-        }
-        if could_redo {
-            (self.slot)(Signal::Redo(false));
+        if let Some(ref mut slot) = self.slot {
+            if old != 0 {
+                slot(Signal::Current { old, new: 0 });
+            }
+            if could_undo {
+                slot(Signal::Undo(false));
+            }
+            if could_redo {
+                slot(Signal::Redo(false));
+            }
         }
     }
 
@@ -301,19 +342,21 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             }
         };
         debug_assert_eq!(self.current(), self.len());
-        // We emit this signal even if the commands might have been merged.
-        (self.slot)(Signal::Current {
-            old: current,
-            new: self.current,
-        });
-        if could_redo {
-            (self.slot)(Signal::Redo(false));
-        }
-        if !could_undo {
-            (self.slot)(Signal::Undo(true));
-        }
-        if was_saved {
-            (self.slot)(Signal::Saved(false));
+        if let Some(ref mut slot) = self.slot {
+            // We emit this signal even if the commands might have been merged.
+            slot(Signal::Current {
+                old: current,
+                new: self.current,
+            });
+            if could_redo {
+                slot(Signal::Redo(false));
+            }
+            if !could_undo {
+                slot(Signal::Undo(true));
+            }
+            if was_saved {
+                slot(Signal::Saved(false));
+            }
         }
         Ok((merged_or_annulled, v))
     }
@@ -344,19 +387,22 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             return Some(Err(error));
         }
         self.current -= 1;
-        (self.slot)(Signal::Current {
-            old,
-            new: self.current,
-        });
-        if old == self.len() {
-            (self.slot)(Signal::Redo(true));
-        }
-        if old == 1 {
-            (self.slot)(Signal::Undo(false));
-        }
+        let len = self.len();
         let is_saved = self.is_saved();
-        if was_saved != is_saved {
-            (self.slot)(Signal::Saved(is_saved));
+        if let Some(ref mut slot) = self.slot {
+            slot(Signal::Current {
+                old,
+                new: self.current,
+            });
+            if old == len {
+                slot(Signal::Redo(true));
+            }
+            if old == 1 {
+                slot(Signal::Undo(false));
+            }
+            if was_saved != is_saved {
+                slot(Signal::Saved(is_saved));
+            }
         }
         Some(Ok(()))
     }
@@ -386,19 +432,22 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
             return Some(Err(error));
         }
         self.current += 1;
-        (self.slot)(Signal::Current {
-            old,
-            new: self.current,
-        });
-        if old == self.len() - 1 {
-            (self.slot)(Signal::Redo(false));
-        }
-        if old == 0 {
-            (self.slot)(Signal::Undo(true));
-        }
+        let len = self.len();
         let is_saved = self.is_saved();
-        if was_saved != is_saved {
-            (self.slot)(Signal::Saved(is_saved));
+        if let Some(ref mut slot) = self.slot {
+            slot(Signal::Current {
+                old,
+                new: self.current,
+            });
+            if old == len - 1 {
+                slot(Signal::Redo(false));
+            }
+            if old == 0 {
+                slot(Signal::Undo(true));
+            }
+            if was_saved != is_saved {
+                slot(Signal::Saved(is_saved));
+            }
         }
         Some(Ok(()))
     }
@@ -420,6 +469,8 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         let old = self.current();
+        // Temporarily remove slot so they are not called each iteration.
+        let slot = self.slot.take();
         while self.current() != current {
             // Decide if we need to undo or redo to reach current.
             let f = if current > self.current() {
@@ -431,23 +482,27 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
                 return Some(Err(err));
             }
         }
-        if old != self.current {
-            (self.slot)(Signal::Current {
-                old,
-                new: self.current,
-            });
-        }
+        // Add slot back.
+        self.slot = slot;
         let can_undo = self.can_undo();
-        if could_undo != can_undo {
-            (self.slot)(Signal::Undo(can_undo));
-        }
         let can_redo = self.can_redo();
-        if could_redo != can_redo {
-            (self.slot)(Signal::Redo(can_redo));
-        }
         let is_saved = self.is_saved();
-        if was_saved != is_saved {
-            (self.slot)(Signal::Saved(is_saved));
+        if let Some(ref mut slot) = self.slot {
+            if old != self.current {
+                slot(Signal::Current {
+                    old,
+                    new: self.current,
+                });
+            }
+            if could_undo != can_undo {
+                slot(Signal::Undo(can_undo));
+            }
+            if could_redo != can_redo {
+                slot(Signal::Redo(can_redo));
+            }
+            if was_saved != is_saved {
+                slot(Signal::Saved(is_saved));
+            }
         }
         Some(Ok(()))
     }
@@ -481,9 +536,8 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and
-    /// the state of the record is left unchanged.
-    /// The remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -593,7 +647,7 @@ impl<R, C: Command<R>> From<R> for Record<R, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> From<History<R, C, F>> for Record<R, C, F> {
+impl<R, C: Command<R>, F> From<History<R, C, F>> for Record<R, C, F> {
     #[inline]
     fn from(history: History<R, C, F>) -> Record<R, C, F> {
         history.record
@@ -647,12 +701,12 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: |_| (),
+            slot: None,
         }
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> RecordBuilder<R, C, F> {
+impl<R, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// Sets the capacity for the record.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C, F> {
@@ -680,14 +734,14 @@ impl<R, C: Command<R>, F: FnMut(Signal)> RecordBuilder<R, C, F> {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with_slot(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
+    pub fn build_and_connect(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot,
+            slot: Some(slot),
         }
     }
 }
@@ -700,11 +754,11 @@ impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
     }
 }
 
-impl<R: Default, C: Command<R>, F: FnMut(Signal)> RecordBuilder<R, C, F> {
+impl<R: Default, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default_with_slot(self, slot: F) -> Record<R, C, F> {
-        self.build_with_slot(R::default(), slot)
+    pub fn default_and_connect(self, slot: F) -> Record<R, C, F> {
+        self.build_and_connect(R::default(), slot)
     }
 }
 
