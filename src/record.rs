@@ -58,7 +58,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Record<R, C: Command<R>, F = fn(Signal)> {
+pub struct Record<R, C, F = fn(Signal)> {
     pub(crate) commands: VecDeque<Meta<C>>,
     receiver: R,
     current: usize,
@@ -67,7 +67,7 @@ pub struct Record<R, C: Command<R>, F = fn(Signal)> {
     pub(crate) slot: Option<F>,
 }
 
-impl<R, C: Command<R>> Record<R, C> {
+impl<R, C> Record<R, C> {
     /// Returns a new record.
     #[inline]
     pub fn new(receiver: impl Into<R>) -> Record<R, C> {

@@ -47,7 +47,7 @@ use std::fmt;
 /// [Record]: struct.Record.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct History<R, C: Command<R>, F = fn(Signal)> {
+pub struct History<R, C, F = fn(Signal)> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
@@ -55,7 +55,7 @@ pub struct History<R, C: Command<R>, F = fn(Signal)> {
     pub(crate) branches: FxHashMap<usize, Branch<C>>,
 }
 
-impl<R, C: Command<R>> History<R, C> {
+impl<R, C> History<R, C> {
     /// Returns a new history.
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R, C> {
