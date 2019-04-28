@@ -46,7 +46,7 @@ use std::fmt;
 ///
 /// [Record]: struct.Record.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct History<R, C, F = fn(Signal)> {
     root: usize,
     next: usize,
