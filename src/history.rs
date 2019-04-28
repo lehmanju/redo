@@ -4,8 +4,7 @@ use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-use std::fmt;
+use std::{collections::VecDeque, fmt};
 
 /// A history of commands.
 ///
@@ -45,7 +44,14 @@ use std::fmt;
 /// ```
 ///
 /// [Record]: struct.Record.html
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound(
+        serialize = "R: Serialize, C: Serialize",
+        deserialize = "R: Deserialize<'de>, C: Deserialize<'de>"
+    ))
+)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct History<R, C, F = fn(Signal)> {
     root: usize,
@@ -711,7 +717,6 @@ impl<R: Default, C: Command<R>, F> HistoryBuilder<R, C, F> {
 mod tests {
     use crate::{Command, History};
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {

@@ -1,14 +1,12 @@
 use crate::{Checkpoint, Command, Display, History, Merge, Meta, Queue, Signal};
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::{collections::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
-use std::cmp::Ordering;
-use std::collections::VecDeque;
-use std::fmt;
-use std::marker::PhantomData;
-use std::num::NonZeroUsize;
+use {
+    chrono::{DateTime, TimeZone, Utc},
+    std::cmp::Ordering,
+};
 
 #[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
@@ -64,6 +62,7 @@ pub struct Record<R, C, F = fn(Signal)> {
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
+    #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
     pub(crate) slot: Option<F>,
 }
 
@@ -511,7 +510,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     #[inline]
     #[cfg(feature = "chrono")]
     pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result<(), C::Error>> {
-        let to = Utc.from_utc_datetime(&to.naive_utc());
+        let to = to.with_timezone(&Utc);
         let current = match self.commands.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
@@ -766,7 +765,6 @@ impl<R: Default, C: Command<R>, F> RecordBuilder<R, C, F> {
 mod tests {
     use crate::{Command, Record};
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {

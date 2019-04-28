@@ -285,7 +285,6 @@ mod tests {
     use crate::{Command, Record};
     use std::error;
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
