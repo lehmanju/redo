@@ -4,7 +4,7 @@ use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt};
+use std::{collections::vec_deque::VecDeque, fmt};
 
 /// A history of commands.
 ///
@@ -73,17 +73,17 @@ impl<R, C> History<R, C> {
             branches: FxHashMap::default(),
         }
     }
-}
 
-impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Returns a builder for a history.
     #[inline]
-    pub fn builder() -> HistoryBuilder<R, C, F> {
+    pub fn builder() -> HistoryBuilder<R, C> {
         HistoryBuilder {
             inner: Record::builder(),
         }
     }
+}
 
+impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -640,8 +640,8 @@ pub(crate) struct Branch<C> {
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct HistoryBuilder<R, C: Command<R>, F = fn(Signal)> {
-    inner: RecordBuilder<R, C, F>,
+pub struct HistoryBuilder<R, C> {
+    inner: RecordBuilder<R, C>,
 }
 
 impl<R, C: Command<R>> HistoryBuilder<R, C> {
@@ -656,12 +656,10 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
             branches: FxHashMap::default(),
         }
     }
-}
 
-impl<R, C: Command<R>, F> HistoryBuilder<R, C, F> {
     /// Sets the capacity for the history.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C, F> {
+    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
         self.inner = self.inner.capacity(capacity);
         self
     }
@@ -671,7 +669,7 @@ impl<R, C: Command<R>, F> HistoryBuilder<R, C, F> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C, F> {
+    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C> {
         self.inner = self.inner.limit(limit);
         self
     }
@@ -679,14 +677,14 @@ impl<R, C: Command<R>, F> HistoryBuilder<R, C, F> {
     /// Sets if the receiver is initially in a saved state.
     /// By default the receiver is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C, F> {
+    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C> {
         self.inner = self.inner.saved(saved);
         self
     }
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_and_connect(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
+    pub fn build_and_connect<F>(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
         History {
             root: 0,
             next: 1,
@@ -703,12 +701,10 @@ impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
     pub fn default(self) -> History<R, C> {
         self.build(R::default())
     }
-}
 
-impl<R: Default, C: Command<R>, F> HistoryBuilder<R, C, F> {
     /// Creates the history with a default `receiver`.
     #[inline]
-    pub fn default_and_connect(self, slot: F) -> History<R, C, F> {
+    pub fn default_and_connect<F>(self, slot: F) -> History<R, C, F> {
         self.build_and_connect(R::default(), slot)
     }
 }

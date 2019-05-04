@@ -1,7 +1,7 @@
 use crate::{Checkpoint, Command, Display, History, Merge, Meta, Queue, Signal};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
+use std::{collections::vec_deque::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
@@ -79,22 +79,21 @@ impl<R, C> Record<R, C> {
             slot: None,
         }
     }
-}
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Returns a builder for a record.
     #[inline]
-    pub fn builder() -> RecordBuilder<R, C, F> {
+    pub fn builder() -> RecordBuilder<R, C> {
         RecordBuilder {
             commands: PhantomData,
             receiver: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
-            slot: PhantomData,
         }
     }
+}
 
+impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -681,13 +680,12 @@ impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for Record<
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct RecordBuilder<R, C: Command<R>, F = fn(Signal)> {
+pub struct RecordBuilder<R, C> {
     commands: PhantomData<C>,
     receiver: PhantomData<R>,
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: PhantomData<F>,
 }
 
 impl<R, C: Command<R>> RecordBuilder<R, C> {
@@ -703,12 +701,10 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
             slot: None,
         }
     }
-}
 
-impl<R, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C, F> {
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
         self.capacity = capacity;
         self
     }
@@ -718,7 +714,7 @@ impl<R, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C, F> {
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -726,14 +722,14 @@ impl<R, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// Sets if the receiver is initially in a saved state.
     /// By default the receiver is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C, F> {
+    pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C> {
         self.saved = saved;
         self
     }
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_and_connect(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
+    pub fn build_and_connect<F>(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
@@ -751,12 +747,10 @@ impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
     pub fn default(self) -> Record<R, C> {
         self.build(R::default())
     }
-}
 
-impl<R: Default, C: Command<R>, F> RecordBuilder<R, C, F> {
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default_and_connect(self, slot: F) -> Record<R, C, F> {
+    pub fn default_and_connect<F>(self, slot: F) -> Record<R, C, F> {
         self.build_and_connect(R::default(), slot)
     }
 }
