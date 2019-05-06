@@ -180,14 +180,14 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Queue<'_, Record<R, C, F>, C> {
+impl<R, C, F> AsRef<R> for Queue<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Queue<'_, Record<R, C, F>, C> {
+impl<R, C, F> AsMut<R> for Queue<'_, Record<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
@@ -257,14 +257,14 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Queue<'_, History<R, C, F>, C> {
+impl<R, C, F> AsRef<R> for Queue<'_, History<R, C, F>, C> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Queue<'_, History<R, C, F>, C> {
+impl<R, C, F> AsMut<R> for Queue<'_, History<R, C, F>, C> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()

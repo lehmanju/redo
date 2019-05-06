@@ -83,7 +83,7 @@ impl<R, C> History<R, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
+impl<R, C, F> History<R, C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -117,6 +117,102 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         self.record.limit()
     }
 
+    /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous slot is returned if it exists.
+    #[inline]
+    pub fn connect(&mut self, slot: F) -> Option<F> {
+        self.record.connect(slot)
+    }
+
+    /// Creates a new history that uses the provided slot.
+    #[inline]
+    pub fn connect_with<G>(self, slot: G) -> History<R, C, G> {
+        History {
+            root: self.root,
+            next: self.next,
+            saved: self.saved,
+            record: self.record.connect_with(slot),
+            branches: self.branches,
+        }
+    }
+
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<F> {
+        self.record.disconnect()
+    }
+
+    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.record.is_saved()
+    }
+
+    /// Returns `true` if the history can undo.
+    #[inline]
+    pub fn can_undo(&self) -> bool {
+        self.record.can_undo()
+    }
+
+    /// Returns `true` if the history can redo.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        self.record.can_redo()
+    }
+
+    /// Returns the current branch.
+    #[inline]
+    pub fn root(&self) -> usize {
+        self.root
+    }
+
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn current(&self) -> usize {
+        self.record.current()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
+        Queue::from(self)
+    }
+
+    /// Returns a reference to the `receiver`.
+    #[inline]
+    pub fn as_receiver(&self) -> &R {
+        self.record.as_receiver()
+    }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.record.as_mut_receiver()
+    }
+
+    /// Consumes the history, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> R {
+        self.record.into_receiver()
+    }
+
+    /// Returns an iterator over the commands in the current branch.
+    #[inline]
+    pub fn commands(&self) -> impl Iterator<Item = &C> {
+        self.record.commands()
+    }
+}
+
+impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Sets the limit of the history and returns the new limit.
     ///
     /// If this limit is reached it will start popping of commands at the beginning
@@ -148,67 +244,11 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         limit
     }
 
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
-    #[inline]
-    pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.record.connect(slot)
-    }
-
-    /// Creates a new history that uses the provided slot.
-    #[inline]
-    pub fn set_and_connect<G>(self, slot: G) -> History<R, C, G> {
-        History {
-            root: self.root,
-            next: self.next,
-            saved: self.saved,
-            record: self.record.set_and_connect(slot),
-            branches: self.branches,
-        }
-    }
-
-    /// Creates a new history by taking a closure that maps the current slot.
-    #[inline]
-    pub fn map_and_connect<G>(self, f: impl FnOnce(F) -> G) -> History<R, C, G> {
-        History {
-            root: self.root,
-            next: self.next,
-            saved: self.saved,
-            record: self.record.map_and_connect(f),
-            branches: self.branches,
-        }
-    }
-
-    /// Removes and returns the slot.
-    #[inline]
-    pub fn disconnect(&mut self) -> Option<F> {
-        self.record.disconnect()
-    }
-
-    /// Returns `true` if the history can undo.
-    #[inline]
-    pub fn can_undo(&self) -> bool {
-        self.record.can_undo()
-    }
-
-    /// Returns `true` if the history can redo.
-    #[inline]
-    pub fn can_redo(&self) -> bool {
-        self.record.can_redo()
-    }
-
     /// Marks the receiver as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         self.record.set_saved(saved);
         self.saved = None;
-    }
-
-    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.record.is_saved()
     }
 
     /// Revert the changes done to the receiver since the saved state.
@@ -220,18 +260,6 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
             self.saved
                 .and_then(|saved| self.go_to(saved.branch, saved.current))
         }
-    }
-
-    /// Returns the current branch.
-    #[inline]
-    pub fn root(&self) -> usize {
-        self.root
-    }
-
-    /// Returns the position of the current command.
-    #[inline]
-    pub fn current(&self) -> usize {
-        self.record.current()
     }
 
     /// Removes all commands from the history without undoing them.
@@ -251,8 +279,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the state of the history is left unchanged.
+    /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -308,8 +335,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned
-    /// and the state of the history is left unchanged.
+    /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
@@ -321,8 +347,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// and sets the next one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned
-    /// and the state of the history is left unchanged.
+    /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
@@ -333,8 +358,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
-    /// and the state of the history is left unchanged.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
@@ -407,8 +431,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -417,44 +440,6 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
             self.apply(command)?;
         }
         Ok(())
-    }
-
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a queue.
-    #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
-        Queue::from(self)
-    }
-
-    /// Returns a reference to the `receiver`.
-    #[inline]
-    pub fn as_receiver(&self) -> &R {
-        self.record.as_receiver()
-    }
-
-    /// Returns a mutable reference to the `receiver`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.record.as_mut_receiver()
-    }
-
-    /// Consumes the history, returning the `receiver`.
-    #[inline]
-    pub fn into_receiver(self) -> R {
-        self.record.into_receiver()
-    }
-
-    /// Returns an iterator over the commands in the current branch.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &C> {
-        self.record.commands()
     }
 
     /// Sets the `root`.
@@ -539,7 +524,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     }
 }
 
-impl<R, C: Command<R> + ToString, F: FnMut(Signal)> History<R, C, F> {
+impl<R, C: ToString, F> History<R, C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -563,35 +548,35 @@ impl<R, C: Command<R> + ToString, F: FnMut(Signal)> History<R, C, F> {
     }
 }
 
-impl<R: Default, C: Command<R>> Default for History<R, C> {
+impl<R: Default, C> Default for History<R, C> {
     #[inline]
     fn default() -> History<R, C> {
         History::new(R::default())
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for History<R, C, F> {
+impl<R, C, F> AsRef<R> for History<R, C, F> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for History<R, C, F> {
+impl<R, C, F> AsMut<R> for History<R, C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.as_mut_receiver()
     }
 }
 
-impl<R, C: Command<R>> From<R> for History<R, C> {
+impl<R, C> From<R> for History<R, C> {
     #[inline]
     fn from(receiver: R) -> Self {
         History::new(receiver)
     }
 }
 
-impl<R, C: Command<R>, F> From<Record<R, C, F>> for History<R, C, F> {
+impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
     #[inline]
     fn from(record: Record<R, C, F>) -> Self {
         History {
@@ -604,7 +589,7 @@ impl<R, C: Command<R>, F> From<Record<R, C, F>> for History<R, C, F> {
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for History<R, C, F> {
+impl<R, C: fmt::Display, F> fmt::Display for History<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -644,19 +629,7 @@ pub struct HistoryBuilder<R, C> {
     inner: RecordBuilder<R, C>,
 }
 
-impl<R, C: Command<R>> HistoryBuilder<R, C> {
-    /// Builds the history.
-    #[inline]
-    pub fn build(self, receiver: impl Into<R>) -> History<R, C> {
-        History {
-            root: 0,
-            next: 1,
-            saved: None,
-            record: self.inner.build(receiver),
-            branches: FxHashMap::default(),
-        }
-    }
-
+impl<R, C> HistoryBuilder<R, C> {
     /// Sets the capacity for the history.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
@@ -682,20 +655,32 @@ impl<R, C: Command<R>> HistoryBuilder<R, C> {
         self
     }
 
-    /// Builds the history with the slot.
+    /// Builds the history.
     #[inline]
-    pub fn build_and_connect<F>(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
+    pub fn build(self, receiver: impl Into<R>) -> History<R, C> {
         History {
             root: 0,
             next: 1,
             saved: None,
-            record: self.inner.build_and_connect(receiver, slot),
+            record: self.inner.build(receiver),
+            branches: FxHashMap::default(),
+        }
+    }
+
+    /// Builds the history with the slot.
+    #[inline]
+    pub fn build_with<F>(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
+        History {
+            root: 0,
+            next: 1,
+            saved: None,
+            record: self.inner.build_with(receiver, slot),
             branches: FxHashMap::default(),
         }
     }
 }
 
-impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
+impl<R: Default, C> HistoryBuilder<R, C> {
     /// Creates the history with a default `receiver`.
     #[inline]
     pub fn default(self) -> History<R, C> {
@@ -704,8 +689,8 @@ impl<R: Default, C: Command<R>> HistoryBuilder<R, C> {
 
     /// Creates the history with a default `receiver`.
     #[inline]
-    pub fn default_and_connect<F>(self, slot: F) -> History<R, C, F> {
-        self.build_and_connect(R::default(), slot)
+    pub fn default_with<F>(self, slot: F) -> History<R, C, F> {
+        self.build_with(R::default(), slot)
     }
 }
 

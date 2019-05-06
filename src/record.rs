@@ -93,7 +93,7 @@ impl<R, C> Record<R, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
+impl<R, C, F> Record<R, C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -121,12 +121,103 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         self.commands.is_empty()
     }
 
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn current(&self) -> usize {
+        self.current
+    }
+
     /// Returns the limit of the record.
     #[inline]
     pub fn limit(&self) -> usize {
         self.limit.get()
     }
 
+    /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous slot is returned if it exists.
+    #[inline]
+    pub fn connect(&mut self, slot: F) -> Option<F> {
+        self.slot.replace(slot)
+    }
+
+    /// Creates a new record that uses the provided slot.
+    #[inline]
+    pub fn connect_with<G>(self, slot: G) -> Record<R, C, G> {
+        Record {
+            commands: self.commands,
+            receiver: self.receiver,
+            current: self.current,
+            limit: self.limit,
+            saved: self.saved,
+            slot: Some(slot),
+        }
+    }
+
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<F> {
+        self.slot.take()
+    }
+
+    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.saved.map_or(false, |saved| saved == self.current())
+    }
+
+    /// Returns `true` if the record can undo.
+    #[inline]
+    pub fn can_undo(&self) -> bool {
+        self.current() > 0
+    }
+
+    /// Returns `true` if the record can redo.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        self.current() < self.len()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
+        Queue::from(self)
+    }
+
+    /// Returns a reference to the `receiver`.
+    #[inline]
+    pub fn as_receiver(&self) -> &R {
+        &self.receiver
+    }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        &mut self.receiver
+    }
+
+    /// Consumes the record, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> R {
+        self.receiver
+    }
+
+    /// Returns an iterator over the commands in the record.
+    #[inline]
+    pub fn commands(&self) -> impl Iterator<Item = &C> {
+        self.commands.iter().map(|meta| &meta.command)
+    }
+}
+
+impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Sets the limit of the record and returns the new limit.
     ///
     /// If this limit is reached it will start popping of commands at the beginning
@@ -170,58 +261,6 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         self.limit()
     }
 
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
-    #[inline]
-    pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.replace(slot)
-    }
-
-    /// Creates a new record that uses the provided slot.
-    #[inline]
-    pub fn set_and_connect<G>(self, slot: G) -> Record<R, C, G> {
-        Record {
-            commands: self.commands,
-            receiver: self.receiver,
-            current: self.current,
-            limit: self.limit,
-            saved: self.saved,
-            slot: Some(slot),
-        }
-    }
-
-    /// Creates a new record by taking a closure that maps the current slot.
-    #[inline]
-    pub fn map_and_connect<G>(self, f: impl FnOnce(F) -> G) -> Record<R, C, G> {
-        Record {
-            commands: self.commands,
-            receiver: self.receiver,
-            current: self.current,
-            limit: self.limit,
-            saved: self.saved,
-            slot: self.slot.map(f),
-        }
-    }
-
-    /// Removes and returns the slot.
-    #[inline]
-    pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.take()
-    }
-
-    /// Returns `true` if the record can undo.
-    #[inline]
-    pub fn can_undo(&self) -> bool {
-        self.current() > 0
-    }
-
-    /// Returns `true` if the record can redo.
-    #[inline]
-    pub fn can_redo(&self) -> bool {
-        self.current() < self.len()
-    }
-
     /// Marks the receiver as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
@@ -243,22 +282,10 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         }
     }
 
-    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.current())
-    }
-
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
     pub fn revert(&mut self) -> Option<Result<(), C::Error>> {
         self.saved.and_then(|saved| self.go_to(saved))
-    }
-
-    /// Returns the position of the current command.
-    #[inline]
-    pub fn current(&self) -> usize {
-        self.current
     }
 
     /// Removes all commands from the record without undoing them.
@@ -286,8 +313,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Pushes the command on top of the record and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -363,8 +389,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
@@ -409,8 +434,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// the next one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when applying [`redo`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
@@ -453,8 +477,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
@@ -545,47 +568,9 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
         }
         Ok(())
     }
-
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a queue.
-    #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
-        Queue::from(self)
-    }
-
-    /// Returns a reference to the `receiver`.
-    #[inline]
-    pub fn as_receiver(&self) -> &R {
-        &self.receiver
-    }
-
-    /// Returns a mutable reference to the `receiver`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        &mut self.receiver
-    }
-
-    /// Consumes the record, returning the `receiver`.
-    #[inline]
-    pub fn into_receiver(self) -> R {
-        self.receiver
-    }
-
-    /// Returns an iterator over the commands in the record.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &C> {
-        self.commands.iter().map(|meta| &meta.command)
-    }
 }
 
-impl<R, C: Command<R> + ToString, F: FnMut(Signal)> Record<R, C, F> {
+impl<R, C: ToString, F> Record<R, C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -617,42 +602,42 @@ impl<R, C: Command<R> + ToString, F: FnMut(Signal)> Record<R, C, F> {
     }
 }
 
-impl<R: Default, C: Command<R>> Default for Record<R, C> {
+impl<R: Default, C> Default for Record<R, C> {
     #[inline]
     fn default() -> Record<R, C> {
         Record::new(R::default())
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsRef<R> for Record<R, C, F> {
+impl<R, C, F> AsRef<R> for Record<R, C, F> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> AsMut<R> for Record<R, C, F> {
+impl<R, C, F> AsMut<R> for Record<R, C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.as_mut_receiver()
     }
 }
 
-impl<R, C: Command<R>> From<R> for Record<R, C> {
+impl<R, C> From<R> for Record<R, C> {
     #[inline]
     fn from(receiver: R) -> Record<R, C> {
         Record::new(receiver)
     }
 }
 
-impl<R, C: Command<R>, F> From<History<R, C, F>> for Record<R, C, F> {
+impl<R, C, F> From<History<R, C, F>> for Record<R, C, F> {
     #[inline]
     fn from(history: History<R, C, F>) -> Record<R, C, F> {
         history.record
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display for Record<R, C, F> {
+impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -688,20 +673,7 @@ pub struct RecordBuilder<R, C> {
     saved: bool,
 }
 
-impl<R, C: Command<R>> RecordBuilder<R, C> {
-    /// Builds the record.
-    #[inline]
-    pub fn build(self, receiver: impl Into<R>) -> Record<R, C> {
-        Record {
-            commands: VecDeque::with_capacity(self.capacity),
-            receiver: receiver.into(),
-            current: 0,
-            limit: self.limit,
-            saved: if self.saved { Some(0) } else { None },
-            slot: None,
-        }
-    }
-
+impl<R, C> RecordBuilder<R, C> {
     /// Sets the capacity for the record.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
@@ -727,9 +699,22 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
         self
     }
 
+    /// Builds the record.
+    #[inline]
+    pub fn build(self, receiver: impl Into<R>) -> Record<R, C> {
+        Record {
+            commands: VecDeque::with_capacity(self.capacity),
+            receiver: receiver.into(),
+            current: 0,
+            limit: self.limit,
+            saved: if self.saved { Some(0) } else { None },
+            slot: None,
+        }
+    }
+
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_and_connect<F>(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
+    pub fn build_with<F>(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
@@ -741,7 +726,7 @@ impl<R, C: Command<R>> RecordBuilder<R, C> {
     }
 }
 
-impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
+impl<R: Default, C> RecordBuilder<R, C> {
     /// Creates the record with a default `receiver`.
     #[inline]
     pub fn default(self) -> Record<R, C> {
@@ -750,8 +735,8 @@ impl<R: Default, C: Command<R>> RecordBuilder<R, C> {
 
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default_and_connect<F>(self, slot: F) -> Record<R, C, F> {
-        self.build_and_connect(R::default(), slot)
+    pub fn default_with<F>(self, slot: F) -> Record<R, C, F> {
+        self.build_with(R::default(), slot)
     }
 }
 

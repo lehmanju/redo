@@ -1,4 +1,4 @@
-use crate::{At, Command, History, Meta, Record, Signal};
+use crate::{At, History, Meta, Record};
 use bitflags::bitflags;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -81,7 +81,7 @@ impl<T> Display<'_, T> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Display<'_, History<R, C, F>> {
+impl<R, C, F> Display<'_, History<R, C, F>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
@@ -90,7 +90,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Display<'_, History<R, C, F>> {
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> Display<'_, Record<R, C, F>> {
+impl<R, C: fmt::Display, F> Display<'_, Record<R, C, F>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<C>) -> fmt::Result {
         self.view.mark(f, 0)?;
@@ -126,7 +126,7 @@ impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> Display<'_, Record<R, C,
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> Display<'_, History<R, C, F>> {
+impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -217,9 +217,7 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display
-    for Display<'_, Record<R, C, F>>
-{
+impl<R, C: fmt::Display, F> fmt::Display for Display<'_, Record<R, C, F>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -233,9 +231,7 @@ impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display
     }
 }
 
-impl<R, C: Command<R> + fmt::Display, F: FnMut(Signal)> fmt::Display
-    for Display<'_, History<R, C, F>>
-{
+impl<R, C: fmt::Display, F> fmt::Display for Display<'_, History<R, C, F>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
