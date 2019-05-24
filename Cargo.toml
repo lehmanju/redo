@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 bitflags = "1"
-chrono = { version = "0.4.6", optional = true, features = ["serde"] }
+chrono = { version = "0.4.7", optional = true, features = ["serde"] }
 colored = "1"
 rustc-hash = "1"
 serde = { version = "1", optional = true, features = ["derive"] }

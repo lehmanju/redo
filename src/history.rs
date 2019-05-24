@@ -4,7 +4,7 @@ use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::vec_deque::VecDeque, fmt};
+use std::{collections::VecDeque, fmt};
 
 /// A history of commands.
 ///

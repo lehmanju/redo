@@ -1,7 +1,7 @@
 use crate::{Checkpoint, Command, Display, History, Merge, Meta, Queue, Signal};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::vec_deque::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
+use std::{collections::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},

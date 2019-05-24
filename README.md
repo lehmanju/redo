@@ -83,7 +83,7 @@ fn main() -> Result<(), &'static str> {
 }
 ```
 
-## License
+### License
 
 Licensed under either of
 
