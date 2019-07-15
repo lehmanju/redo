@@ -1,5 +1,4 @@
 use crate::{At, History, Meta, Record};
-use bitflags::bitflags;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use colored::{Color, Colorize};
@@ -39,21 +38,21 @@ impl<T> Display<'_, T> {
     /// Show colored output (off by default).
     #[inline]
     pub fn colored(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::COLORED, on);
+        self.view.colored = on;
         self
     }
 
     /// Show the current position in the output (on by default).
     #[inline]
     pub fn current(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::CURRENT, on);
+        self.view.current = on;
         self
     }
 
     /// Show detailed output (on by default).
     #[inline]
     pub fn detailed(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::DETAILED, on);
+        self.view.detailed = on;
         self
     }
 
@@ -62,21 +61,21 @@ impl<T> Display<'_, T> {
     /// The ligatures might only work as expected with monospaced fonts.
     #[inline]
     pub fn ligatures(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::LIGATURES, on);
+        self.view.ligatures = on;
         self
     }
 
     /// Show the position of the command (on by default).
     #[inline]
     pub fn position(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::POSITION, on);
+        self.view.position = on;
         self
     }
 
     /// Show the saved command (on by default).
     #[inline]
     pub fn saved(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::SAVED, on);
+        self.view.saved = on;
         self
     }
 }
@@ -85,7 +84,7 @@ impl<R, C, F> Display<'_, History<R, C, F>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
-        self.view.set(View::GRAPH, on);
+        self.view.graph = on;
         self
     }
 }
@@ -95,7 +94,7 @@ impl<R, C: fmt::Display, F> Display<'_, Record<R, C, F>> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<C>) -> fmt::Result {
         self.view.mark(f, 0)?;
         self.view.position(f, at, false)?;
-        if self.view.contains(View::DETAILED) {
+        if self.view.detailed {
             #[cfg(feature = "chrono")]
             self.view.timestamp(f, &meta.timestamp)?;
         }
@@ -115,7 +114,7 @@ impl<R, C: fmt::Display, F> Display<'_, Record<R, C, F>> {
                 current: saved,
             }),
         )?;
-        if self.view.contains(View::DETAILED) {
+        if self.view.detailed {
             writeln!(f)?;
             self.view.message(f, meta, 0)
         } else {
@@ -137,7 +136,7 @@ impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
     ) -> fmt::Result {
         self.view.mark(f, level)?;
         self.view.position(f, at, true)?;
-        if self.view.contains(View::DETAILED) {
+        if self.view.detailed {
             #[cfg(feature = "chrono")]
             self.view.timestamp(f, &meta.timestamp)?;
         }
@@ -161,7 +160,7 @@ impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
                 })
                 .or(self.data.saved),
         )?;
-        if self.view.contains(View::DETAILED) {
+        if self.view.detailed {
             writeln!(f)?;
             self.view.message(f, meta, level)
         } else {
@@ -239,7 +238,7 @@ impl<R, C: fmt::Display, F> fmt::Display for Display<'_, History<R, C, F>> {
                 branch: self.data.root(),
                 current: i + 1,
             };
-            if self.view.contains(View::GRAPH) {
+            if self.view.graph {
                 self.fmt_graph(f, at, cmd, 0)?;
             } else {
                 self.fmt_list(f, at, cmd, 0)?;
@@ -249,22 +248,29 @@ impl<R, C: fmt::Display, F> fmt::Display for Display<'_, History<R, C, F>> {
     }
 }
 
-bitflags! {
-    struct View: u8 {
-        const COLORED   = 0b_0000_0001;
-        const CURRENT   = 0b_0000_0010;
-        const DETAILED  = 0b_0000_0100;
-        const GRAPH     = 0b_0000_1000;
-        const LIGATURES = 0b_0001_0000;
-        const POSITION  = 0b_0010_0000;
-        const SAVED     = 0b_0100_0000;
-    }
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+struct View {
+    colored: bool,
+    current: bool,
+    detailed: bool,
+    graph: bool,
+    ligatures: bool,
+    position: bool,
+    saved: bool,
 }
 
 impl Default for View {
     #[inline]
     fn default() -> Self {
-        View::CURRENT | View::DETAILED | View::POSITION | View::SAVED
+        View {
+            colored: false,
+            current: true,
+            detailed: true,
+            graph: false,
+            ligatures: false,
+            position: true,
+            saved: true,
+        }
     }
 }
 
@@ -273,7 +279,7 @@ impl View {
     fn message(self, f: &mut fmt::Formatter, msg: &impl ToString, level: usize) -> fmt::Result {
         let msg = msg.to_string();
         let lines = msg.lines();
-        if self.contains(View::DETAILED) {
+        if self.detailed {
             for line in lines {
                 for i in 0..=level {
                     self.edge(f, i)?;
@@ -289,7 +295,7 @@ impl View {
 
     #[inline]
     fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+        match (self.colored, self.ligatures) {
             (true, true) => write!(f, "{}", "\u{25CF}".color(color(level))),
             (true, false) => write!(f, "{}", "*".color(color(level))),
             (false, true) => f.write_char('\u{25CF}'),
@@ -299,7 +305,7 @@ impl View {
 
     #[inline]
     fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+        match (self.colored, self.ligatures) {
             (true, true) => write!(f, "{}", "\u{2502}".color(color(level))),
             (true, false) => write!(f, "{}", "|".color(color(level))),
             (false, true) => f.write_char('\u{2502}'),
@@ -309,7 +315,7 @@ impl View {
 
     #[inline]
     fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+        match (self.colored, self.ligatures) {
             (true, true) => write!(
                 f,
                 "{}{}{}",
@@ -330,8 +336,8 @@ impl View {
 
     #[inline]
     fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
-        if self.contains(View::POSITION) {
-            if self.contains(View::COLORED) {
+        if self.position {
+            if self.colored {
                 let position = if use_branch {
                     format!("[{}:{}]", at.branch, at.current)
                 } else {
@@ -350,8 +356,8 @@ impl View {
 
     #[inline]
     fn current(self, f: &mut fmt::Formatter, at: At, current: At) -> fmt::Result {
-        if self.contains(View::CURRENT) && at == current {
-            if self.contains(View::COLORED) {
+        if self.current && at == current {
+            if self.colored {
                 write!(f, " {}{}{}", "(".yellow(), "current".cyan(), ")".yellow())
             } else {
                 f.write_str(" (current)")
@@ -363,8 +369,8 @@ impl View {
 
     #[inline]
     fn saved(self, f: &mut fmt::Formatter, at: At, saved: Option<At>) -> fmt::Result {
-        if self.contains(View::SAVED) && saved.map_or(false, |saved| saved == at) {
-            if self.contains(View::COLORED) {
+        if self.saved && saved.map_or(false, |saved| saved == at) {
+            if self.colored {
                 write!(
                     f,
                     " {}{}{}",
@@ -383,7 +389,7 @@ impl View {
     #[inline]
     #[cfg(feature = "chrono")]
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
-        if self.contains(View::COLORED) {
+        if self.colored {
             write!(
                 f,
                 " {}{}{}",
