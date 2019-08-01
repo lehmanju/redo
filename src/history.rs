@@ -99,6 +99,12 @@ impl<R, C, F> History<R, C, F> {
         self.record.capacity()
     }
 
+    /// Shrinks the capacity of the history as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.record.shrink_to_fit();
+    }
+
     /// Returns the number of commands in the current branch of the history.
     #[inline]
     pub fn len(&self) -> usize {
