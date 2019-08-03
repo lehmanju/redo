@@ -32,7 +32,7 @@ use std::{collections::VecDeque, fmt};
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
 /// history.apply(Add('c'))?;
-/// let abc = history.root();
+/// let abc = history.branch();
 /// history.go_to(abc, 1).unwrap()?;
 /// history.apply(Add('f'))?;
 /// history.apply(Add('g'))?;
@@ -169,7 +169,7 @@ impl<R, C, F> History<R, C, F> {
 
     /// Returns the current branch.
     #[inline]
-    pub fn root(&self) -> usize {
+    pub fn branch(&self) -> usize {
         self.root
     }
 
@@ -236,7 +236,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         let len = self.len();
         let limit = self.record.set_limit(limit);
         let diff = len - self.len();
-        let root = self.root();
+        let root = self.branch();
         for current in 0..diff {
             self.rm_child(root, current);
         }
@@ -271,14 +271,14 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Removes all commands from the history without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        let old = self.root();
+        let old = self.branch();
         self.root = 0;
         self.next = 1;
         self.saved = None;
         self.record.clear();
         self.branches.clear();
         if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Root { old, new: 0 });
+            slot(Signal::Branch { old, new: 0 });
         }
     }
 
@@ -295,7 +295,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         let (merged, commands) = self.record.__apply(Meta::from(command))?;
         // Check if the limit has been reached.
         if !merged && current == self.current() {
-            let root = self.root();
+            let root = self.branch();
             self.rm_child(root, 0);
             for branch in self
                 .branches
@@ -307,7 +307,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         }
         // Handle new branch.
         if !commands.is_empty() {
-            let old = self.root();
+            let old = self.branch();
             let new = self.next;
             self.next += 1;
             self.branches.insert(
@@ -331,7 +331,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
                 _ => unreachable!(),
             }
             if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Root { old, new });
+                slot(Signal::Branch { old, new });
             }
         }
         Ok(())
@@ -376,7 +376,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         }
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
-            let old = self.root();
+            let old = self.branch();
             // Walk to `branch.current` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.current).unwrap() {
                 return Some(Err(err));
@@ -419,7 +419,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
         if let Err(err) = self.record.go_to(current)? {
             return Some(Err(err));
         } else if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Root {
+            slot(Signal::Branch {
                 old: root,
                 new: self.root,
             });
@@ -453,7 +453,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Sets the `root`.
     #[inline]
     fn set_root(&mut self, root: usize, current: usize) {
-        let old = self.root();
+        let old = self.branch();
         self.root = root;
         debug_assert_ne!(old, root);
         // Handle the child branches.
@@ -518,11 +518,11 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
-        debug_assert_ne!(self.root(), to);
+        debug_assert_ne!(self.branch(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
         let mut path = vec![(to, dest)];
-        while i != self.root() {
+        while i != self.branch() {
             dest = self.branches.remove(&i).unwrap();
             to = i;
             i = dest.parent.branch;
@@ -749,38 +749,38 @@ mod tests {
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
-        let abcde = history.root();
+        let abcde = history.branch();
         history.apply(Add('f')).unwrap();
         history.apply(Add('g')).unwrap();
         assert_eq!(history.as_receiver(), "abcfg");
         history.undo().unwrap().unwrap();
-        let abcfg = history.root();
+        let abcfg = history.branch();
         history.apply(Add('h')).unwrap();
         history.apply(Add('i')).unwrap();
         history.apply(Add('j')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let abcfhij = history.root();
+        let abcfhij = history.branch();
         history.apply(Add('k')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let abcfhik = history.root();
+        let abcfhik = history.branch();
         history.apply(Add('l')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhil");
         history.apply(Add('m')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhilm");
-        let abcfhilm = history.root();
+        let abcfhilm = history.branch();
         history.go_to(abcde, 2).unwrap().unwrap();
         history.apply(Add('n')).unwrap();
         history.apply(Add('o')).unwrap();
         assert_eq!(history.as_receiver(), "abno");
         history.undo().unwrap().unwrap();
-        let abno = history.root();
+        let abno = history.branch();
         history.apply(Add('p')).unwrap();
         history.apply(Add('q')).unwrap();
         assert_eq!(history.as_receiver(), "abnpq");
 
-        let abnpq = history.root();
+        let abnpq = history.branch();
         history.go_to(abcde, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcde");
         history.go_to(abcfg, 5).unwrap().unwrap();

@@ -144,7 +144,7 @@ impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
             f,
             at,
             At {
-                branch: self.data.root(),
+                branch: self.data.branch(),
                 current: self.data.current(),
             },
         )?;
@@ -155,7 +155,7 @@ impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
                 .record
                 .saved
                 .map(|saved| At {
-                    branch: self.data.root(),
+                    branch: self.data.branch(),
                     current: saved,
                 })
                 .or(self.data.saved),
@@ -235,7 +235,7 @@ impl<R, C: fmt::Display, F> fmt::Display for Display<'_, History<R, C, F>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
             let at = At {
-                branch: self.data.root(),
+                branch: self.data.branch(),
                 current: i + 1,
             };
             if self.view.graph {

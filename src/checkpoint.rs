@@ -246,7 +246,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Checkpoint<'_, History<R, C, F>, C> {
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
-        let root = self.inner.root();
+        let root = self.inner.branch();
         let old = self.inner.current();
         self.inner.apply(command)?;
         self.stack.push(Action::GoTo(root, old));
@@ -286,7 +286,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Checkpoint<'_, History<R, C, F>, C> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<(), C::Error>> {
-        let root = self.inner.root();
+        let root = self.inner.branch();
         let old = self.inner.current();
         match self.inner.go_to(branch, current) {
             Some(Ok(_)) => {
