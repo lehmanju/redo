@@ -77,9 +77,7 @@ impl<R, C> History<R, C> {
     /// Returns a builder for a history.
     #[inline]
     pub fn builder() -> HistoryBuilder<R, C> {
-        HistoryBuilder {
-            inner: Record::builder(),
-        }
+        HistoryBuilder::new()
     }
 }
 
@@ -638,6 +636,14 @@ pub struct HistoryBuilder<R, C> {
 }
 
 impl<R, C> HistoryBuilder<R, C> {
+    /// Returns a builder for a history.
+    #[inline]
+    pub fn new() -> HistoryBuilder<R, C> {
+        HistoryBuilder {
+            inner: Record::builder(),
+        }
+    }
+
     /// Sets the capacity for the history.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
@@ -685,6 +691,13 @@ impl<R, C> HistoryBuilder<R, C> {
             record: self.inner.build_with(receiver, slot),
             branches: FxHashMap::default(),
         }
+    }
+}
+
+impl<R, C> Default for HistoryBuilder<R, C> {
+    #[inline]
+    fn default() -> Self {
+        HistoryBuilder::new()
     }
 }
 
