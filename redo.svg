@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-    <text fill="#4c7eb3" dominant-baseline="text-before-edge" font-size="120" font-family="Times New Roman" font-weight="lighter">
-        red<tspan alignment-baseline="text-before-edge" fill="#c45eaa">↻</tspan>
+    <text fill="#4c7eb3" dominant-baseline="text-before-edge" font-size="120" font-family="Times New Roman" font-weight="lighter" style="stroke: #3c6590;">
+        red<tspan alignment-baseline="text-before-edge" fill="#c45eaa" style="stroke: #9c4987">↻</tspan>
     </text>
 </svg>
