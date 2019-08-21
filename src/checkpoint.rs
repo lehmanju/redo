@@ -1,4 +1,4 @@
-use crate::{Command, History, Meta, Queue, Record, Signal};
+use crate::{Command, Entry, History, Queue, Record, Signal};
 use std::collections::VecDeque;
 
 /// A checkpoint wrapper.
@@ -103,7 +103,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Checkpoint<'_, Record<R, C, F>, C> {
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
-        let (_, v) = self.inner.__apply(Meta::from(command))?;
+        let (_, v) = self.inner.__apply(Entry::from(command))?;
         self.stack.push(Action::Apply(v));
         Ok(())
     }
@@ -382,7 +382,7 @@ impl<R, C, F> AsMut<R> for Checkpoint<'_, History<R, C, F>, C> {
 /// An action that can be applied to a Record or History.
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
-    Apply(VecDeque<Meta<C>>),
+    Apply(VecDeque<Entry<C>>),
     Undo,
     Redo,
     GoTo(usize, usize),

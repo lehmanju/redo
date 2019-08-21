@@ -267,16 +267,16 @@ struct At {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Meta<C> {
+struct Entry<C> {
     command: C,
     #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
 
-impl<C> From<C> for Meta<C> {
+impl<C> From<C> for Entry<C> {
     #[inline]
     fn from(command: C) -> Self {
-        Meta {
+        Entry {
             command,
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
@@ -284,7 +284,7 @@ impl<C> From<C> for Meta<C> {
     }
 }
 
-impl<R, C: Command<R>> Command<R> for Meta<C> {
+impl<R, C: Command<R>> Command<R> for Entry<C> {
     type Error = C::Error;
 
     #[inline]
@@ -309,7 +309,7 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     {
         match self.command.merge(command.command) {
             Merge::Yes => Merge::Yes,
-            Merge::No(command) => Merge::No(Meta::from(command)),
+            Merge::No(command) => Merge::No(Entry::from(command)),
             Merge::Annul => Merge::Annul,
         }
     }
@@ -320,7 +320,7 @@ impl<R, C: Command<R>> Command<R> for Meta<C> {
     }
 }
 
-impl<C: fmt::Display> fmt::Display for Meta<C> {
+impl<C: fmt::Display> fmt::Display for Entry<C> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)
