@@ -1,7 +1,11 @@
-use crate::{Checkpoint, Command, Display, Entry, History, Merge, Queue, Signal};
+#[cfg(feature = "display")]
+use crate::Display;
+use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Signal};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt, marker::PhantomData, num::NonZeroUsize};
+#[cfg(feature = "display")]
+use std::fmt;
+use std::{collections::VecDeque, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
@@ -597,6 +601,7 @@ impl<R, C: ToString, F> Record<R, C, F> {
 
     /// Returns a structure for configurable formatting of the record.
     #[inline]
+    #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
@@ -637,6 +642,7 @@ impl<R, C, F> From<History<R, C, F>> for Record<R, C, F> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

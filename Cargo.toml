@@ -14,13 +14,17 @@ edition = "2018"
 
 [dependencies]
 chrono = { version = "0.4.7", optional = true, features = ["serde"] }
-colored = "1"
+colored = { version = "1", optional = true }
 rustc-hash = "1"
 serde = { version = "1", optional = true, features = ["derive"] }
+
+[features]
+default = []
+display = ["colored"]
 
 [badges]
 travis-ci = { repository = "evenorog/redo" }
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["chrono", "serde"]
+features = ["chrono", "display", "serde"]

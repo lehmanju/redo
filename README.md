@@ -22,7 +22,7 @@ but is more focused on performance instead of ease of use.
 * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-* Configurable display formatting is provided through the [Display] structure.
+* Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 
@@ -104,6 +104,5 @@ additional terms or conditions.
 [History]: https://docs.rs/redo/latest/redo/struct.History.html
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
-[Display]: https://docs.rs/undo/latest/undo/struct.Display.html
 [merge]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
 [undo]: https://github.com/evenorog/undo

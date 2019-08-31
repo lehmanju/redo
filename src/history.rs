@@ -1,10 +1,14 @@
-use crate::{At, Checkpoint, Command, Display, Entry, Queue, Record, RecordBuilder, Signal};
+#[cfg(feature = "display")]
+use crate::Display;
+use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt};
+use std::collections::VecDeque;
+#[cfg(feature = "display")]
+use std::fmt;
 
 /// A history of commands.
 ///
@@ -549,6 +553,7 @@ impl<R, C: ToString, F> History<R, C, F> {
 
     /// Returns a structure for configurable formatting of the record.
     #[inline]
+    #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
@@ -595,6 +600,7 @@ impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R, C: fmt::Display, F> fmt::Display for History<R, C, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -16,7 +16,7 @@
 //! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-//! * Configurable display formatting is provided through the [Display] structure.
+//! * Configurable display formatting is provided when the `display` feature is enabled.
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //! * Serialization and deserialization is provided when the `serde` feature is enabled.
 //!
@@ -83,7 +83,6 @@
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
-//! [Display]: struct.Display.html
 //! [merge]: trait.Command.html#method.merge
 //! [undo]: https://github.com/evenorog/undo
 
@@ -99,6 +98,7 @@
 )]
 
 mod checkpoint;
+#[cfg(feature = "display")]
 mod display;
 mod history;
 mod queue;
@@ -110,9 +110,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+#[cfg(feature = "display")]
+pub use self::display::Display;
 pub use self::{
     checkpoint::Checkpoint,
-    display::Display,
     history::{History, HistoryBuilder},
     queue::Queue,
     record::{Record, RecordBuilder},
