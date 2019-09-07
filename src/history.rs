@@ -552,6 +552,8 @@ impl<R, C: ToString, F> History<R, C, F> {
     }
 
     /// Returns a structure for configurable formatting of the record.
+    ///
+    /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
