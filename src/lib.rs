@@ -237,16 +237,16 @@ pub enum Signal {
     },
     /// Says if the current branch has changed.
     ///
-    /// This is only emitted from `History`.
+    /// This is currently only emitted from `History`.
     Branch {
-        /// The old root.
+        /// The old branch.
         old: usize,
-        /// The new root.
+        /// The new branch.
         new: usize,
     },
 }
 
-/// The result of merging two commands.
+/// Says if the command have been merged with another command.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Merge<C> {
