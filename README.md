@@ -1,6 +1,6 @@
 ![redo](https://raw.githubusercontent.com/evenorog/redo/master/redo.svg?sanitize=true)
 
-[![Travis](https://travis-ci.org/evenorog/redo.svg?branch=master)](https://travis-ci.org/evenorog/redo)
+[![Travis](https://travis-ci.com/evenorog/redo.svg?branch=master)](https://travis-ci.com/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
