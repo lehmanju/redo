@@ -1,14 +1,13 @@
 #[cfg(feature = "display")]
 use crate::Display;
 use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Signal};
-use alloc::collections::VecDeque;
+use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use core::fmt;
-use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +63,7 @@ pub struct History<R, C, F = fn(Signal)> {
     next: usize,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<R, C, F>,
-    pub(crate) branches: FxHashMap<usize, Branch<C>>,
+    pub(crate) branches: BTreeMap<usize, Branch<C>>,
 }
 
 impl<R, C> History<R, C> {
@@ -76,7 +75,7 @@ impl<R, C> History<R, C> {
             next: 1,
             saved: None,
             record: Record::new(receiver),
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 
@@ -599,7 +598,7 @@ impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
             next: 1,
             saved: None,
             record,
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 }
@@ -700,7 +699,7 @@ impl<R, C> HistoryBuilder<R, C> {
             next: 1,
             saved: None,
             record: self.inner.build(receiver),
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 
@@ -712,7 +711,7 @@ impl<R, C> HistoryBuilder<R, C> {
             next: 1,
             saved: None,
             record: self.inner.build_with(receiver, slot),
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 }
