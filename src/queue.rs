@@ -1,4 +1,5 @@
 use crate::{Checkpoint, Command, History, Record, Signal};
+use alloc::vec::Vec;
 
 /// A command queue wrapper.
 ///
@@ -289,12 +290,12 @@ enum Action<C> {
 #[cfg(test)]
 mod tests {
     use crate::{Command, Record};
-    use std::error;
+    use alloc::string::String;
 
     struct Add(char);
 
     impl Command<String> for Add {
-        type Error = Box<dyn error::Error>;
+        type Error = &'static str;
 
         fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
             s.push(self.0);

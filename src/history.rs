@@ -1,14 +1,16 @@
 #[cfg(feature = "display")]
 use crate::Display;
 use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Signal};
+use alloc::collections::VecDeque;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
+use core::fmt;
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-#[cfg(feature = "display")]
-use std::fmt;
 
 /// A history of commands.
 ///
@@ -56,7 +58,7 @@ use std::fmt;
         deserialize = "R: Deserialize<'de>, C: Deserialize<'de>"
     ))
 )]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct History<R, C, F = fn(Signal)> {
     root: usize,
     next: usize,
@@ -602,6 +604,19 @@ impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
     }
 }
 
+impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for History<R, C, F> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("History")
+            .field("root", &self.root)
+            .field("next", &self.next)
+            .field("saved", &self.saved)
+            .field("record", &self.record)
+            .field("branches", &self.branches)
+            .finish()
+    }
+}
+
 #[cfg(feature = "display")]
 impl<R, C: fmt::Display, F> fmt::Display for History<R, C, F> {
     #[inline]
@@ -726,6 +741,7 @@ impl<R: Default, C> HistoryBuilder<R, C> {
 #[cfg(test)]
 mod tests {
     use crate::{Command, History};
+    use alloc::string::String;
 
     struct Add(char);
 

@@ -1,15 +1,17 @@
 #[cfg(feature = "display")]
 use crate::Display;
 use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Signal};
+use alloc::collections::VecDeque;
+use alloc::string::{String, ToString};
+use core::fmt;
+use core::marker::PhantomData;
+use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "display")]
-use std::fmt;
-use std::{collections::VecDeque, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
-    std::cmp::Ordering,
+    core::cmp::Ordering,
 };
 
 #[allow(unsafe_code)]
@@ -59,7 +61,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Record<R, C, F = fn(Signal)> {
     pub(crate) commands: VecDeque<Entry<C>>,
     receiver: R,
@@ -644,6 +646,19 @@ impl<R, C, F> From<History<R, C, F>> for Record<R, C, F> {
     }
 }
 
+impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for Record<R, C, F> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Record")
+            .field("commands", &self.commands)
+            .field("receiver", &self.receiver)
+            .field("current", &self.current)
+            .field("limit", &self.limit)
+            .field("saved", &self.saved)
+            .finish()
+    }
+}
+
 #[cfg(feature = "display")]
 impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
     #[inline]
@@ -770,6 +785,7 @@ impl<R: Default, C> RecordBuilder<R, C> {
 #[cfg(test)]
 mod tests {
     use crate::{Command, Record};
+    use alloc::string::String;
 
     struct Add(char);
 

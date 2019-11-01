@@ -86,6 +86,7 @@
 //! [merge]: trait.Command.html#method.merge
 //! [undo]: https://github.com/evenorog/undo
 
+#![no_std]
 #![doc(html_root_url = "https://docs.rs/redo/latest")]
 #![deny(
     bad_style,
@@ -97,6 +98,8 @@
     unstable_features
 )]
 
+extern crate alloc;
+
 mod checkpoint;
 #[cfg(feature = "display")]
 mod display;
@@ -106,9 +109,9 @@ mod record;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
+use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[cfg(feature = "display")]
 pub use self::display::Display;

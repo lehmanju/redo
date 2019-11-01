@@ -1,8 +1,10 @@
 use crate::{At, Entry, History, Record};
+use alloc::format;
+use alloc::string::ToString;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use colored::{Color, Colorize};
-use std::fmt::{self, Write};
+use core::fmt::{self, Write};
 
 /// Configurable display formatting of structures.
 ///
