@@ -2,7 +2,7 @@ use crate::{At, Entry, History, Record};
 use alloc::format;
 use alloc::string::ToString;
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use colored::{Color, Colorize};
 use core::fmt::{self, Write};
 
@@ -396,11 +396,11 @@ impl View {
                 f,
                 " {}{}{}",
                 "[".yellow(),
-                timestamp.to_rfc2822().yellow(),
+                timestamp.with_timezone(&Local).to_rfc2822().yellow(),
                 "]".yellow()
             )
         } else {
-            write!(f, " [{}]", timestamp.to_rfc2822())
+            write!(f, " [{}]", timestamp.with_timezone(&Local).to_rfc2822())
         }
     }
 }
