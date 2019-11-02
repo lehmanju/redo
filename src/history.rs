@@ -57,7 +57,7 @@ use serde::{Deserialize, Serialize};
         deserialize = "R: Deserialize<'de>, C: Deserialize<'de>"
     ))
 )]
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct History<R, C, F = fn(Signal)> {
     root: usize,
     next: usize,
