@@ -19,6 +19,7 @@
 //! * Configurable display formatting is provided when the `display` feature is enabled.
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //! * Serialization and deserialization is provided when the `serde` feature is enabled.
+//! * The library can be used as `no_std` by default.
 //!
 //! # Concepts
 //!
