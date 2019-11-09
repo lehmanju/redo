@@ -6,8 +6,6 @@
 //! it is easy to apply, undo, and redo changes made to a receiver.
 //! Both linear and non-linear undo-redo functionality is provided through
 //! the [Record] and [History] data structures.
-//! This library provides more or less the same functionality as the [undo] library
-//! but is more focused on performance and control instead of ease of use.
 //!
 //! # Contents
 //!
@@ -80,12 +78,10 @@
 //!
 //! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
-//! [Timeline]: struct.Timeline.html
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
 //! [merge]: trait.Command.html#method.merge
-//! [undo]: https://github.com/evenorog/undo
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/redo/latest")]
