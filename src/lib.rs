@@ -44,21 +44,22 @@
 //!
 //! struct Add(char);
 //!
-//! impl Command<String> for Add {
+//! impl Command for Add {
+//!     type Receiver = String;
 //!     type Error = &'static str;
 //!
-//!     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+//!     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 //!         s.push(self.0);
 //!         Ok(())
 //!     }
 //!
-//!     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+//!     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
 //!         self.0 = s.pop().ok_or("`s` is empty")?;
 //!         Ok(())
 //!     }
 //! }
 //!
-//! fn main() -> Result<(), &'static str> {
+//! fn main() -> redo::Result<Add> {
 //!     let mut record = Record::default();
 //!     record.apply(Add('a'))?;
 //!     record.apply(Add('b'))?;
@@ -119,18 +120,23 @@ pub use self::{
     record::{Record, RecordBuilder},
 };
 
+/// A specialized Result type for undo-redo operations.
+pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
+
 /// Base functionality for all commands.
-pub trait Command<R> {
+pub trait Command {
+    /// The receiver type.
+    type Receiver;
     /// The error type.
     type Error;
 
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+    fn apply(&mut self, receiver: &mut Self::Receiver) -> Result<Self>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Self::Error>;
+    fn undo(&mut self, receiver: &mut Self::Receiver) -> Result<Self>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -139,7 +145,7 @@ pub trait Command<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Self::Error> {
+    fn redo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
         self.apply(receiver)
     }
 
@@ -150,27 +156,28 @@ pub trait Command<R> {
     /// # use redo::{Command, Merge, Record};
     /// struct Add(String);
     ///
-    /// impl Command<String> for Add {
+    /// impl Command for Add {
+    ///     type Receiver = String;
     ///     type Error = ();
     ///
-    ///     fn apply(&mut self, s: &mut String) -> Result<(), ()> {
+    ///     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
     ///         s.push_str(&self.0);
     ///         Ok(())
     ///     }
     ///
-    ///     fn undo(&mut self, s: &mut String) -> Result<(), ()> {
+    ///     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
     ///         let len = s.len() - self.0.len();
     ///         s.truncate(len);
     ///         Ok(())
     ///     }
     ///
-    ///     fn merge(&mut self, Add(s): Self) -> Merge<Self> {
+    ///     fn merge(&mut self, Add(s): Self) -> Merge<Add> {
     ///         self.0.push_str(&s);
     ///         Merge::Yes
     ///     }
     /// }
     ///
-    /// fn main() -> Result<(), ()> {
+    /// fn main() -> redo::Result<Add> {
     ///     let mut record = Record::default();
     ///     // The `a`, `b`, and `c` commands are merged.
     ///     record.apply(Add("a".into()))?;
@@ -285,21 +292,22 @@ impl<C> From<C> for Entry<C> {
     }
 }
 
-impl<R, C: Command<R>> Command<R> for Entry<C> {
+impl<C: Command> Command for Entry<C> {
+    type Receiver = C::Receiver;
     type Error = C::Error;
 
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn apply(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
         self.command.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn undo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
         self.command.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), <Self as Command<R>>::Error> {
+    fn redo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
         self.command.redo(receiver)
     }
 

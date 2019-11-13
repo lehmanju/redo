@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, History, Record, Signal};
+use crate::{Checkpoint, Command, History, Record, Result, Signal};
 use alloc::vec::Vec;
 
 /// A command queue wrapper.
@@ -10,18 +10,19 @@ use alloc::vec::Vec;
 /// ```
 /// # use redo::{Command, Record};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
 /// #         Ok(())
 /// #     }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         self.0 = s.pop().ok_or("`s` is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> Result<(), &'static str> {
+/// # fn main() -> redo::Result<Add> {
 /// let mut record = Record::default();
 /// let mut queue = record.queue();
 /// queue.apply(Add('a'));
@@ -124,7 +125,7 @@ impl<T, C> Extend<C> for Queue<'_, T, C> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>, C> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -136,7 +137,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), C::Error> {
+    pub fn commit(self) -> Result<C> {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -162,19 +163,19 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
+    pub fn queue(&mut self) -> Queue<Record<C, F>, C> {
         self.inner.queue()
     }
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
+    pub fn as_receiver(&self) -> &C::Receiver {
         self.inner.as_receiver()
     }
 
@@ -182,26 +183,26 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, Record<R, C, F>, C> {
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
+    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
         self.inner.as_mut_receiver()
     }
 }
 
-impl<R, C, F> AsRef<R> for Queue<'_, Record<R, C, F>, C> {
+impl<C: Command, F> AsRef<C::Receiver> for Queue<'_, Record<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &C::Receiver {
         self.inner.as_ref()
     }
 }
 
-impl<R, C, F> AsMut<R> for Queue<'_, Record<R, C, F>, C> {
+impl<C: Command, F> AsMut<C::Receiver> for Queue<'_, Record<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut C::Receiver {
         self.inner.as_mut()
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>, C> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -213,7 +214,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), C::Error> {
+    pub fn commit(self) -> Result<C> {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -239,19 +240,19 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>, C> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
+    pub fn queue(&mut self) -> Queue<History<C, F>, C> {
         self.inner.queue()
     }
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
+    pub fn as_receiver(&self) -> &C::Receiver {
         self.inner.as_receiver()
     }
 
@@ -259,21 +260,21 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Queue<'_, History<R, C, F>, C> {
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
+    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
         self.inner.as_mut_receiver()
     }
 }
 
-impl<R, C, F> AsRef<R> for Queue<'_, History<R, C, F>, C> {
+impl<C: Command, F> AsRef<C::Receiver> for Queue<'_, History<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &C::Receiver {
         self.inner.as_ref()
     }
 }
 
-impl<R, C, F> AsMut<R> for Queue<'_, History<R, C, F>, C> {
+impl<C: Command, F> AsMut<C::Receiver> for Queue<'_, History<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut C::Receiver {
         self.inner.as_mut()
     }
 }
@@ -289,20 +290,21 @@ enum Action<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, Record};
+    use crate::{Command, Record, Result};
     use alloc::string::String;
 
     struct Add(char);
 
-    impl Command<String> for Add {
+    impl Command for Add {
+        type Receiver = String;
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+        fn apply(&mut self, s: &mut String) -> Result<Add> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+        fn undo(&mut self, s: &mut String) -> Result<Add> {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }

@@ -1,6 +1,6 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Signal};
+use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -21,18 +21,19 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// # use redo::{Command, History};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
 /// #         Ok(())
 /// #     }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         self.0 = s.pop().ok_or("`s` is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> Result<(), &'static str> {
+/// # fn main() -> redo::Result<Add> {
 /// let mut history = History::default();
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
@@ -53,23 +54,22 @@ use serde::{Deserialize, Serialize};
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(bound(
-        serialize = "R: Serialize, C: Serialize",
-        deserialize = "R: Deserialize<'de>, C: Deserialize<'de>"
+        serialize = "C: Command + Serialize, C::Receiver: Serialize",
+        deserialize = "C: Command + Deserialize<'de>, C::Receiver: Deserialize<'de>"
     ))
 )]
-#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct History<R, C, F = fn(Signal)> {
+pub struct History<C: Command, F = fn(Signal)> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
-    pub(crate) record: Record<R, C, F>,
+    pub(crate) record: Record<C, F>,
     pub(crate) branches: BTreeMap<usize, Branch<C>>,
 }
 
-impl<R, C> History<R, C> {
+impl<C: Command> History<C> {
     /// Returns a new history.
     #[inline]
-    pub fn new(receiver: impl Into<R>) -> History<R, C> {
+    pub fn new(receiver: C::Receiver) -> History<C> {
         History {
             root: 0,
             next: 1,
@@ -81,12 +81,12 @@ impl<R, C> History<R, C> {
 
     /// Returns a builder for a history.
     #[inline]
-    pub fn builder() -> HistoryBuilder<R, C> {
+    pub fn builder() -> HistoryBuilder<C> {
         HistoryBuilder::new()
     }
 }
 
-impl<R, C, F> History<R, C, F> {
+impl<C: Command, F> History<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -136,7 +136,7 @@ impl<R, C, F> History<R, C, F> {
 
     /// Creates a new history that uses the provided slot.
     #[inline]
-    pub fn connect_with<G>(self, slot: G) -> History<R, C, G> {
+    pub fn connect_with<G>(self, slot: G) -> History<C, G> {
         History {
             root: self.root,
             next: self.next,
@@ -184,19 +184,19 @@ impl<R, C, F> History<R, C, F> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R, C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>, C> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R, C, F>, C> {
+    pub fn queue(&mut self) -> Queue<History<C, F>, C> {
         Queue::from(self)
     }
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
+    pub fn as_receiver(&self) -> &C::Receiver {
         self.record.as_receiver()
     }
 
@@ -204,13 +204,13 @@ impl<R, C, F> History<R, C, F> {
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
+    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
         self.record.as_mut_receiver()
     }
 
     /// Consumes the history, returning the `receiver`.
     #[inline]
-    pub fn into_receiver(self) -> R {
+    pub fn into_receiver(self) -> C::Receiver {
         self.record.into_receiver()
     }
 
@@ -221,7 +221,7 @@ impl<R, C, F> History<R, C, F> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
+impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Sets the limit of the history and returns the new limit.
     ///
     /// If this limit is reached it will start popping of commands at the beginning
@@ -262,7 +262,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn revert(&mut self) -> Option<Result<C>> {
         if self.record.saved.is_some() {
             self.record.revert()
         } else {
@@ -292,7 +292,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
+    pub fn apply(&mut self, command: C) -> Result<C> {
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(Entry::from(command))?;
@@ -348,7 +348,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn undo(&mut self) -> Option<Result<C>> {
         self.record.undo()
     }
 
@@ -360,7 +360,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn redo(&mut self) -> Option<Result<C>> {
         self.record.redo()
     }
 
@@ -372,7 +372,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<(), C::Error>> {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(current);
@@ -435,7 +435,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     /// This method does not jump across branches.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<(), C::Error>> {
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
         self.record.time_travel(to)
     }
 
@@ -446,7 +446,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<(), C::Error> {
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
         for command in commands {
             self.apply(command)?;
         }
@@ -535,7 +535,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> History<R, C, F> {
     }
 }
 
-impl<R, C: ToString, F> History<R, C, F> {
+impl<C: Command + ToString, F> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -562,37 +562,33 @@ impl<R, C: ToString, F> History<R, C, F> {
     }
 }
 
-impl<R: Default, C> Default for History<R, C> {
+impl<C: Command> Default for History<C>
+where
+    C::Receiver: Default,
+{
     #[inline]
-    fn default() -> History<R, C> {
-        History::new(R::default())
+    fn default() -> History<C> {
+        History::new(Default::default())
     }
 }
 
-impl<R, C, F> AsRef<R> for History<R, C, F> {
+impl<C: Command, F> AsRef<C::Receiver> for History<C, F> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &C::Receiver {
         self.as_receiver()
     }
 }
 
-impl<R, C, F> AsMut<R> for History<R, C, F> {
+impl<C: Command, F> AsMut<C::Receiver> for History<C, F> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut C::Receiver {
         self.as_mut_receiver()
     }
 }
 
-impl<R, C> From<R> for History<R, C> {
+impl<C: Command, F> From<Record<C, F>> for History<C, F> {
     #[inline]
-    fn from(receiver: R) -> Self {
-        History::new(receiver)
-    }
-}
-
-impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
-    #[inline]
-    fn from(record: Record<R, C, F>) -> Self {
+    fn from(record: Record<C, F>) -> Self {
         History {
             root: 0,
             next: 1,
@@ -603,7 +599,11 @@ impl<R, C, F> From<Record<R, C, F>> for History<R, C, F> {
     }
 }
 
-impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for History<R, C, F> {
+impl<C: Command, F> fmt::Debug for History<C, F>
+where
+    C: fmt::Debug,
+    C::Receiver: fmt::Debug,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("History")
@@ -617,7 +617,11 @@ impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for History<R, C, F> {
 }
 
 #[cfg(feature = "display")]
-impl<R, C: fmt::Display, F> fmt::Display for History<R, C, F> {
+impl<C: Command, F> fmt::Display for History<C, F>
+where
+    C: fmt::Display,
+    C::Receiver: fmt::Display,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -636,14 +640,15 @@ pub(crate) struct Branch<C> {
 ///
 /// # Examples
 /// ```
-/// # use redo::{Command, History};
+/// # use redo::{self, Command, History};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = ();
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// # }
-/// # fn foo() -> History<String, Add> {
+/// # fn foo() -> History<Add> {
 /// History::builder()
 ///     .capacity(100)
 ///     .limit(100)
@@ -653,14 +658,14 @@ pub(crate) struct Branch<C> {
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct HistoryBuilder<R, C> {
-    inner: RecordBuilder<R, C>,
+pub struct HistoryBuilder<C: Command> {
+    inner: RecordBuilder<C>,
 }
 
-impl<R, C> HistoryBuilder<R, C> {
+impl<C: Command> HistoryBuilder<C> {
     /// Returns a builder for a history.
     #[inline]
-    pub fn new() -> HistoryBuilder<R, C> {
+    pub fn new() -> HistoryBuilder<C> {
         HistoryBuilder {
             inner: Record::builder(),
         }
@@ -668,7 +673,7 @@ impl<R, C> HistoryBuilder<R, C> {
 
     /// Sets the capacity for the history.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R, C> {
+    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<C> {
         self.inner = self.inner.capacity(capacity);
         self
     }
@@ -678,7 +683,7 @@ impl<R, C> HistoryBuilder<R, C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R, C> {
+    pub fn limit(mut self, limit: usize) -> HistoryBuilder<C> {
         self.inner = self.inner.limit(limit);
         self
     }
@@ -686,14 +691,14 @@ impl<R, C> HistoryBuilder<R, C> {
     /// Sets if the receiver is initially in a saved state.
     /// By default the receiver is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R, C> {
+    pub fn saved(mut self, saved: bool) -> HistoryBuilder<C> {
         self.inner = self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
     #[inline]
-    pub fn build(self, receiver: impl Into<R>) -> History<R, C> {
+    pub fn build(self, receiver: C::Receiver) -> History<C> {
         History {
             root: 0,
             next: 1,
@@ -705,7 +710,7 @@ impl<R, C> HistoryBuilder<R, C> {
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with<F>(self, receiver: impl Into<R>, slot: F) -> History<R, C, F> {
+    pub fn build_with<F>(self, receiver: C::Receiver, slot: F) -> History<C, F> {
         History {
             root: 0,
             next: 1,
@@ -716,43 +721,47 @@ impl<R, C> HistoryBuilder<R, C> {
     }
 }
 
-impl<R, C> Default for HistoryBuilder<R, C> {
+impl<C: Command> Default for HistoryBuilder<C> {
     #[inline]
     fn default() -> Self {
         HistoryBuilder::new()
     }
 }
 
-impl<R: Default, C> HistoryBuilder<R, C> {
+impl<C: Command> HistoryBuilder<C>
+where
+    C::Receiver: Default,
+{
     /// Creates the history with a default `receiver`.
     #[inline]
-    pub fn default(self) -> History<R, C> {
-        self.build(R::default())
+    pub fn default(self) -> History<C> {
+        self.build(Default::default())
     }
 
     /// Creates the history with a default `receiver`.
     #[inline]
-    pub fn default_with<F>(self, slot: F) -> History<R, C, F> {
-        self.build_with(R::default(), slot)
+    pub fn default_with<F>(self, slot: F) -> History<C, F> {
+        self.build_with(Default::default(), slot)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, History};
+    use crate::{Command, History, Result};
     use alloc::string::String;
 
     struct Add(char);
 
-    impl Command<String> for Add {
+    impl Command for Add {
+        type Receiver = String;
         type Error = &'static str;
 
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Self::Error> {
+        fn apply(&mut self, receiver: &mut String) -> Result<Add> {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Self::Error> {
+        fn undo(&mut self, receiver: &mut String) -> Result<Add> {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }

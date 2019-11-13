@@ -1,4 +1,4 @@
-use crate::{At, Entry, History, Record};
+use crate::{At, Command, Entry, History, Record};
 use alloc::format;
 use alloc::string::ToString;
 #[cfg(feature = "chrono")]
@@ -13,15 +13,16 @@ use core::fmt::{self, Write};
 /// # use std::fmt::{self, Display, Formatter};
 /// # use redo::{Command, History};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = ();
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// # }
 /// # impl Display for Add {
 /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result { Ok(()) }
 /// # }
-/// # fn foo() -> History<String, Add> {
+/// # fn foo() -> History<Add> {
 /// let history = History::default();
 /// println!(
 ///     "{}",
@@ -82,7 +83,7 @@ impl<T> Display<'_, T> {
     }
 }
 
-impl<R, C, F> Display<'_, History<R, C, F>> {
+impl<C: Command, F> Display<'_, History<C, F>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
@@ -91,7 +92,7 @@ impl<R, C, F> Display<'_, History<R, C, F>> {
     }
 }
 
-impl<R, C: fmt::Display, F> Display<'_, Record<R, C, F>> {
+impl<C: Command + fmt::Display, F> Display<'_, Record<C, F>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
         self.view.mark(f, 0)?;
@@ -127,7 +128,7 @@ impl<R, C: fmt::Display, F> Display<'_, Record<R, C, F>> {
     }
 }
 
-impl<R, C: fmt::Display, F> Display<'_, History<R, C, F>> {
+impl<C: Command + fmt::Display, F> Display<'_, History<C, F>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -218,7 +219,7 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<R, C: fmt::Display, F> fmt::Display for Display<'_, Record<R, C, F>> {
+impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, Record<C, F>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -232,7 +233,11 @@ impl<R, C: fmt::Display, F> fmt::Display for Display<'_, Record<R, C, F>> {
     }
 }
 
-impl<R, C: fmt::Display, F> fmt::Display for Display<'_, History<R, C, F>> {
+impl<C: Command, F> fmt::Display for Display<'_, History<C, F>>
+where
+    C: fmt::Display,
+    C::Receiver: fmt::Display,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {

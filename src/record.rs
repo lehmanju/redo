@@ -1,6 +1,6 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Signal};
+use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use core::fmt;
@@ -29,7 +29,8 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// ```
 /// # use redo::{Command, Record};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
 /// #         s.push(self.0);
@@ -61,10 +62,9 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Record<R, C, F = fn(Signal)> {
+pub struct Record<C: Command, F = fn(Signal)> {
     pub(crate) commands: VecDeque<Entry<C>>,
-    receiver: R,
+    receiver: C::Receiver,
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
@@ -72,13 +72,13 @@ pub struct Record<R, C, F = fn(Signal)> {
     pub(crate) slot: Option<F>,
 }
 
-impl<R, C> Record<R, C> {
+impl<C: Command> Record<C> {
     /// Returns a new record.
     #[inline]
-    pub fn new(receiver: impl Into<R>) -> Record<R, C> {
+    pub fn new(receiver: C::Receiver) -> Record<C> {
         Record {
             commands: VecDeque::new(),
-            receiver: receiver.into(),
+            receiver,
             current: 0,
             limit: MAX_LIMIT,
             saved: Some(0),
@@ -88,12 +88,12 @@ impl<R, C> Record<R, C> {
 
     /// Returns a builder for a record.
     #[inline]
-    pub fn builder() -> RecordBuilder<R, C> {
+    pub fn builder() -> RecordBuilder<C> {
         RecordBuilder::new()
     }
 }
 
-impl<R, C, F> Record<R, C, F> {
+impl<C: Command, F> Record<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -149,7 +149,7 @@ impl<R, C, F> Record<R, C, F> {
 
     /// Creates a new record that uses the provided slot.
     #[inline]
-    pub fn connect_with<G>(self, slot: G) -> Record<R, C, G> {
+    pub fn connect_with<G>(self, slot: G) -> Record<C, G> {
         Record {
             commands: self.commands,
             receiver: self.receiver,
@@ -186,19 +186,19 @@ impl<R, C, F> Record<R, C, F> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R, C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>, C> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R, C, F>, C> {
+    pub fn queue(&mut self) -> Queue<Record<C, F>, C> {
         Queue::from(self)
     }
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
+    pub fn as_receiver(&self) -> &C::Receiver {
         &self.receiver
     }
 
@@ -206,13 +206,13 @@ impl<R, C, F> Record<R, C, F> {
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
+    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
         &mut self.receiver
     }
 
     /// Consumes the record, returning the `receiver`.
     #[inline]
-    pub fn into_receiver(self) -> R {
+    pub fn into_receiver(self) -> C::Receiver {
         self.receiver
     }
 
@@ -223,7 +223,7 @@ impl<R, C, F> Record<R, C, F> {
     }
 }
 
-impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
+impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Sets the limit of the record and returns the new limit.
     ///
     /// If this limit is reached it will start popping of commands at the beginning
@@ -290,7 +290,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn revert(&mut self) -> Option<Result<C>> {
         self.saved.and_then(|saved| self.go_to(saved))
     }
 
@@ -323,7 +323,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: C) -> Result<(), C::Error> {
+    pub fn apply(&mut self, command: C) -> Result<C> {
         self.__apply(Entry::from(command)).map(|_| ())
     }
 
@@ -331,7 +331,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     pub(crate) fn __apply(
         &mut self,
         mut entry: Entry<C>,
-    ) -> Result<(bool, VecDeque<Entry<C>>), C::Error> {
+    ) -> core::result::Result<(bool, VecDeque<Entry<C>>), C::Error> {
         if entry.is_dead() {
             return Ok((false, VecDeque::new()));
         }
@@ -399,7 +399,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn undo(&mut self) -> Option<Result<C>> {
         let was_saved = self.is_saved();
         let old = self.current();
         loop {
@@ -444,7 +444,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), C::Error>> {
+    pub fn redo(&mut self) -> Option<Result<C>> {
         let was_saved = self.is_saved();
         let old = self.current();
         loop {
@@ -488,7 +488,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, current: usize) -> Option<Result<(), C::Error>> {
+    pub fn go_to(&mut self, current: usize) -> Option<Result<C>> {
         if current > self.len() {
             return None;
         }
@@ -537,7 +537,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     /// Go back or forward in the record to the command that was made closest to the datetime provided.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<(), C::Error>> {
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
         let to = to.with_timezone(&Utc);
         let current = match self.commands.as_slices() {
             ([], []) => return None,
@@ -568,7 +568,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<(), C::Error> {
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
         for command in commands {
             self.apply(command)?;
         }
@@ -576,7 +576,7 @@ impl<R, C: Command<R>, F: FnMut(Signal)> Record<R, C, F> {
     }
 }
 
-impl<R, C: ToString, F> Record<R, C, F> {
+impl<C: Command + ToString, F> Record<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -611,42 +611,42 @@ impl<R, C: ToString, F> Record<R, C, F> {
     }
 }
 
-impl<R: Default, C> Default for Record<R, C> {
+impl<C: Command> Default for Record<C>
+where
+    C::Receiver: Default,
+{
     #[inline]
-    fn default() -> Record<R, C> {
-        Record::new(R::default())
+    fn default() -> Record<C> {
+        Record::new(Default::default())
     }
 }
 
-impl<R, C, F> AsRef<R> for Record<R, C, F> {
+impl<C: Command, F> AsRef<C::Receiver> for Record<C, F> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &C::Receiver {
         self.as_receiver()
     }
 }
 
-impl<R, C, F> AsMut<R> for Record<R, C, F> {
+impl<C: Command, F> AsMut<C::Receiver> for Record<C, F> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut C::Receiver {
         self.as_mut_receiver()
     }
 }
 
-impl<R, C> From<R> for Record<R, C> {
+impl<C: Command, F> From<History<C, F>> for Record<C, F> {
     #[inline]
-    fn from(receiver: R) -> Record<R, C> {
-        Record::new(receiver)
-    }
-}
-
-impl<R, C, F> From<History<R, C, F>> for Record<R, C, F> {
-    #[inline]
-    fn from(history: History<R, C, F>) -> Record<R, C, F> {
+    fn from(history: History<C, F>) -> Record<C, F> {
         history.record
     }
 }
 
-impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for Record<R, C, F> {
+impl<C: Command, F> fmt::Debug for Record<C, F>
+where
+    C: fmt::Debug,
+    C::Receiver: fmt::Debug,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -660,7 +660,11 @@ impl<R: fmt::Debug, C: fmt::Debug, F> fmt::Debug for Record<R, C, F> {
 }
 
 #[cfg(feature = "display")]
-impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
+impl<C: Command, F> fmt::Display for Record<C, F>
+where
+    C: fmt::Display,
+    C::Receiver: fmt::Display,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -671,14 +675,15 @@ impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
 ///
 /// # Examples
 /// ```
-/// # use redo::{Command, Record};
+/// # use redo::{self, Command, Record};
 /// # struct Add(char);
-/// # impl Command<String> for Add {
+/// # impl Command for Add {
+/// #     type Receiver = String;
 /// #     type Error = ();
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> { Ok(()) }
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// # }
-/// # fn foo() -> Record<String, Add> {
+/// # fn foo() -> Record<Add> {
 /// Record::builder()
 ///     .capacity(100)
 ///     .limit(100)
@@ -688,21 +693,19 @@ impl<R, C: fmt::Display, F> fmt::Display for Record<R, C, F> {
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct RecordBuilder<R, C> {
+pub struct RecordBuilder<C: Command> {
     commands: PhantomData<C>,
-    receiver: PhantomData<R>,
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
 }
 
-impl<R, C> RecordBuilder<R, C> {
+impl<C: Command> RecordBuilder<C> {
     /// Returns a builder for a record.
     #[inline]
-    pub fn new() -> RecordBuilder<R, C> {
+    pub fn new() -> RecordBuilder<C> {
         RecordBuilder {
             commands: PhantomData,
-            receiver: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
@@ -711,7 +714,7 @@ impl<R, C> RecordBuilder<R, C> {
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R, C> {
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<C> {
         self.capacity = capacity;
         self
     }
@@ -721,7 +724,7 @@ impl<R, C> RecordBuilder<R, C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<R, C> {
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<C> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -729,17 +732,17 @@ impl<R, C> RecordBuilder<R, C> {
     /// Sets if the receiver is initially in a saved state.
     /// By default the receiver is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<R, C> {
+    pub fn saved(mut self, saved: bool) -> RecordBuilder<C> {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(self, receiver: impl Into<R>) -> Record<R, C> {
+    pub fn build(self, receiver: C::Receiver) -> Record<C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
-            receiver: receiver.into(),
+            receiver,
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
@@ -749,10 +752,10 @@ impl<R, C> RecordBuilder<R, C> {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with<F>(self, receiver: impl Into<R>, slot: F) -> Record<R, C, F> {
+    pub fn build_with<F>(self, receiver: C::Receiver, slot: F) -> Record<C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
-            receiver: receiver.into(),
+            receiver,
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
@@ -761,24 +764,27 @@ impl<R, C> RecordBuilder<R, C> {
     }
 }
 
-impl<R, C> Default for RecordBuilder<R, C> {
+impl<C: Command> Default for RecordBuilder<C> {
     #[inline]
     fn default() -> Self {
         RecordBuilder::new()
     }
 }
 
-impl<R: Default, C> RecordBuilder<R, C> {
+impl<C: Command> RecordBuilder<C>
+where
+    C::Receiver: Default,
+{
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default(self) -> Record<R, C> {
-        self.build(R::default())
+    pub fn default(self) -> Record<C> {
+        self.build(Default::default())
     }
 
     /// Creates the record with a default `receiver`.
     #[inline]
-    pub fn default_with<F>(self, slot: F) -> Record<R, C, F> {
-        self.build_with(R::default(), slot)
+    pub fn default_with<F>(self, slot: F) -> Record<C, F> {
+        self.build_with(Default::default(), slot)
     }
 }
 
@@ -789,7 +795,8 @@ mod tests {
 
     struct Add(char);
 
-    impl Command<String> for Add {
+    impl Command for Add {
+        type Receiver = String;
         type Error = &'static str;
 
         fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {

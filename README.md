@@ -50,21 +50,22 @@ use redo::{Command, Record};
 
 struct Add(char);
 
-impl Command<String> for Add {
+impl Command for Add {
+    type Receiver = String;
     type Error = &'static str;
 
-    fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+    fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
         s.push(self.0);
         Ok(())
     }
 
-    fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+    fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
         self.0 = s.pop().ok_or("`s` is empty")?;
         Ok(())
     }
 }
 
-fn main() -> Result<(), &'static str> {
+fn main() -> redo::Result<Add> {
     let mut record = Record::default();
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
