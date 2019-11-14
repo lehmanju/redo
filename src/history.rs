@@ -14,15 +14,15 @@ use serde::{Deserialize, Serialize};
 /// A history of commands.
 ///
 /// Unlike [Record] which maintains a linear undo history, History maintains an undo tree
-/// containing every edit made to the receiver. By switching between different branches in the
-/// tree, the user can get to any previous state of the receiver.
+/// containing every edit made to the target. By switching between different branches in the
+/// tree, the user can get to any previous state of the target.
 ///
 /// # Examples
 /// ```
 /// # use redo::{Command, History};
 /// # struct Add(char);
 /// # impl Command for Add {
-/// #     type Receiver = String;
+/// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
@@ -42,9 +42,9 @@ use serde::{Deserialize, Serialize};
 /// history.go_to(abc, 1).unwrap()?;
 /// history.apply(Add('f'))?;
 /// history.apply(Add('g'))?;
-/// assert_eq!(history.as_receiver(), "afg");
+/// assert_eq!(history.as_target(), "afg");
 /// history.go_to(abc, 3).unwrap()?;
-/// assert_eq!(history.as_receiver(), "abc");
+/// assert_eq!(history.as_target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -54,8 +54,8 @@ use serde::{Deserialize, Serialize};
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(bound(
-        serialize = "C: Command + Serialize, C::Receiver: Serialize",
-        deserialize = "C: Command + Deserialize<'de>, C::Receiver: Deserialize<'de>"
+        serialize = "C: Command + Serialize, C::Target: Serialize",
+        deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
     ))
 )]
 pub struct History<C: Command, F = fn(Signal)> {
@@ -69,14 +69,8 @@ pub struct History<C: Command, F = fn(Signal)> {
 impl<C: Command> History<C> {
     /// Returns a new history.
     #[inline]
-    pub fn new(receiver: C::Receiver) -> History<C> {
-        History {
-            root: 0,
-            next: 1,
-            saved: None,
-            record: Record::new(receiver),
-            branches: BTreeMap::default(),
-        }
+    pub fn new(target: C::Target) -> History<C> {
+        History::from(Record::new(target))
     }
 
     /// Returns a builder for a history.
@@ -152,7 +146,7 @@ impl<C: Command, F> History<C, F> {
         self.record.disconnect()
     }
 
-    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
     #[inline]
     pub fn is_saved(&self) -> bool {
         self.record.is_saved()
@@ -194,30 +188,24 @@ impl<C: Command, F> History<C, F> {
         Queue::from(self)
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &C::Receiver {
-        self.record.as_receiver()
+    pub fn as_target(&self) -> &C::Target {
+        self.record.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
-        self.record.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.record.as_mut_target()
     }
 
-    /// Consumes the history, returning the `receiver`.
+    /// Consumes the history, returning the `target`.
     #[inline]
-    pub fn into_receiver(self) -> C::Receiver {
-        self.record.into_receiver()
-    }
-
-    /// Returns an iterator over the commands in the current branch.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &C> {
-        self.record.commands()
+    pub fn into_target(self) -> C::Target {
+        self.record.into_target()
     }
 }
 
@@ -253,14 +241,14 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         limit
     }
 
-    /// Marks the receiver as currently being in a saved or unsaved state.
+    /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         self.record.set_saved(saved);
         self.saved = None;
     }
 
-    /// Revert the changes done to the receiver since the saved state.
+    /// Revert the changes done to the target since the saved state.
     #[inline]
     pub fn revert(&mut self) -> Option<Result<C>> {
         if self.record.saved.is_some() {
@@ -564,7 +552,7 @@ impl<C: Command + ToString, F> History<C, F> {
 
 impl<C: Command> Default for History<C>
 where
-    C::Receiver: Default,
+    C::Target: Default,
 {
     #[inline]
     fn default() -> History<C> {
@@ -572,17 +560,17 @@ where
     }
 }
 
-impl<C: Command, F> AsRef<C::Receiver> for History<C, F> {
+impl<C: Command, F> AsRef<C::Target> for History<C, F> {
     #[inline]
-    fn as_ref(&self) -> &C::Receiver {
-        self.as_receiver()
+    fn as_ref(&self) -> &C::Target {
+        self.as_target()
     }
 }
 
-impl<C: Command, F> AsMut<C::Receiver> for History<C, F> {
+impl<C: Command, F> AsMut<C::Target> for History<C, F> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Receiver {
-        self.as_mut_receiver()
+    fn as_mut(&mut self) -> &mut C::Target {
+        self.as_mut_target()
     }
 }
 
@@ -602,7 +590,7 @@ impl<C: Command, F> From<Record<C, F>> for History<C, F> {
 impl<C: Command, F> fmt::Debug for History<C, F>
 where
     C: fmt::Debug,
-    C::Receiver: fmt::Debug,
+    C::Target: fmt::Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -620,7 +608,7 @@ where
 impl<C: Command, F> fmt::Display for History<C, F>
 where
     C: fmt::Display,
-    C::Receiver: fmt::Display,
+    C::Target: fmt::Display,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -643,7 +631,7 @@ pub(crate) struct Branch<C> {
 /// # use redo::{self, Command, History};
 /// # struct Add(char);
 /// # impl Command for Add {
-/// #     type Receiver = String;
+/// #     type Target = String;
 /// #     type Error = ();
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
@@ -688,8 +676,8 @@ impl<C: Command> HistoryBuilder<C> {
         self
     }
 
-    /// Sets if the receiver is initially in a saved state.
-    /// By default the receiver is in a saved state.
+    /// Sets if the target is initially in a saved state.
+    /// By default the target is in a saved state.
     #[inline]
     pub fn saved(mut self, saved: bool) -> HistoryBuilder<C> {
         self.inner = self.inner.saved(saved);
@@ -698,26 +686,14 @@ impl<C: Command> HistoryBuilder<C> {
 
     /// Builds the history.
     #[inline]
-    pub fn build(self, receiver: C::Receiver) -> History<C> {
-        History {
-            root: 0,
-            next: 1,
-            saved: None,
-            record: self.inner.build(receiver),
-            branches: BTreeMap::default(),
-        }
+    pub fn build(self, target: C::Target) -> History<C> {
+        History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with<F>(self, receiver: C::Receiver, slot: F) -> History<C, F> {
-        History {
-            root: 0,
-            next: 1,
-            saved: None,
-            record: self.inner.build_with(receiver, slot),
-            branches: BTreeMap::default(),
-        }
+    pub fn build_with<F>(self, target: C::Target, slot: F) -> History<C, F> {
+        History::from(self.inner.build_with(target, slot))
     }
 }
 
@@ -730,15 +706,15 @@ impl<C: Command> Default for HistoryBuilder<C> {
 
 impl<C: Command> HistoryBuilder<C>
 where
-    C::Receiver: Default,
+    C::Target: Default,
 {
-    /// Creates the history with a default `receiver`.
+    /// Creates the history with a default `target`.
     #[inline]
     pub fn default(self) -> History<C> {
         self.build(Default::default())
     }
 
-    /// Creates the history with a default `receiver`.
+    /// Creates the history with a default `target`.
     #[inline]
     pub fn default_with<F>(self, slot: F) -> History<C, F> {
         self.build_with(Default::default(), slot)
@@ -747,22 +723,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, History, Result};
+    use crate::*;
     use alloc::string::String;
 
     struct Add(char);
 
     impl Command for Add {
-        type Receiver = String;
+        type Target = String;
         type Error = &'static str;
 
-        fn apply(&mut self, receiver: &mut String) -> Result<Add> {
-            receiver.push(self.0);
+        fn apply(&mut self, target: &mut String) -> Result<Add> {
+            target.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<Add> {
-            self.0 = receiver.pop().ok_or("`receiver` is empty")?;
+        fn undo(&mut self, target: &mut String) -> Result<Add> {
+            self.0 = target.pop().ok_or("`target` is empty")?;
             Ok(())
         }
     }
@@ -790,55 +766,55 @@ mod tests {
         history.apply(Add('c')).unwrap();
         history.apply(Add('d')).unwrap();
         history.apply(Add('e')).unwrap();
-        assert_eq!(history.as_receiver(), "abcde");
+        assert_eq!(history.as_target(), "abcde");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abc");
+        assert_eq!(history.as_target(), "abc");
         let abcde = history.branch();
         history.apply(Add('f')).unwrap();
         history.apply(Add('g')).unwrap();
-        assert_eq!(history.as_receiver(), "abcfg");
+        assert_eq!(history.as_target(), "abcfg");
         history.undo().unwrap().unwrap();
         let abcfg = history.branch();
         history.apply(Add('h')).unwrap();
         history.apply(Add('i')).unwrap();
         history.apply(Add('j')).unwrap();
-        assert_eq!(history.as_receiver(), "abcfhij");
+        assert_eq!(history.as_target(), "abcfhij");
         history.undo().unwrap().unwrap();
         let abcfhij = history.branch();
         history.apply(Add('k')).unwrap();
-        assert_eq!(history.as_receiver(), "abcfhik");
+        assert_eq!(history.as_target(), "abcfhik");
         history.undo().unwrap().unwrap();
         let abcfhik = history.branch();
         history.apply(Add('l')).unwrap();
-        assert_eq!(history.as_receiver(), "abcfhil");
+        assert_eq!(history.as_target(), "abcfhil");
         history.apply(Add('m')).unwrap();
-        assert_eq!(history.as_receiver(), "abcfhilm");
+        assert_eq!(history.as_target(), "abcfhilm");
         let abcfhilm = history.branch();
         history.go_to(abcde, 2).unwrap().unwrap();
         history.apply(Add('n')).unwrap();
         history.apply(Add('o')).unwrap();
-        assert_eq!(history.as_receiver(), "abno");
+        assert_eq!(history.as_target(), "abno");
         history.undo().unwrap().unwrap();
         let abno = history.branch();
         history.apply(Add('p')).unwrap();
         history.apply(Add('q')).unwrap();
-        assert_eq!(history.as_receiver(), "abnpq");
+        assert_eq!(history.as_target(), "abnpq");
 
         let abnpq = history.branch();
         history.go_to(abcde, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcde");
+        assert_eq!(history.as_target(), "abcde");
         history.go_to(abcfg, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfg");
+        assert_eq!(history.as_target(), "abcfg");
         history.go_to(abcfhij, 7).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfhij");
+        assert_eq!(history.as_target(), "abcfhij");
         history.go_to(abcfhik, 7).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfhik");
+        assert_eq!(history.as_target(), "abcfhik");
         history.go_to(abcfhilm, 8).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfhilm");
+        assert_eq!(history.as_target(), "abcfhilm");
         history.go_to(abno, 4).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abno");
+        assert_eq!(history.as_target(), "abno");
         history.go_to(abnpq, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abnpq");
+        assert_eq!(history.as_target(), "abnpq");
     }
 }

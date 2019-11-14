@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 /// # use redo::{Command, Record};
 /// # struct Add(char);
 /// # impl Command for Add {
-/// #     type Receiver = String;
+/// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
@@ -28,9 +28,9 @@ use alloc::vec::Vec;
 /// queue.apply(Add('a'));
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
-/// assert_eq!(queue.as_receiver(), "");
+/// assert_eq!(queue.as_target(), "");
 /// queue.commit()?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// assert_eq!(record.as_target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -173,31 +173,31 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>, C> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &C::Receiver {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &C::Target {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.inner.as_mut_target()
     }
 }
 
-impl<C: Command, F> AsRef<C::Receiver> for Queue<'_, Record<C, F>, C> {
+impl<C: Command, F> AsRef<C::Target> for Queue<'_, Record<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &C::Receiver {
+    fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Receiver> for Queue<'_, Record<C, F>, C> {
+impl<C: Command, F> AsMut<C::Target> for Queue<'_, Record<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Receiver {
+    fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
@@ -250,31 +250,31 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>, C> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &C::Receiver {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &C::Target {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.inner.as_mut_target()
     }
 }
 
-impl<C: Command, F> AsRef<C::Receiver> for Queue<'_, History<C, F>, C> {
+impl<C: Command, F> AsRef<C::Target> for Queue<'_, History<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &C::Receiver {
+    fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Receiver> for Queue<'_, History<C, F>, C> {
+impl<C: Command, F> AsMut<C::Target> for Queue<'_, History<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Receiver {
+    fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
@@ -290,13 +290,13 @@ enum Action<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, Record, Result};
+    use crate::*;
     use alloc::string::String;
 
     struct Add(char);
 
     impl Command for Add {
-        type Receiver = String;
+        type Target = String;
         type Error = &'static str;
 
         fn apply(&mut self, s: &mut String) -> Result<Add> {
@@ -325,12 +325,12 @@ mod tests {
         q3.apply(Add('a'));
         q3.apply(Add('b'));
         q3.apply(Add('c'));
-        assert_eq!(q3.as_receiver(), "");
+        assert_eq!(q3.as_target(), "");
         q3.commit().unwrap();
-        assert_eq!(q2.as_receiver(), "abc");
+        assert_eq!(q2.as_target(), "abc");
         q2.commit().unwrap();
-        assert_eq!(q1.as_receiver(), "");
+        assert_eq!(q1.as_target(), "");
         q1.commit().unwrap();
-        assert_eq!(record.as_receiver(), "abc");
+        assert_eq!(record.as_target(), "abc");
     }
 }

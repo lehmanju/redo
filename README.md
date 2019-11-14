@@ -9,7 +9,7 @@ Provides undo-redo functionality with static dispatch and manual command merging
 It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
 how to undo the changes it applies, and by using the provided data structures
-it is easy to apply, undo, and redo changes made to a receiver.
+it is easy to apply, undo, and redo changes made to a target.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
 
@@ -30,7 +30,7 @@ the [Record] and [History] data structures.
 * Commands can be merged into a single command by implementing the [merge] method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
   merged into larger changes that can be undone and redone in a single step.
-* The receiver can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+* The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 
@@ -51,7 +51,7 @@ use redo::{Command, Record};
 struct Add(char);
 
 impl Command for Add {
-    type Receiver = String;
+    type Target = String;
     type Error = &'static str;
 
     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
@@ -70,15 +70,15 @@ fn main() -> redo::Result<Add> {
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
-    assert_eq!(record.as_receiver(), "abc");
+    assert_eq!(record.as_target(), "abc");
     record.undo().unwrap()?;
     record.undo().unwrap()?;
     record.undo().unwrap()?;
-    assert_eq!(record.as_receiver(), "");
+    assert_eq!(record.as_target(), "");
     record.redo().unwrap()?;
     record.redo().unwrap()?;
     record.redo().unwrap()?;
-    assert_eq!(record.as_receiver(), "abc");
+    assert_eq!(record.as_target(), "abc");
     Ok(())
 }
 ```

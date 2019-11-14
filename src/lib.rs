@@ -3,7 +3,7 @@
 //! It is an implementation of the command pattern, where all modifications are done
 //! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
-//! it is easy to apply, undo, and redo changes made to a receiver.
+//! it is easy to apply, undo, and redo changes made to a target.
 //! Both linear and non-linear undo-redo functionality is provided through
 //! the [Record] and [History] data structures.
 //!
@@ -24,7 +24,7 @@
 //! * Commands can be merged into a single command by implementing the [merge] method on the command.
 //!   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
 //!   merged into larger changes that can be undone and redone in a single step.
-//! * The receiver can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+//! * The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 //!
@@ -45,7 +45,7 @@
 //! struct Add(char);
 //!
 //! impl Command for Add {
-//!     type Receiver = String;
+//!     type Target = String;
 //!     type Error = &'static str;
 //!
 //!     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
@@ -64,15 +64,15 @@
 //!     record.apply(Add('a'))?;
 //!     record.apply(Add('b'))?;
 //!     record.apply(Add('c'))?;
-//!     assert_eq!(record.as_receiver(), "abc");
+//!     assert_eq!(record.as_target(), "abc");
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
-//!     assert_eq!(record.as_receiver(), "");
+//!     assert_eq!(record.as_target(), "");
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
-//!     assert_eq!(record.as_receiver(), "abc");
+//!     assert_eq!(record.as_target(), "abc");
 //!     Ok(())
 //! }
 //! ```
@@ -125,28 +125,28 @@ pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
 
 /// Base functionality for all commands.
 pub trait Command {
-    /// The receiver type.
-    type Receiver;
+    /// The target type.
+    type Target;
     /// The error type.
     type Error;
 
-    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+    /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut Self::Receiver) -> Result<Self>;
+    fn apply(&mut self, target: &mut Self::Target) -> Result<Self>;
 
-    /// Restores the state of the receiver as it was before the command was applied
+    /// Restores the state of the target as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut Self::Receiver) -> Result<Self>;
+    fn undo(&mut self, target: &mut Self::Target) -> Result<Self>;
 
-    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// Reapplies the command on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
-        self.apply(receiver)
+    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.apply(target)
     }
 
     /// Used for manual merging of two commands.
@@ -157,7 +157,7 @@ pub trait Command {
     /// struct Add(String);
     ///
     /// impl Command for Add {
-    ///     type Receiver = String;
+    ///     type Target = String;
     ///     type Error = ();
     ///
     ///     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
@@ -183,13 +183,13 @@ pub trait Command {
     ///     record.apply(Add("a".into()))?;
     ///     record.apply(Add("b".into()))?;
     ///     record.apply(Add("c".into()))?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     // Calling `undo` once will undo all the merged commands.
     ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "");
+    ///     assert_eq!(record.as_target(), "");
     ///     // Calling `redo` once will redo all the merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     Ok(())
     /// }
     /// ```
@@ -212,7 +212,7 @@ pub trait Command {
     }
 }
 
-/// The signal sent when the record, the history, or the receiver changes.
+/// The signal sent when the record, the history, or the target changes.
 ///
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
@@ -228,9 +228,9 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the records ability to redo changes.
     Redo(bool),
-    /// Says if the receiver is in a saved state.
+    /// Says if the target is in a saved state.
     ///
-    /// This signal will be emitted when the record enters or leaves its receivers saved state.
+    /// This signal will be emitted when the record enters or leaves its targets saved state.
     Saved(bool),
     /// Says if the current command has changed.
     ///
@@ -293,22 +293,22 @@ impl<C> From<C> for Entry<C> {
 }
 
 impl<C: Command> Command for Entry<C> {
-    type Receiver = C::Receiver;
+    type Target = C::Target;
     type Error = C::Error;
 
     #[inline]
-    fn apply(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
-        self.command.apply(receiver)
+    fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.command.apply(target)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
-        self.command.undo(receiver)
+    fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.command.undo(target)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut Self::Receiver) -> Result<Self> {
-        self.command.redo(receiver)
+    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.command.redo(target)
     }
 
     #[inline]

@@ -14,7 +14,7 @@ use core::fmt::{self, Write};
 /// # use redo::{Command, History};
 /// # struct Add(char);
 /// # impl Command for Add {
-/// #     type Receiver = String;
+/// #     type Target = String;
 /// #     type Error = ();
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
@@ -236,7 +236,7 @@ impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, Record<C, F>> {
 impl<C: Command, F> fmt::Display for Display<'_, History<C, F>>
 where
     C: fmt::Display,
-    C::Receiver: fmt::Display,
+    C::Target: fmt::Display,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

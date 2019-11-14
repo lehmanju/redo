@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 /// # use redo::{Command, Record};
 /// # struct Add(char);
 /// # impl Command for Add {
-/// #     type Receiver = String;
+/// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
@@ -29,9 +29,9 @@ use alloc::vec::Vec;
 /// cp.apply(Add('a'))?;
 /// cp.apply(Add('b'))?;
 /// cp.apply(Add('c'))?;
-/// assert_eq!(cp.as_receiver(), "abc");
+/// assert_eq!(cp.as_target(), "abc");
 /// cp.cancel()?;
-/// assert_eq!(record.as_receiver(), "");
+/// assert_eq!(record.as_target(), "");
 /// # Ok(())
 /// # }
 /// ```
@@ -213,31 +213,31 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>, C> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &C::Receiver {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &C::Target {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.inner.as_mut_target()
     }
 }
 
-impl<C: Command, F> AsRef<C::Receiver> for Checkpoint<'_, Record<C, F>, C> {
+impl<C: Command, F> AsRef<C::Target> for Checkpoint<'_, Record<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &C::Receiver {
+    fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Receiver> for Checkpoint<'_, Record<C, F>, C> {
+impl<C: Command, F> AsMut<C::Target> for Checkpoint<'_, Record<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Receiver {
+    fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
@@ -352,31 +352,31 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>, C> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &C::Receiver {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &C::Target {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut C::Receiver {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.inner.as_mut_target()
     }
 }
 
-impl<C: Command, F> AsRef<C::Receiver> for Checkpoint<'_, History<C, F>, C> {
+impl<C: Command, F> AsRef<C::Target> for Checkpoint<'_, History<C, F>, C> {
     #[inline]
-    fn as_ref(&self) -> &C::Receiver {
+    fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Receiver> for Checkpoint<'_, History<C, F>, C> {
+impl<C: Command, F> AsMut<C::Target> for Checkpoint<'_, History<C, F>, C> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Receiver {
+    fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
@@ -392,13 +392,13 @@ enum Action<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, Record, Result};
+    use crate::*;
     use alloc::string::String;
 
     struct Add(char);
 
     impl Command for Add {
-        type Receiver = String;
+        type Target = String;
         type Error = &'static str;
 
         fn apply(&mut self, s: &mut String) -> Result<Add> {
@@ -419,21 +419,21 @@ mod tests {
         cp1.apply(Add('a')).unwrap();
         cp1.apply(Add('b')).unwrap();
         cp1.apply(Add('c')).unwrap();
-        assert_eq!(cp1.as_receiver(), "abc");
+        assert_eq!(cp1.as_target(), "abc");
         let mut cp2 = cp1.checkpoint();
         cp2.apply(Add('d')).unwrap();
         cp2.apply(Add('e')).unwrap();
         cp2.apply(Add('f')).unwrap();
-        assert_eq!(cp2.as_receiver(), "abcdef");
+        assert_eq!(cp2.as_target(), "abcdef");
         let mut cp3 = cp2.checkpoint();
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        assert_eq!(cp3.as_target(), "abcdefghi");
         cp3.commit();
         cp2.commit();
         cp1.commit();
-        assert_eq!(record.as_receiver(), "abcdefghi");
+        assert_eq!(record.as_target(), "abcdefghi");
     }
 
     #[test]
@@ -451,12 +451,12 @@ mod tests {
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        assert_eq!(cp3.as_target(), "abcdefghi");
         cp3.cancel().unwrap();
-        assert_eq!(cp2.as_receiver(), "abcdef");
+        assert_eq!(cp2.as_target(), "abcdef");
         cp2.cancel().unwrap();
-        assert_eq!(cp1.as_receiver(), "abc");
+        assert_eq!(cp1.as_target(), "abc");
         cp1.cancel().unwrap();
-        assert_eq!(record.as_receiver(), "");
+        assert_eq!(record.as_target(), "");
     }
 }
