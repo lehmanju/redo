@@ -215,12 +215,6 @@ impl<C: Command, F> Record<C, F> {
     pub fn into_target(self) -> C::Target {
         self.target
     }
-
-    /// Returns an iterator over the commands in the record.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &C> {
-        self.commands.iter().map(|entry| &entry.command)
-    }
 }
 
 impl<C: Command, F: FnMut(Signal)> Record<C, F> {
@@ -335,9 +329,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         if entry.is_dead() {
             return Ok((false, VecDeque::new()));
         }
-        if let Err(error) = entry.apply(&mut self.target) {
-            return Err(error);
-        }
+        entry.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();

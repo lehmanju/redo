@@ -26,7 +26,7 @@ use core::fmt::{self, Write};
 /// let history = History::default();
 /// println!(
 ///     "{}",
-///     history.display().graph(true).colored(true).ligatures(true)
+///     history.display().graph(true).colored(true).unicode(true)
 /// );
 /// # history
 /// # }
@@ -59,12 +59,12 @@ impl<T> Display<'_, T> {
         self
     }
 
-    /// Use ligature (unicode) in the output (off by default).
+    /// Use unicode symbols in the output (off by default).
     ///
-    /// The ligatures might only work as expected with monospaced fonts.
+    /// The symbols might only work as expected with monospaced fonts.
     #[inline]
-    pub fn ligatures(&mut self, on: bool) -> &mut Self {
-        self.view.ligatures = on;
+    pub fn unicode(&mut self, on: bool) -> &mut Self {
+        self.view.unicode = on;
         self
     }
 
@@ -261,7 +261,7 @@ struct View {
     current: bool,
     detailed: bool,
     graph: bool,
-    ligatures: bool,
+    unicode: bool,
     position: bool,
     saved: bool,
 }
@@ -274,7 +274,7 @@ impl Default for View {
             current: true,
             detailed: true,
             graph: false,
-            ligatures: false,
+            unicode: false,
             position: true,
             saved: true,
         }
@@ -302,9 +302,9 @@ impl View {
 
     #[inline]
     fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.colored, self.ligatures) {
-            (true, true) => write!(f, "{}", "\u{25CF}".color(color(level))),
-            (true, false) => write!(f, "{}", "*".color(color(level))),
+        match (self.colored, self.unicode) {
+            (true, true) => write!(f, "{}", "\u{25CF}".color(to_color(level))),
+            (true, false) => write!(f, "{}", "*".color(to_color(level))),
             (false, true) => f.write_char('\u{25CF}'),
             (false, false) => f.write_char('*'),
         }
@@ -312,9 +312,9 @@ impl View {
 
     #[inline]
     fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.colored, self.ligatures) {
-            (true, true) => write!(f, "{}", "\u{2502}".color(color(level))),
-            (true, false) => write!(f, "{}", "|".color(color(level))),
+        match (self.colored, self.unicode) {
+            (true, true) => write!(f, "{}", "\u{2502}".color(to_color(level))),
+            (true, false) => write!(f, "{}", "|".color(to_color(level))),
             (false, true) => f.write_char('\u{2502}'),
             (false, false) => f.write_char('|'),
         }
@@ -322,19 +322,19 @@ impl View {
 
     #[inline]
     fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        match (self.colored, self.ligatures) {
+        match (self.colored, self.unicode) {
             (true, true) => write!(
                 f,
                 "{}{}{}",
-                "\u{251C}".color(color(level)),
-                "\u{2500}".color(color(level + 1)),
-                "\u{256F}".color(color(level + 1))
+                "\u{251C}".color(to_color(level)),
+                "\u{2500}".color(to_color(level + 1)),
+                "\u{256F}".color(to_color(level + 1))
             ),
             (true, false) => write!(
                 f,
                 "{}{}",
-                "|".color(color(level)),
-                "/".color(color(level + 1))
+                "|".color(to_color(level)),
+                "/".color(to_color(level + 1))
             ),
             (false, true) => f.write_str("\u{251C}\u{2500}\u{256F}"),
             (false, false) => f.write_str("|/"),
@@ -406,7 +406,7 @@ impl View {
 }
 
 #[inline]
-fn color(i: usize) -> Color {
+fn to_color(i: usize) -> Color {
     match i % 6 {
         0 => Color::Cyan,
         1 => Color::Red,
