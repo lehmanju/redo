@@ -281,9 +281,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
-        if command.is_dead() {
-            return Ok(());
-        }
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(Entry::from(command))?;

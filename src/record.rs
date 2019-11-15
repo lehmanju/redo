@@ -326,9 +326,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         &mut self,
         mut entry: Entry<C>,
     ) -> core::result::Result<(bool, VecDeque<Entry<C>>), C::Error> {
-        if entry.is_dead() {
-            return Ok((false, VecDeque::new()));
-        }
         entry.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
@@ -392,18 +389,11 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<C>> {
+        if !self.can_undo() {
+            return None;
+        }
         let was_saved = self.is_saved();
         let old = self.current();
-        loop {
-            if !self.can_undo() {
-                return None;
-            } else if self.commands[self.current - 1].is_dead() {
-                self.current -= 1;
-                self.commands.remove(self.current).unwrap();
-            } else {
-                break;
-            }
-        }
         if let Err(error) = self.commands[self.current - 1].undo(&mut self.target) {
             return Some(Err(error));
         }
@@ -437,17 +427,11 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<C>> {
+        if !self.can_redo() {
+            return None;
+        }
         let was_saved = self.is_saved();
         let old = self.current();
-        loop {
-            if !self.can_redo() {
-                return None;
-            } else if self.commands[self.current].is_dead() {
-                self.commands.remove(self.current).unwrap();
-            } else {
-                break;
-            }
-        }
         if let Err(error) = self.commands[self.current].redo(&mut self.target) {
             return Some(Err(error));
         }

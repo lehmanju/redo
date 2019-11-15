@@ -200,16 +200,6 @@ pub trait Command {
     {
         Merge::No(command)
     }
-
-    /// Says if the command is dead.
-    ///
-    /// A dead command will be removed the next time it becomes the current command.
-    /// This can be used to remove command if for example executing it caused an error,
-    /// and it needs to be removed.
-    #[inline]
-    fn is_dead(&self) -> bool {
-        false
-    }
 }
 
 /// The signal sent when the record, the history, or the target changes.
@@ -321,11 +311,6 @@ impl<C: Command> Command for Entry<C> {
             Merge::No(command) => Merge::No(Entry::from(command)),
             Merge::Annul => Merge::Annul,
         }
-    }
-
-    #[inline]
-    fn is_dead(&self) -> bool {
-        self.command.is_dead()
     }
 }
 
