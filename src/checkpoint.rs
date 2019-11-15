@@ -44,10 +44,7 @@ pub struct Checkpoint<'a, T, C> {
 impl<'a, T, C> From<&'a mut T> for Checkpoint<'a, T, C> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
-        Checkpoint {
-            inner,
-            stack: Vec::new(),
-        }
+        Checkpoint::new(inner)
     }
 }
 

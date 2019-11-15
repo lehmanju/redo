@@ -43,10 +43,7 @@ pub struct Queue<'a, T, C> {
 impl<'a, T, C> From<&'a mut T> for Queue<'a, T, C> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
-        Queue {
-            inner,
-            queue: Vec::new(),
-        }
+        Queue::new(inner)
     }
 }
 
