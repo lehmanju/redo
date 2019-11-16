@@ -72,12 +72,6 @@ impl<C: Command> History<C> {
     pub fn new(target: C::Target) -> History<C> {
         History::from(Record::new(target))
     }
-
-    /// Returns a builder for a history.
-    #[inline]
-    pub fn builder() -> HistoryBuilder<C> {
-        HistoryBuilder::new()
-    }
 }
 
 impl<C: Command, F> History<C, F> {
@@ -628,7 +622,7 @@ pub(crate) struct Branch<C> {
 ///
 /// # Examples
 /// ```
-/// # use redo::{self, Command, History};
+/// # use redo::{self, Command, History, HistoryBuilder};
 /// # struct Add(char);
 /// # impl Command for Add {
 /// #     type Target = String;
@@ -637,7 +631,7 @@ pub(crate) struct Branch<C> {
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// # }
 /// # fn foo() -> History<Add> {
-/// History::builder()
+/// HistoryBuilder::new()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
@@ -655,7 +649,7 @@ impl<C: Command> HistoryBuilder<C> {
     #[inline]
     pub fn new() -> HistoryBuilder<C> {
         HistoryBuilder {
-            inner: Record::builder(),
+            inner: RecordBuilder::new(),
         }
     }
 

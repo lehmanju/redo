@@ -85,12 +85,6 @@ impl<C: Command> Record<C> {
             slot: None,
         }
     }
-
-    /// Returns a builder for a record.
-    #[inline]
-    pub fn builder() -> RecordBuilder<C> {
-        RecordBuilder::new()
-    }
 }
 
 impl<C: Command, F> Record<C, F> {
@@ -651,7 +645,7 @@ where
 ///
 /// # Examples
 /// ```
-/// # use redo::{self, Command, Record};
+/// # use redo::{self, Command, Record, RecordBuilder};
 /// # struct Add(char);
 /// # impl Command for Add {
 /// #     type Target = String;
@@ -660,7 +654,7 @@ where
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
 /// # }
 /// # fn foo() -> Record<Add> {
-/// Record::builder()
+/// RecordBuilder::new()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
