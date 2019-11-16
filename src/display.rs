@@ -1,4 +1,4 @@
-use crate::{At, Command, Entry, History, Record};
+use crate::{At, Command, Entry, History, Record, Signal};
 use alloc::format;
 use alloc::string::ToString;
 #[cfg(feature = "chrono")]
@@ -92,7 +92,7 @@ impl<C: Command, F> Display<'_, History<C, F>> {
     }
 }
 
-impl<C: Command + fmt::Display, F> Display<'_, Record<C, F>> {
+impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, Record<C, F>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
         self.view.mark(f, 0)?;
@@ -128,7 +128,7 @@ impl<C: Command + fmt::Display, F> Display<'_, Record<C, F>> {
     }
 }
 
-impl<C: Command + fmt::Display, F> Display<'_, History<C, F>> {
+impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, History<C, F>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -219,7 +219,7 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, Record<C, F>> {
+impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, Record<C, F>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -233,7 +233,7 @@ impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, Record<C, F>> {
     }
 }
 
-impl<C: Command, F> fmt::Display for Display<'_, History<C, F>>
+impl<C: Command, F: FnMut(Signal)> fmt::Display for Display<'_, History<C, F>>
 where
     C: fmt::Display,
     C::Target: fmt::Display,

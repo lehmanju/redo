@@ -1,6 +1,6 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
+use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal, Timeline};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use core::fmt;
@@ -79,7 +79,7 @@ impl<C: Command> Record<C> {
     }
 }
 
-impl<C: Command, F> Record<C, F> {
+impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -113,97 +113,12 @@ impl<C: Command, F> Record<C, F> {
         self.commands.is_empty()
     }
 
-    /// Returns the position of the current command.
-    #[inline]
-    pub fn current(&self) -> usize {
-        self.current
-    }
-
     /// Returns the limit of the record.
     #[inline]
     pub fn limit(&self) -> usize {
         self.limit.get()
     }
 
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
-    #[inline]
-    pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.replace(slot)
-    }
-
-    /// Creates a new record that uses the provided slot.
-    #[inline]
-    pub fn connect_with<G>(self, slot: G) -> Record<C, G> {
-        Record {
-            commands: self.commands,
-            target: self.target,
-            current: self.current,
-            limit: self.limit,
-            saved: self.saved,
-            slot: Some(slot),
-        }
-    }
-
-    /// Removes and returns the slot.
-    #[inline]
-    pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.take()
-    }
-
-    /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.current())
-    }
-
-    /// Returns `true` if the record can undo.
-    #[inline]
-    pub fn can_undo(&self) -> bool {
-        self.current() > 0
-    }
-
-    /// Returns `true` if the record can redo.
-    #[inline]
-    pub fn can_redo(&self) -> bool {
-        self.current() < self.len()
-    }
-
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>, C> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a queue.
-    #[inline]
-    pub fn queue(&mut self) -> Queue<Record<C, F>, C> {
-        Queue::from(self)
-    }
-
-    /// Returns a reference to the `target`.
-    #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        &self.target
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        &mut self.target
-    }
-
-    /// Consumes the record, returning the `target`.
-    #[inline]
-    pub fn into_target(self) -> C::Target {
-        self.target
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Sets the limit of the record and returns the new limit.
     ///
     /// If this limit is reached it will start popping of commands at the beginning
@@ -247,6 +162,51 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.limit()
     }
 
+    /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous slot is returned if it exists.
+    #[inline]
+    pub fn connect(&mut self, slot: F) -> Option<F> {
+        self.slot.replace(slot)
+    }
+
+    /// Creates a new record that uses the provided slot.
+    #[inline]
+    pub fn connect_with<G>(self, slot: G) -> Record<C, G> {
+        Record {
+            commands: self.commands,
+            target: self.target,
+            current: self.current,
+            limit: self.limit,
+            saved: self.saved,
+            slot: Some(slot),
+        }
+    }
+
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<F> {
+        self.slot.take()
+    }
+
+    /// Returns `true` if the record can undo.
+    #[inline]
+    pub fn can_undo(&self) -> bool {
+        self.current() > 0
+    }
+
+    /// Returns `true` if the record can redo.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        self.current() < self.len()
+    }
+
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.saved.map_or(false, |saved| saved == self.current())
+    }
+
     /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
@@ -272,6 +232,12 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     #[inline]
     pub fn revert(&mut self) -> Option<Result<C>> {
         self.saved.and_then(|saved| self.go_to(saved))
+    }
+
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn current(&self) -> usize {
+        self.current
     }
 
     /// Removes all commands from the record without undoing them.
@@ -536,9 +502,41 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         }
         Ok(())
     }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<Record<C, F>> {
+        Queue::from(self)
+    }
+
+    /// Returns a reference to the `target`.
+    #[inline]
+    pub fn as_target(&self) -> &C::Target {
+        &self.target
+    }
+
+    /// Returns a mutable reference to the `target`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        &mut self.target
+    }
+
+    /// Consumes the record, returning the `target`.
+    #[inline]
+    pub fn into_target(self) -> C::Target {
+        self.target
+    }
 }
 
-impl<C: Command + ToString, F> Record<C, F> {
+impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -573,6 +571,10 @@ impl<C: Command + ToString, F> Record<C, F> {
     }
 }
 
+impl<C: Command, F: FnMut(Signal)> Timeline for Record<C, F> {
+    type Command = C;
+}
+
 impl<C: Command> Default for Record<C>
 where
     C::Target: Default,
@@ -583,28 +585,28 @@ where
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for Record<C, F> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Record<C, F> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.as_target()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for Record<C, F> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Record<C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.as_mut_target()
     }
 }
 
-impl<C: Command, F> From<History<C, F>> for Record<C, F> {
+impl<C: Command, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
     #[inline]
     fn from(history: History<C, F>) -> Record<C, F> {
         history.record
     }
 }
 
-impl<C: Command, F> fmt::Debug for Record<C, F>
+impl<C: Command, F: FnMut(Signal)> fmt::Debug for Record<C, F>
 where
     C: fmt::Debug,
     C::Target: fmt::Debug,
@@ -622,7 +624,7 @@ where
 }
 
 #[cfg(feature = "display")]
-impl<C: Command, F> fmt::Display for Record<C, F>
+impl<C: Command, F: FnMut(Signal)> fmt::Display for Record<C, F>
 where
     C: fmt::Display,
     C::Target: fmt::Display,
@@ -712,7 +714,11 @@ impl RecordBuilder {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> Record<C, F> {
+    pub fn build_with<C: Command, F: FnMut(Signal)>(
+        &self,
+        target: C::Target,
+        slot: F,
+    ) -> Record<C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -734,7 +740,7 @@ impl RecordBuilder {
 
     /// Creates the record with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<C: Command, F>(&self, slot: F) -> Record<C, F>
+    pub fn default_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> Record<C, F>
     where
         C::Target: Default,
     {

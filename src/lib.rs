@@ -123,6 +123,12 @@ pub use self::{
 /// A specialized Result type for undo-redo operations.
 pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
 
+/// Common trait for data structures that can use commands.
+pub trait Timeline {
+    /// The command type used.
+    type Command: Command;
+}
+
 /// Base functionality for all commands.
 pub trait Command {
     /// The target type.
@@ -153,12 +159,14 @@ pub trait Command {
     ///
     /// # Examples
     /// ```
-    /// # use redo::{Command, Merge, Record};
+    /// use redo::{Command, Merge, Record};
+    /// use std::convert::Infallible;
+    ///
     /// struct Add(String);
     ///
     /// impl Command for Add {
     ///     type Target = String;
-    ///     type Error = ();
+    ///     type Error = Infallible;
     ///
     ///     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
     ///         s.push_str(&self.0);

@@ -1,6 +1,8 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal};
+use crate::{
+    At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
+};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -74,7 +76,7 @@ impl<C: Command> History<C> {
     }
 }
 
-impl<C: Command, F> History<C, F> {
+impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -114,6 +116,37 @@ impl<C: Command, F> History<C, F> {
         self.record.limit()
     }
 
+    /// Sets the limit of the history and returns the new limit.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the history when new commands are applied. No limit is set by
+    /// default which means it may grow indefinitely.
+    ///
+    /// If `limit < len` the first commands will be removed until `len == limit`.
+    /// However, if the current active command is going to be removed, the limit is instead
+    /// adjusted to `len - active` so the active command is not removed.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
+    #[inline]
+    pub fn set_limit(&mut self, limit: usize) -> usize {
+        let len = self.len();
+        let limit = self.record.set_limit(limit);
+        let diff = len - self.len();
+        let root = self.branch();
+        for current in 0..diff {
+            self.rm_child(root, current);
+        }
+        for branch in self
+            .branches
+            .values_mut()
+            .filter(|branch| branch.parent.branch == root)
+        {
+            branch.parent.current -= diff;
+        }
+        limit
+    }
+
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
@@ -146,6 +179,24 @@ impl<C: Command, F> History<C, F> {
         self.record.is_saved()
     }
 
+    /// Marks the target as currently being in a saved or unsaved state.
+    #[inline]
+    pub fn set_saved(&mut self, saved: bool) {
+        self.record.set_saved(saved);
+        self.saved = None;
+    }
+
+    /// Revert the changes done to the target since the saved state.
+    #[inline]
+    pub fn revert(&mut self) -> Option<Result<C>> {
+        if self.record.saved.is_some() {
+            self.record.revert()
+        } else {
+            self.saved
+                .and_then(|saved| self.go_to(saved.branch, saved.current))
+        }
+    }
+
     /// Returns `true` if the history can undo.
     #[inline]
     pub fn can_undo(&self) -> bool {
@@ -168,89 +219,6 @@ impl<C: Command, F> History<C, F> {
     #[inline]
     pub fn current(&self) -> usize {
         self.record.current()
-    }
-
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>, C> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a queue.
-    #[inline]
-    pub fn queue(&mut self) -> Queue<History<C, F>, C> {
-        Queue::from(self)
-    }
-
-    /// Returns a reference to the `target`.
-    #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.record.as_target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.record.as_mut_target()
-    }
-
-    /// Consumes the history, returning the `target`.
-    #[inline]
-    pub fn into_target(self) -> C::Target {
-        self.record.into_target()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> History<C, F> {
-    /// Sets the limit of the history and returns the new limit.
-    ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the history when new commands are applied. No limit is set by
-    /// default which means it may grow indefinitely.
-    ///
-    /// If `limit < len` the first commands will be removed until `len == limit`.
-    /// However, if the current active command is going to be removed, the limit is instead
-    /// adjusted to `len - active` so the active command is not removed.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
-    #[inline]
-    pub fn set_limit(&mut self, limit: usize) -> usize {
-        let len = self.len();
-        let limit = self.record.set_limit(limit);
-        let diff = len - self.len();
-        let root = self.branch();
-        for current in 0..diff {
-            self.rm_child(root, current);
-        }
-        for branch in self
-            .branches
-            .values_mut()
-            .filter(|branch| branch.parent.branch == root)
-        {
-            branch.parent.current -= diff;
-        }
-        limit
-    }
-
-    /// Marks the target as currently being in a saved or unsaved state.
-    #[inline]
-    pub fn set_saved(&mut self, saved: bool) {
-        self.record.set_saved(saved);
-        self.saved = None;
-    }
-
-    /// Revert the changes done to the target since the saved state.
-    #[inline]
-    pub fn revert(&mut self) -> Option<Result<C>> {
-        if self.record.saved.is_some() {
-            self.record.revert()
-        } else {
-            self.saved
-                .and_then(|saved| self.go_to(saved.branch, saved.current))
-        }
     }
 
     /// Removes all commands from the history without undoing them.
@@ -435,6 +403,38 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         Ok(())
     }
 
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<History<C, F>> {
+        Queue::from(self)
+    }
+
+    /// Returns a reference to the `target`.
+    #[inline]
+    pub fn as_target(&self) -> &C::Target {
+        self.record.as_target()
+    }
+
+    /// Returns a mutable reference to the `target`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_target(&mut self) -> &mut C::Target {
+        self.record.as_mut_target()
+    }
+
+    /// Consumes the history, returning the `target`.
+    #[inline]
+    pub fn into_target(self) -> C::Target {
+        self.record.into_target()
+    }
+
     /// Sets the `root`.
     #[inline]
     fn set_root(&mut self, root: usize, current: usize) {
@@ -517,7 +517,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 }
 
-impl<C: Command + ToString, F> History<C, F> {
+impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -544,6 +544,10 @@ impl<C: Command + ToString, F> History<C, F> {
     }
 }
 
+impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
+    type Command = C;
+}
+
 impl<C: Command> Default for History<C>
 where
     C::Target: Default,
@@ -554,21 +558,21 @@ where
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for History<C, F> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for History<C, F> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.as_target()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for History<C, F> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for History<C, F> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.as_mut_target()
     }
 }
 
-impl<C: Command, F> From<Record<C, F>> for History<C, F> {
+impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
     #[inline]
     fn from(record: Record<C, F>) -> Self {
         History {
@@ -581,7 +585,7 @@ impl<C: Command, F> From<Record<C, F>> for History<C, F> {
     }
 }
 
-impl<C: Command, F> fmt::Debug for History<C, F>
+impl<C: Command, F: FnMut(Signal)> fmt::Debug for History<C, F>
 where
     C: fmt::Debug,
     C::Target: fmt::Debug,
@@ -599,7 +603,7 @@ where
 }
 
 #[cfg(feature = "display")]
-impl<C: Command, F> fmt::Display for History<C, F>
+impl<C: Command, F: FnMut(Signal)> fmt::Display for History<C, F>
 where
     C: fmt::Display,
     C::Target: fmt::Display,
@@ -686,7 +690,11 @@ impl HistoryBuilder {
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> History<C, F> {
+    pub fn build_with<C: Command, F: FnMut(Signal)>(
+        &self,
+        target: C::Target,
+        slot: F,
+    ) -> History<C, F> {
         History::from(self.inner.build_with(target, slot))
     }
 
@@ -701,7 +709,7 @@ impl HistoryBuilder {
 
     /// Creates the history with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<C: Command, F>(&self, slot: F) -> History<C, F>
+    pub fn default_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> History<C, F>
     where
         C::Target: Default,
     {

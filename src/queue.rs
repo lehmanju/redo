@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, History, Record, Result, Signal};
+use crate::{Checkpoint, Command, History, Record, Result, Signal, Timeline};
 use alloc::vec::Vec;
 
 /// A command queue wrapper.
@@ -35,22 +35,22 @@ use alloc::vec::Vec;
 /// # }
 /// ```
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Queue<'a, T, C> {
+pub struct Queue<'a, T: Timeline> {
     inner: &'a mut T,
-    queue: Vec<Action<C>>,
+    queue: Vec<Action<T::Command>>,
 }
 
-impl<'a, T, C> From<&'a mut T> for Queue<'a, T, C> {
+impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
         Queue::new(inner)
     }
 }
 
-impl<'a, T, C> Queue<'a, T, C> {
+impl<'a, T: Timeline> Queue<'a, T> {
     /// Returns a queue.
     #[inline]
-    pub fn new(inner: &'a mut T) -> Queue<'a, T, C> {
+    pub fn new(inner: &'a mut T) -> Queue<'a, T> {
         Queue {
             inner,
             queue: Vec::new(),
@@ -92,7 +92,7 @@ impl<'a, T, C> Queue<'a, T, C> {
 
     /// Queues an `apply` action.
     #[inline]
-    pub fn apply(&mut self, command: C) {
+    pub fn apply(&mut self, command: T::Command) {
         self.queue.push(Action::Apply(command));
     }
 
@@ -113,16 +113,16 @@ impl<'a, T, C> Queue<'a, T, C> {
     pub fn cancel(self) {}
 }
 
-impl<T, C> Extend<C> for Queue<'_, T, C> {
+impl<T: Timeline> Extend<T::Command> for Queue<'_, T> {
     #[inline]
-    fn extend<I: IntoIterator<Item = C>>(&mut self, commands: I) {
+    fn extend<I: IntoIterator<Item = T::Command>>(&mut self, commands: I) {
         for command in commands {
             self.apply(command);
         }
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -160,13 +160,13 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<C, F>, C> {
+    pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
     }
 
@@ -185,21 +185,21 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>, C> {
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for Queue<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Queue<'_, Record<C, F>> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for Queue<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Queue<'_, Record<C, F>> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -237,13 +237,13 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<C, F>, C> {
+    pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()
     }
 
@@ -262,14 +262,14 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>, C> {
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for Queue<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Queue<'_, History<C, F>> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for Queue<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Queue<'_, History<C, F>> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()

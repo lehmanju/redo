@@ -1,4 +1,4 @@
-use crate::{Command, Entry, History, Queue, Record, Result, Signal};
+use crate::{Command, Entry, History, Queue, Record, Result, Signal, Timeline};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
@@ -36,22 +36,22 @@ use alloc::vec::Vec;
 /// # }
 /// ```
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Checkpoint<'a, T, C> {
+pub struct Checkpoint<'a, T: Timeline> {
     inner: &'a mut T,
-    stack: Vec<Action<C>>,
+    stack: Vec<Action<T::Command>>,
 }
 
-impl<'a, T, C> From<&'a mut T> for Checkpoint<'a, T, C> {
+impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
         Checkpoint::new(inner)
     }
 }
 
-impl<'a, T, C> Checkpoint<'a, T, C> {
+impl<'a, T: Timeline> Checkpoint<'a, T> {
     /// Returns a checkpoint.
     #[inline]
-    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T, C> {
+    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
         Checkpoint {
             inner,
             stack: Vec::new(),
@@ -96,7 +96,7 @@ impl<'a, T, C> Checkpoint<'a, T, C> {
     pub fn commit(self) {}
 }
 
-impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
@@ -200,13 +200,13 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<C, F>, C> {
+    pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
     }
 
@@ -225,21 +225,21 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>, C> {
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for Checkpoint<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Checkpoint<'_, Record<C, F>> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for Checkpoint<'_, Record<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Checkpoint<'_, Record<C, F>> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
@@ -339,13 +339,13 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>, C> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>, C> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<C, F>, C> {
+    pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()
     }
 
@@ -364,14 +364,14 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>, C> {
     }
 }
 
-impl<C: Command, F> AsRef<C::Target> for Checkpoint<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Checkpoint<'_, History<C, F>> {
     #[inline]
     fn as_ref(&self) -> &C::Target {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F> AsMut<C::Target> for Checkpoint<'_, History<C, F>, C> {
+impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Checkpoint<'_, History<C, F>> {
     #[inline]
     fn as_mut(&mut self) -> &mut C::Target {
         self.inner.as_mut()
