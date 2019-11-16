@@ -640,14 +640,14 @@ pub(crate) struct Branch<C> {
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct HistoryBuilder<C: Command> {
-    inner: RecordBuilder<C>,
+pub struct HistoryBuilder {
+    inner: RecordBuilder,
 }
 
-impl<C: Command> HistoryBuilder<C> {
+impl HistoryBuilder {
     /// Returns a builder for a history.
     #[inline]
-    pub fn new() -> HistoryBuilder<C> {
+    pub fn new() -> HistoryBuilder {
         HistoryBuilder {
             inner: RecordBuilder::new(),
         }
@@ -655,7 +655,7 @@ impl<C: Command> HistoryBuilder<C> {
 
     /// Sets the capacity for the history.
     #[inline]
-    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder<C> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder {
         self.inner.capacity(capacity);
         self
     }
@@ -665,7 +665,7 @@ impl<C: Command> HistoryBuilder<C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder<C> {
+    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder {
         self.inner.limit(limit);
         self
     }
@@ -673,45 +673,46 @@ impl<C: Command> HistoryBuilder<C> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder<C> {
+    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder {
         self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
     #[inline]
-    pub fn build(&self, target: C::Target) -> History<C> {
+    pub fn build<C: Command>(&self, target: C::Target) -> History<C> {
         History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with<F>(&self, target: C::Target, slot: F) -> History<C, F> {
+    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> History<C, F> {
         History::from(self.inner.build_with(target, slot))
     }
-}
 
-impl<C: Command> Default for HistoryBuilder<C> {
-    #[inline]
-    fn default() -> Self {
-        HistoryBuilder::new()
-    }
-}
-
-impl<C: Command> HistoryBuilder<C>
-where
-    C::Target: Default,
-{
     /// Creates the history with a default `target`.
     #[inline]
-    pub fn default(&self) -> History<C> {
+    pub fn default<C: Command>(&self) -> History<C>
+    where
+        C::Target: Default,
+    {
         self.build(Default::default())
     }
 
     /// Creates the history with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<F>(&self, slot: F) -> History<C, F> {
+    pub fn default_with<C: Command, F>(&self, slot: F) -> History<C, F>
+    where
+        C::Target: Default,
+    {
         self.build_with(Default::default(), slot)
+    }
+}
+
+impl Default for HistoryBuilder {
+    #[inline]
+    fn default() -> Self {
+        HistoryBuilder::new()
     }
 }
 

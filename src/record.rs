@@ -4,7 +4,6 @@ use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use core::fmt;
-use core::marker::PhantomData;
 use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -76,14 +75,7 @@ impl<C: Command> Record<C> {
     /// Returns a new record.
     #[inline]
     pub fn new(target: C::Target) -> Record<C> {
-        Record {
-            commands: VecDeque::new(),
-            target,
-            current: 0,
-            limit: MAX_LIMIT,
-            saved: Some(0),
-            slot: None,
-        }
+        RecordBuilder::new().build(target)
     }
 }
 
@@ -663,19 +655,17 @@ where
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct RecordBuilder<C: Command> {
-    commands: PhantomData<C>,
+pub struct RecordBuilder {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
 }
 
-impl<C: Command> RecordBuilder<C> {
+impl RecordBuilder {
     /// Returns a builder for a record.
     #[inline]
-    pub fn new() -> RecordBuilder<C> {
+    pub fn new() -> RecordBuilder {
         RecordBuilder {
-            commands: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
@@ -684,7 +674,7 @@ impl<C: Command> RecordBuilder<C> {
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder<C> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder {
         self.capacity = capacity;
         self
     }
@@ -694,7 +684,7 @@ impl<C: Command> RecordBuilder<C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder<C> {
+    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -702,14 +692,14 @@ impl<C: Command> RecordBuilder<C> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder<C> {
+    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(&self, target: C::Target) -> Record<C> {
+    pub fn build<C: Command>(&self, target: C::Target) -> Record<C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -722,7 +712,7 @@ impl<C: Command> RecordBuilder<C> {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with<F>(&self, target: C::Target, slot: F) -> Record<C, F> {
+    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> Record<C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -732,29 +722,30 @@ impl<C: Command> RecordBuilder<C> {
             slot: Some(slot),
         }
     }
-}
 
-impl<C: Command> Default for RecordBuilder<C> {
-    #[inline]
-    fn default() -> Self {
-        RecordBuilder::new()
-    }
-}
-
-impl<C: Command> RecordBuilder<C>
-where
-    C::Target: Default,
-{
     /// Creates the record with a default `target`.
     #[inline]
-    pub fn default(&self) -> Record<C> {
+    pub fn default<C: Command>(&self) -> Record<C>
+    where
+        C::Target: Default,
+    {
         self.build(Default::default())
     }
 
     /// Creates the record with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<F>(&self, slot: F) -> Record<C, F> {
+    pub fn default_with<C: Command, F>(&self, slot: F) -> Record<C, F>
+    where
+        C::Target: Default,
+    {
         self.build_with(Default::default(), slot)
+    }
+}
+
+impl Default for RecordBuilder {
+    #[inline]
+    fn default() -> Self {
+        RecordBuilder::new()
     }
 }
 
