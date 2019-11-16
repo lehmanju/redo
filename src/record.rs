@@ -684,7 +684,7 @@ impl<C: Command> RecordBuilder<C> {
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<C> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder<C> {
         self.capacity = capacity;
         self
     }
@@ -694,7 +694,7 @@ impl<C: Command> RecordBuilder<C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<C> {
+    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder<C> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -702,14 +702,14 @@ impl<C: Command> RecordBuilder<C> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<C> {
+    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder<C> {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(self, target: C::Target) -> Record<C> {
+    pub fn build(&self, target: C::Target) -> Record<C> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -722,7 +722,7 @@ impl<C: Command> RecordBuilder<C> {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with<F>(self, target: C::Target, slot: F) -> Record<C, F> {
+    pub fn build_with<F>(&self, target: C::Target, slot: F) -> Record<C, F> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -747,13 +747,13 @@ where
 {
     /// Creates the record with a default `target`.
     #[inline]
-    pub fn default(self) -> Record<C> {
+    pub fn default(&self) -> Record<C> {
         self.build(Default::default())
     }
 
-    /// Creates the record with a default `target`.
+    /// Creates the record with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<F>(self, slot: F) -> Record<C, F> {
+    pub fn default_with<F>(&self, slot: F) -> Record<C, F> {
         self.build_with(Default::default(), slot)
     }
 }

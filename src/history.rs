@@ -655,8 +655,8 @@ impl<C: Command> HistoryBuilder<C> {
 
     /// Sets the capacity for the history.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<C> {
-        self.inner = self.inner.capacity(capacity);
+    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder<C> {
+        self.inner.capacity(capacity);
         self
     }
 
@@ -665,28 +665,28 @@ impl<C: Command> HistoryBuilder<C> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> HistoryBuilder<C> {
-        self.inner = self.inner.limit(limit);
+    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder<C> {
+        self.inner.limit(limit);
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> HistoryBuilder<C> {
-        self.inner = self.inner.saved(saved);
+    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder<C> {
+        self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
     #[inline]
-    pub fn build(self, target: C::Target) -> History<C> {
+    pub fn build(&self, target: C::Target) -> History<C> {
         History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with<F>(self, target: C::Target, slot: F) -> History<C, F> {
+    pub fn build_with<F>(&self, target: C::Target, slot: F) -> History<C, F> {
         History::from(self.inner.build_with(target, slot))
     }
 }
@@ -704,13 +704,13 @@ where
 {
     /// Creates the history with a default `target`.
     #[inline]
-    pub fn default(self) -> History<C> {
+    pub fn default(&self) -> History<C> {
         self.build(Default::default())
     }
 
-    /// Creates the history with a default `target`.
+    /// Creates the history with a default `target` and with the slot.
     #[inline]
-    pub fn default_with<F>(self, slot: F) -> History<C, F> {
+    pub fn default_with<F>(&self, slot: F) -> History<C, F> {
         self.build_with(Default::default(), slot)
     }
 }
