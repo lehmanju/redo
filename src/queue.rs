@@ -40,13 +40,6 @@ pub struct Queue<'a, T: Timeline> {
     queue: Vec<Action<T::Command>>,
 }
 
-impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
-    #[inline]
-    fn from(inner: &'a mut T) -> Self {
-        Queue::new(inner)
-    }
-}
-
 impl<'a, T: Timeline> Queue<'a, T> {
     /// Returns a queue.
     #[inline]
@@ -108,18 +101,17 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.queue.push(Action::Redo);
     }
 
-    /// Cancels the queued actions.
+    /// Queues an `apply` action for each command in the iterator.
     #[inline]
-    pub fn cancel(self) {}
-}
-
-impl<T: Timeline> Extend<T::Command> for Queue<'_, T> {
-    #[inline]
-    fn extend<I: IntoIterator<Item = T::Command>>(&mut self, commands: I) {
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = T::Command>) {
         for command in commands {
             self.apply(command);
         }
     }
+
+    /// Cancels the queued actions.
+    #[inline]
+    pub fn cancel(self) {}
 }
 
 impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
@@ -182,20 +174,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     #[inline]
     pub fn as_mut_target(&mut self) -> &mut C::Target {
         self.inner.as_mut_target()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Queue<'_, Record<C, F>> {
-    #[inline]
-    fn as_ref(&self) -> &C::Target {
-        self.inner.as_ref()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Queue<'_, Record<C, F>> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut C::Target {
-        self.inner.as_mut()
     }
 }
 
@@ -262,16 +240,45 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Queue<'_, History<C, F>> {
+impl<T: Timeline> Timeline for Queue<'_, T> {
+    type Command = T::Command;
+
     #[inline]
-    fn as_ref(&self) -> &C::Target {
+    fn apply(&mut self, command: Self::Command) -> Result<T::Command> {
+        self.apply(command);
+        Ok(())
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result<T::Command>> {
+        self.undo();
+        Some(Ok(()))
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result<T::Command>> {
+        self.redo();
+        Some(Ok(()))
+    }
+}
+
+impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
+    #[inline]
+    fn from(inner: &'a mut T) -> Self {
+        Queue::new(inner)
+    }
+}
+
+impl<T: Timeline + AsRef<U>, U> AsRef<U> for Queue<'_, T> {
+    #[inline]
+    fn as_ref(&self) -> &U {
         self.inner.as_ref()
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Queue<'_, History<C, F>> {
+impl<T: Timeline + AsMut<U>, U> AsMut<U> for Queue<'_, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut C::Target {
+    fn as_mut(&mut self) -> &mut U {
         self.inner.as_mut()
     }
 }

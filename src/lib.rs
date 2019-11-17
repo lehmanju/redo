@@ -127,6 +127,15 @@ pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
 pub trait Timeline {
     /// The command type used.
     type Command: Command;
+
+    /// Applies the command to the record.
+    fn apply(&mut self, command: Self::Command) -> Result<Self::Command>;
+
+    /// Calls the undo method on the current command.
+    fn undo(&mut self) -> Option<Result<Self::Command>>;
+
+    /// Calls the redo method on the current command.
+    fn redo(&mut self) -> Option<Result<Self::Command>>;
 }
 
 /// Base functionality for all commands.

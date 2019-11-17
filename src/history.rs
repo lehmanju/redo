@@ -546,6 +546,21 @@ impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
 
 impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
     type Command = C;
+
+    #[inline]
+    fn apply(&mut self, command: Self::Command) -> Result<C> {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result<C>> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result<C>> {
+        self.redo()
+    }
 }
 
 impl<C: Command> Default for History<C>

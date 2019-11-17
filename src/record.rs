@@ -573,6 +573,21 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
 
 impl<C: Command, F: FnMut(Signal)> Timeline for Record<C, F> {
     type Command = C;
+
+    #[inline]
+    fn apply(&mut self, command: Self::Command) -> Result<C> {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result<C>> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result<C>> {
+        self.redo()
+    }
 }
 
 impl<C: Command> Default for Record<C>
