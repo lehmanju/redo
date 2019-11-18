@@ -29,9 +29,9 @@ use alloc::vec::Vec;
 /// cp.apply(Add('a'))?;
 /// cp.apply(Add('b'))?;
 /// cp.apply(Add('c'))?;
-/// assert_eq!(cp.as_target(), "abc");
+/// assert_eq!(cp.target(), "abc");
 /// cp.cancel()?;
-/// assert_eq!(record.as_target(), "");
+/// assert_eq!(record.target(), "");
 /// # Ok(())
 /// # }
 /// ```
@@ -201,16 +201,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.inner.as_target()
+    pub fn target(&self) -> &C::Target {
+        self.inner.target()
     }
 
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.inner.as_mut_target()
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.inner.target_mut()
     }
 }
 
@@ -298,16 +298,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.inner.as_target()
+    pub fn target(&self) -> &C::Target {
+        self.inner.target()
     }
 
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.inner.as_mut_target()
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.inner.target_mut()
     }
 }
 
@@ -356,20 +356,6 @@ impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     }
 }
 
-impl<T: Timeline + AsRef<U>, U> AsRef<U> for Checkpoint<'_, T> {
-    #[inline]
-    fn as_ref(&self) -> &U {
-        self.inner.as_ref()
-    }
-}
-
-impl<T: Timeline + AsMut<U>, U> AsMut<U> for Checkpoint<'_, T> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut U {
-        self.inner.as_mut()
-    }
-}
-
 /// An action that can be applied to a Record or History.
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
@@ -408,21 +394,21 @@ mod tests {
         cp1.apply(Add('a')).unwrap();
         cp1.apply(Add('b')).unwrap();
         cp1.apply(Add('c')).unwrap();
-        assert_eq!(cp1.as_target(), "abc");
+        assert_eq!(cp1.target(), "abc");
         let mut cp2 = cp1.checkpoint();
         cp2.apply(Add('d')).unwrap();
         cp2.apply(Add('e')).unwrap();
         cp2.apply(Add('f')).unwrap();
-        assert_eq!(cp2.as_target(), "abcdef");
+        assert_eq!(cp2.target(), "abcdef");
         let mut cp3 = cp2.checkpoint();
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_target(), "abcdefghi");
+        assert_eq!(cp3.target(), "abcdefghi");
         cp3.commit();
         cp2.commit();
         cp1.commit();
-        assert_eq!(record.as_target(), "abcdefghi");
+        assert_eq!(record.target(), "abcdefghi");
     }
 
     #[test]
@@ -440,12 +426,12 @@ mod tests {
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_target(), "abcdefghi");
+        assert_eq!(cp3.target(), "abcdefghi");
         cp3.cancel().unwrap();
-        assert_eq!(cp2.as_target(), "abcdef");
+        assert_eq!(cp2.target(), "abcdef");
         cp2.cancel().unwrap();
-        assert_eq!(cp1.as_target(), "abc");
+        assert_eq!(cp1.target(), "abc");
         cp1.cancel().unwrap();
-        assert_eq!(record.as_target(), "");
+        assert_eq!(record.target(), "");
     }
 }

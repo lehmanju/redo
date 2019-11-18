@@ -70,15 +70,15 @@ fn main() -> redo::Result<Add> {
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
-    assert_eq!(record.as_target(), "abc");
+    assert_eq!(record.target(), "abc");
     record.undo().unwrap()?;
     record.undo().unwrap()?;
     record.undo().unwrap()?;
-    assert_eq!(record.as_target(), "");
+    assert_eq!(record.target(), "");
     record.redo().unwrap()?;
     record.redo().unwrap()?;
     record.redo().unwrap()?;
-    assert_eq!(record.as_target(), "abc");
+    assert_eq!(record.target(), "abc");
     Ok(())
 }
 ```

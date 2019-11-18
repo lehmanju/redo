@@ -44,9 +44,9 @@ use serde::{Deserialize, Serialize};
 /// history.go_to(abc, 1).unwrap()?;
 /// history.apply(Add('f'))?;
 /// history.apply(Add('g'))?;
-/// assert_eq!(history.as_target(), "afg");
+/// assert_eq!(history.target(), "afg");
 /// history.go_to(abc, 3).unwrap()?;
-/// assert_eq!(history.as_target(), "abc");
+/// assert_eq!(history.target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -417,16 +417,16 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.record.as_target()
+    pub fn target(&self) -> &C::Target {
+        self.record.target()
     }
 
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.record.as_mut_target()
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.record.target_mut()
     }
 
     /// Consumes the history, returning the `target`.
@@ -570,20 +570,6 @@ where
     #[inline]
     fn default() -> History<C> {
         History::new(Default::default())
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for History<C, F> {
-    #[inline]
-    fn as_ref(&self) -> &C::Target {
-        self.as_target()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for History<C, F> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut C::Target {
-        self.as_mut_target()
     }
 }
 
@@ -784,55 +770,55 @@ mod tests {
         history.apply(Add('c')).unwrap();
         history.apply(Add('d')).unwrap();
         history.apply(Add('e')).unwrap();
-        assert_eq!(history.as_target(), "abcde");
+        assert_eq!(history.target(), "abcde");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
-        assert_eq!(history.as_target(), "abc");
+        assert_eq!(history.target(), "abc");
         let abcde = history.branch();
         history.apply(Add('f')).unwrap();
         history.apply(Add('g')).unwrap();
-        assert_eq!(history.as_target(), "abcfg");
+        assert_eq!(history.target(), "abcfg");
         history.undo().unwrap().unwrap();
         let abcfg = history.branch();
         history.apply(Add('h')).unwrap();
         history.apply(Add('i')).unwrap();
         history.apply(Add('j')).unwrap();
-        assert_eq!(history.as_target(), "abcfhij");
+        assert_eq!(history.target(), "abcfhij");
         history.undo().unwrap().unwrap();
         let abcfhij = history.branch();
         history.apply(Add('k')).unwrap();
-        assert_eq!(history.as_target(), "abcfhik");
+        assert_eq!(history.target(), "abcfhik");
         history.undo().unwrap().unwrap();
         let abcfhik = history.branch();
         history.apply(Add('l')).unwrap();
-        assert_eq!(history.as_target(), "abcfhil");
+        assert_eq!(history.target(), "abcfhil");
         history.apply(Add('m')).unwrap();
-        assert_eq!(history.as_target(), "abcfhilm");
+        assert_eq!(history.target(), "abcfhilm");
         let abcfhilm = history.branch();
         history.go_to(abcde, 2).unwrap().unwrap();
         history.apply(Add('n')).unwrap();
         history.apply(Add('o')).unwrap();
-        assert_eq!(history.as_target(), "abno");
+        assert_eq!(history.target(), "abno");
         history.undo().unwrap().unwrap();
         let abno = history.branch();
         history.apply(Add('p')).unwrap();
         history.apply(Add('q')).unwrap();
-        assert_eq!(history.as_target(), "abnpq");
+        assert_eq!(history.target(), "abnpq");
 
         let abnpq = history.branch();
         history.go_to(abcde, 5).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abcde");
+        assert_eq!(history.target(), "abcde");
         history.go_to(abcfg, 5).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abcfg");
+        assert_eq!(history.target(), "abcfg");
         history.go_to(abcfhij, 7).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abcfhij");
+        assert_eq!(history.target(), "abcfhij");
         history.go_to(abcfhik, 7).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abcfhik");
+        assert_eq!(history.target(), "abcfhik");
         history.go_to(abcfhilm, 8).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abcfhilm");
+        assert_eq!(history.target(), "abcfhilm");
         history.go_to(abno, 4).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abno");
+        assert_eq!(history.target(), "abno");
         history.go_to(abnpq, 5).unwrap().unwrap();
-        assert_eq!(history.as_target(), "abnpq");
+        assert_eq!(history.target(), "abnpq");
     }
 }

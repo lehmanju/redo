@@ -45,15 +45,15 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// record.apply(Add('a'))?;
 /// record.apply(Add('b'))?;
 /// record.apply(Add('c'))?;
-/// assert_eq!(record.as_target(), "abc");
+/// assert_eq!(record.target(), "abc");
 /// record.undo().unwrap()?;
 /// record.undo().unwrap()?;
 /// record.undo().unwrap()?;
-/// assert_eq!(record.as_target(), "");
+/// assert_eq!(record.target(), "");
 /// record.redo().unwrap()?;
 /// record.redo().unwrap()?;
 /// record.redo().unwrap()?;
-/// assert_eq!(record.as_target(), "abc");
+/// assert_eq!(record.target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -517,7 +517,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
+    pub fn target(&self) -> &C::Target {
         &self.target
     }
 
@@ -525,7 +525,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
+    pub fn target_mut(&mut self) -> &mut C::Target {
         &mut self.target
     }
 
@@ -597,20 +597,6 @@ where
     #[inline]
     fn default() -> Record<C> {
         Record::new(Default::default())
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsRef<C::Target> for Record<C, F> {
-    #[inline]
-    fn as_ref(&self) -> &C::Target {
-        self.as_target()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> AsMut<C::Target> for Record<C, F> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut C::Target {
-        self.as_mut_target()
     }
 }
 
@@ -870,22 +856,22 @@ mod tests {
 
         record.go_to(0).unwrap().unwrap();
         assert_eq!(record.current(), 0);
-        assert_eq!(record.as_target(), "");
+        assert_eq!(record.target(), "");
         record.go_to(5).unwrap().unwrap();
         assert_eq!(record.current(), 5);
-        assert_eq!(record.as_target(), "abcde");
+        assert_eq!(record.target(), "abcde");
         record.go_to(1).unwrap().unwrap();
         assert_eq!(record.current(), 1);
-        assert_eq!(record.as_target(), "a");
+        assert_eq!(record.target(), "a");
         record.go_to(4).unwrap().unwrap();
         assert_eq!(record.current(), 4);
-        assert_eq!(record.as_target(), "abcd");
+        assert_eq!(record.target(), "abcd");
         record.go_to(2).unwrap().unwrap();
         assert_eq!(record.current(), 2);
-        assert_eq!(record.as_target(), "ab");
+        assert_eq!(record.target(), "ab");
         record.go_to(3).unwrap().unwrap();
         assert_eq!(record.current(), 3);
-        assert_eq!(record.as_target(), "abc");
+        assert_eq!(record.target(), "abc");
         assert!(record.go_to(6).is_none());
         assert_eq!(record.current(), 3);
     }
@@ -899,8 +885,8 @@ mod tests {
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
         record.time_travel(&a).unwrap().unwrap();
-        assert_eq!(record.as_target(), "a");
+        assert_eq!(record.target(), "a");
         record.time_travel(&chrono::Utc::now()).unwrap().unwrap();
-        assert_eq!(record.as_target(), "abc");
+        assert_eq!(record.target(), "abc");
     }
 }

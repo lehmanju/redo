@@ -28,9 +28,9 @@ use alloc::vec::Vec;
 /// queue.apply(Add('a'));
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
-/// assert_eq!(queue.as_target(), "");
+/// assert_eq!(queue.target(), "");
 /// queue.commit()?;
-/// assert_eq!(record.as_target(), "abc");
+/// assert_eq!(record.target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -164,16 +164,16 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.inner.as_target()
+    pub fn target(&self) -> &C::Target {
+        self.inner.target()
     }
 
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.inner.as_mut_target()
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.inner.target_mut()
     }
 }
 
@@ -227,16 +227,16 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
 
     /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_target(&self) -> &C::Target {
-        self.inner.as_target()
+    pub fn target(&self) -> &C::Target {
+        self.inner.target()
     }
 
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_target(&mut self) -> &mut C::Target {
-        self.inner.as_mut_target()
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.inner.target_mut()
     }
 }
 
@@ -266,20 +266,6 @@ impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
         Queue::new(inner)
-    }
-}
-
-impl<T: Timeline + AsRef<U>, U> AsRef<U> for Queue<'_, T> {
-    #[inline]
-    fn as_ref(&self) -> &U {
-        self.inner.as_ref()
-    }
-}
-
-impl<T: Timeline + AsMut<U>, U> AsMut<U> for Queue<'_, T> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut U {
-        self.inner.as_mut()
     }
 }
 
@@ -329,12 +315,12 @@ mod tests {
         q3.apply(Add('a'));
         q3.apply(Add('b'));
         q3.apply(Add('c'));
-        assert_eq!(q3.as_target(), "");
+        assert_eq!(q3.target(), "");
         q3.commit().unwrap();
-        assert_eq!(q2.as_target(), "abc");
+        assert_eq!(q2.target(), "abc");
         q2.commit().unwrap();
-        assert_eq!(q1.as_target(), "");
+        assert_eq!(q1.target(), "");
         q1.commit().unwrap();
-        assert_eq!(record.as_target(), "abc");
+        assert_eq!(record.target(), "abc");
     }
 }
