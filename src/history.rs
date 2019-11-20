@@ -157,7 +157,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 
     /// Creates a new history that uses the provided slot.
     #[inline]
-    pub fn connect_with<G>(self, slot: G) -> History<C, G> {
+    pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> History<C, G> {
         History {
             root: self.root,
             next: self.next,
@@ -403,16 +403,16 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
-        Checkpoint::from(self)
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
+        Checkpoint::from(self)
     }
 
     /// Returns a reference to the `target`.

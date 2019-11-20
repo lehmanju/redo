@@ -172,7 +172,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 
     /// Creates a new record that uses the provided slot.
     #[inline]
-    pub fn connect_with<G>(self, slot: G) -> Record<C, G> {
+    pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> Record<C, G> {
         Record {
             commands: self.commands,
             target: self.target,
@@ -503,16 +503,16 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
-        Checkpoint::from(self)
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<C, F>> {
         Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
+        Checkpoint::from(self)
     }
 
     /// Returns a reference to the `target`.

@@ -150,16 +150,16 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -213,16 +213,16 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.

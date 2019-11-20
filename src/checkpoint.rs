@@ -187,16 +187,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -284,16 +284,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -433,5 +433,27 @@ mod tests {
         assert_eq!(cp1.target(), "abc");
         cp1.cancel().unwrap();
         assert_eq!(record.target(), "");
+    }
+
+    #[test]
+    fn restore() {
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        let mut cp = record.checkpoint();
+        cp.apply(Add('d')).unwrap();
+        cp.apply(Add('e')).unwrap();
+        cp.apply(Add('f')).unwrap();
+        assert_eq!(cp.target(), "def");
+        cp.cancel().unwrap();
+        assert_eq!(record.target(), "");
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        assert_eq!(record.target(), "abc");
     }
 }
