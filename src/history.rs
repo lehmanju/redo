@@ -548,7 +548,7 @@ impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
     type Command = C;
 
     #[inline]
-    fn apply(&mut self, command: Self::Command) -> Result<C> {
+    fn apply(&mut self, command: C) -> Result<C> {
         self.apply(command)
     }
 

@@ -31,16 +31,16 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// # impl Command for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
 /// #         Ok(())
 /// #     }
-/// #     fn undo(&mut self, s: &mut String) -> Result<(), Self::Error> {
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         self.0 = s.pop().ok_or("`s` is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> Result<(), &'static str> {
+/// # fn main() -> redo::Result<Add> {
 /// let mut record = Record::default();
 /// record.apply(Add('a'))?;
 /// record.apply(Add('b'))?;
@@ -434,6 +434,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 Record::undo
             };
             if let Err(err) = f(self).unwrap() {
+                self.slot = slot;
                 return Some(Err(err));
             }
         }
@@ -575,7 +576,7 @@ impl<C: Command, F: FnMut(Signal)> Timeline for Record<C, F> {
     type Command = C;
 
     #[inline]
-    fn apply(&mut self, command: Self::Command) -> Result<C> {
+    fn apply(&mut self, command: C) -> Result<C> {
         self.apply(command)
     }
 

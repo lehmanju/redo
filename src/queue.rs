@@ -244,7 +244,7 @@ impl<T: Timeline> Timeline for Queue<'_, T> {
     type Command = T::Command;
 
     #[inline]
-    fn apply(&mut self, command: Self::Command) -> Result<T::Command> {
+    fn apply(&mut self, command: T::Command) -> Result<T::Command> {
         self.apply(command);
         Ok(())
     }
