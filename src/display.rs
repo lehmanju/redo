@@ -9,7 +9,7 @@ use core::fmt::{self, Write};
 /// Configurable display formatting of structures.
 ///
 /// # Examples
-/// ```
+/// ```no_run
 /// # use std::fmt::{self, Display, Formatter};
 /// # use redo::{Command, History};
 /// # struct Add(char);
@@ -24,10 +24,7 @@ use core::fmt::{self, Write};
 /// # }
 /// # fn foo() -> History<Add> {
 /// let history = History::default();
-/// println!(
-///     "{}",
-///     history.display().graph(true).colored(true)
-/// );
+/// println!("{}", history.display().graph(true).colored(true));
 /// # history
 /// # }
 /// ```

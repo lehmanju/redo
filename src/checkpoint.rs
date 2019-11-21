@@ -119,8 +119,9 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
+        let saved = self.inner.saved;
         let (_, v) = self.inner.__apply(Entry::from(command))?;
-        self.stack.push(Action::Apply(v));
+        self.stack.push(Action::Apply(saved, v));
         Ok(())
     }
 
@@ -159,13 +160,14 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     pub fn cancel(self) -> Result<C> {
         for action in self.stack.into_iter().rev() {
             match action {
-                Action::Apply(mut v) => {
+                Action::Apply(saved, mut v) => {
                     if let Some(Err(error)) = self.inner.undo() {
                         return Err(error);
                     }
                     let current = self.inner.current();
                     self.inner.commands.truncate(current);
                     self.inner.commands.append(&mut v);
+                    self.inner.saved = saved;
                 }
                 Action::Undo => {
                     if let Some(Err(error)) = self.inner.redo() {
@@ -263,7 +265,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     pub fn cancel(self) -> Result<C> {
         for action in self.stack.into_iter().rev() {
             match action {
-                Action::Apply(_) => unreachable!(),
+                Action::Apply(_, _) => unreachable!(),
                 Action::Undo => {
                     if let Some(Err(error)) = self.inner.redo() {
                         return Err(error);
@@ -359,7 +361,7 @@ impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
 /// An action that can be applied to a Record or History.
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
-    Apply(VecDeque<Entry<C>>),
+    Apply(Option<usize>, VecDeque<Entry<C>>),
     Undo,
     Redo,
     GoTo(usize, usize),
@@ -436,11 +438,12 @@ mod tests {
     }
 
     #[test]
-    fn restore() {
+    fn saved() {
         let mut record = Record::default();
         record.apply(Add('a')).unwrap();
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
+        record.set_saved(true);
         record.undo().unwrap().unwrap();
         record.undo().unwrap().unwrap();
         record.undo().unwrap().unwrap();
@@ -454,6 +457,7 @@ mod tests {
         record.redo().unwrap().unwrap();
         record.redo().unwrap().unwrap();
         record.redo().unwrap().unwrap();
+        assert!(record.is_saved());
         assert_eq!(record.target(), "abc");
     }
 }
