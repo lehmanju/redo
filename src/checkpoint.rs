@@ -116,8 +116,8 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
         let saved = self.inner.saved;
-        let (_, v) = self.inner.__apply(Entry::from(command))?;
-        self.stack.push(Action::Apply(saved, v));
+        let (_, commands) = self.inner.__apply(Entry::from(command))?;
+        self.stack.push(Action::Apply(saved, commands));
         Ok(())
     }
 
@@ -154,30 +154,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     pub fn cancel(self) -> Result<C> {
         for action in self.stack.into_iter().rev() {
             match action {
-                Action::Apply(saved, mut v) => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                    let current = self.inner.current();
-                    self.inner.commands.truncate(current);
-                    self.inner.commands.append(&mut v);
+                Action::Apply(saved, mut commands) => {
+                    self.inner.undo().unwrap()?;
+                    self.inner.commands.pop_back();
+                    self.inner.commands.append(&mut commands);
                     self.inner.saved = saved;
                 }
-                Action::Undo => {
-                    if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(_, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(current) {
-                        return Err(error);
-                    }
-                }
+                Action::Branch(_, _) => unreachable!(),
+                Action::Undo => self.inner.redo().unwrap()?,
+                Action::Redo => self.inner.undo().unwrap()?,
+                Action::GoTo(_, current) => self.inner.go_to(current).unwrap()?,
             }
         }
         Ok(())
@@ -216,10 +202,10 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
-        let root = self.inner.branch();
-        let old = self.inner.current();
+        let branch = self.inner.branch();
+        let current = self.inner.current();
         self.inner.apply(command)?;
-        self.stack.push(Action::GoTo(root, old));
+        self.stack.push(Action::Branch(branch, current));
         Ok(())
     }
 
@@ -258,21 +244,18 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         for action in self.stack.into_iter().rev() {
             match action {
                 Action::Apply(_, _) => unreachable!(),
-                Action::Undo => {
-                    if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
+                Action::Branch(branch, current) => {
+                    let root = self.inner.branch();
+                    self.inner.go_to(branch, current).unwrap()?;
+                    if root == branch {
+                        self.inner.record.commands.pop_back();
+                    } else {
+                        self.inner.branches.remove(&root).unwrap();
                     }
                 }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(branch, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(branch, current) {
-                        return Err(error);
-                    }
-                }
+                Action::Undo => self.inner.redo().unwrap()?,
+                Action::Redo => self.inner.undo().unwrap()?,
+                Action::GoTo(branch, current) => self.inner.go_to(branch, current).unwrap()?,
             }
         }
         Ok(())
@@ -354,6 +337,7 @@ impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
     Apply(Option<usize>, VecDeque<Entry<C>>),
+    Branch(usize, usize),
     Undo,
     Redo,
     GoTo(usize, usize),
