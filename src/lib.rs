@@ -34,7 +34,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! redo = "0.39"
+//! redo = "0.40"
 //! ```
 //!
 //! And this to `main.rs`:
@@ -123,7 +123,7 @@ pub use self::{
 /// A specialized Result type for undo-redo operations.
 pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
 
-/// Common trait for data structures that can use commands.
+/// Base functionality for data structures that can use commands.
 pub trait Timeline {
     /// The command type used.
     type Command: Command;

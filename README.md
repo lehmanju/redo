@@ -40,7 +40,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-redo = "0.39"
+redo = "0.40"
 ```
 
 And this to `main.rs`:
