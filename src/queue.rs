@@ -37,7 +37,7 @@ use alloc::vec::Vec;
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Queue<'a, T: Timeline> {
     inner: &'a mut T,
-    queue: Vec<Action<T::Command>>,
+    actions: Vec<Action<T::Command>>,
 }
 
 impl<'a, T: Timeline> Queue<'a, T> {
@@ -46,7 +46,7 @@ impl<'a, T: Timeline> Queue<'a, T> {
     pub fn new(inner: &'a mut T) -> Queue<'a, T> {
         Queue {
             inner,
-            queue: Vec::new(),
+            actions: Vec::new(),
         }
     }
 
@@ -56,49 +56,49 @@ impl<'a, T: Timeline> Queue<'a, T> {
     /// Panics if the new capacity overflows usize.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.queue.reserve(additional);
+        self.actions.reserve(additional);
     }
 
     /// Returns the capacity of the queue.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.queue.capacity()
+        self.actions.capacity()
     }
 
     /// Shrinks the capacity of the queue as much as possible.
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.queue.shrink_to_fit();
+        self.actions.shrink_to_fit();
     }
 
     /// Returns the number of commands in the queue.
     #[inline]
     pub fn len(&self) -> usize {
-        self.queue.len()
+        self.actions.len()
     }
 
     /// Returns `true` if the queue is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.queue.is_empty()
+        self.actions.is_empty()
     }
 
     /// Queues an `apply` action.
     #[inline]
     pub fn apply(&mut self, command: T::Command) {
-        self.queue.push(Action::Apply(command));
+        self.actions.push(Action::Apply(command));
     }
 
     /// Queues an `undo` action.
     #[inline]
     pub fn undo(&mut self) {
-        self.queue.push(Action::Undo);
+        self.actions.push(Action::Undo);
     }
 
     /// Queues a `redo` action.
     #[inline]
     pub fn redo(&mut self) {
-        self.queue.push(Action::Redo);
+        self.actions.push(Action::Redo);
     }
 
     /// Queues an `apply` action for each command in the iterator.
@@ -118,7 +118,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
-        self.queue.push(Action::GoTo(0, current));
+        self.actions.push(Action::GoTo(0, current));
     }
 
     /// Applies the actions that is queued.
@@ -127,7 +127,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
     pub fn commit(self) -> Result<C> {
-        for action in self.queue {
+        for action in self.actions {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
                 Action::Undo => {
@@ -181,7 +181,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
-        self.queue.push(Action::GoTo(branch, current));
+        self.actions.push(Action::GoTo(branch, current));
     }
 
     /// Applies the actions that is queued.
@@ -190,7 +190,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
     pub fn commit(self) -> Result<C> {
-        for action in self.queue {
+        for action in self.actions {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
                 Action::Undo => {

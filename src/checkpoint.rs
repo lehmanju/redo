@@ -38,7 +38,7 @@ use alloc::vec::Vec;
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Checkpoint<'a, T: Timeline> {
     inner: &'a mut T,
-    stack: Vec<Action<T::Command>>,
+    actions: Vec<Action<T::Command>>,
 }
 
 impl<'a, T: Timeline> Checkpoint<'a, T> {
@@ -47,7 +47,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
         Checkpoint {
             inner,
-            stack: Vec::new(),
+            actions: Vec::new(),
         }
     }
 
@@ -57,31 +57,31 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     /// Panics if the new capacity overflows usize.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.stack.reserve(additional);
+        self.actions.reserve(additional);
     }
 
     /// Returns the capacity of the checkpoint.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.stack.capacity()
+        self.actions.capacity()
     }
 
     /// Shrinks the capacity of the checkpoint as much as possible.
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.stack.shrink_to_fit();
+        self.actions.shrink_to_fit();
     }
 
     /// Returns the number of commands in the checkpoint.
     #[inline]
     pub fn len(&self) -> usize {
-        self.stack.len()
+        self.actions.len()
     }
 
     /// Returns `true` if the checkpoint is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
+        self.actions.is_empty()
     }
 
     /// Calls the `undo` method.
@@ -89,7 +89,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     pub fn undo(&mut self) -> Option<Result<T::Command>> {
         let undo = self.inner.undo();
         if let Some(Ok(_)) = undo {
-            self.stack.push(Action::Undo);
+            self.actions.push(Action::Undo);
         }
         undo
     }
@@ -99,7 +99,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     pub fn redo(&mut self) -> Option<Result<T::Command>> {
         let redo = self.inner.redo();
         if let Some(Ok(_)) = redo {
-            self.stack.push(Action::Redo);
+            self.actions.push(Action::Redo);
         }
         redo
     }
@@ -117,7 +117,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     pub fn apply(&mut self, command: C) -> Result<C> {
         let saved = self.inner.saved;
         let (_, commands) = self.inner.__apply(Entry::from(command))?;
-        self.stack.push(Action::Apply(saved, commands));
+        self.actions.push(Action::Apply(saved, commands));
         Ok(())
     }
 
@@ -129,7 +129,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
         let old = self.inner.current();
         let go_to = self.inner.go_to(current);
         if let Some(Ok(_)) = go_to {
-            self.stack.push(Action::GoTo(0, old));
+            self.actions.push(Action::GoTo(0, old));
         }
         go_to
     }
@@ -152,7 +152,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// and the remaining commands are not canceled.
     #[inline]
     pub fn cancel(self) -> Result<C> {
-        for action in self.stack.into_iter().rev() {
+        for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(saved, mut commands) => {
                     self.inner.undo().unwrap()?;
@@ -205,7 +205,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         let branch = self.inner.branch();
         let current = self.inner.current();
         self.inner.apply(command)?;
-        self.stack.push(Action::Branch(branch, current));
+        self.actions.push(Action::Branch(branch, current));
         Ok(())
     }
 
@@ -218,7 +218,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         let old = self.inner.current();
         let go_to = self.inner.go_to(branch, current);
         if let Some(Ok(_)) = go_to {
-            self.stack.push(Action::GoTo(root, old));
+            self.actions.push(Action::GoTo(root, old));
         }
         go_to
     }
@@ -241,7 +241,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// and the remaining commands are not canceled.
     #[inline]
     pub fn cancel(self) -> Result<C> {
-        for action in self.stack.into_iter().rev() {
+        for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(_, _) => unreachable!(),
                 Action::Branch(branch, current) => {
