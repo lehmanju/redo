@@ -137,13 +137,10 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         for current in 0..diff {
             self.rm_child(root, current);
         }
-        for branch in self
-            .branches
+        self.branches
             .values_mut()
             .filter(|branch| branch.parent.branch == root)
-        {
-            branch.parent.current -= diff;
-        }
+            .for_each(|branch| branch.parent.current -= diff);
         limit
     }
 
@@ -243,48 +240,30 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
-        let current = self.current();
-        let saved = self.record.saved.filter(|&saved| saved > current);
+        let old = self.at();
+        let saved = self.record.saved.filter(|&saved| saved > old.current);
         let (merged, commands) = self.record.__apply(Entry::from(command))?;
         // Check if the limit has been reached.
-        if !merged && current == self.current() {
+        if !merged && old.current == self.current() {
             let root = self.branch();
             self.rm_child(root, 0);
-            for branch in self
-                .branches
+            self.branches
                 .values_mut()
                 .filter(|branch| branch.parent.branch == root)
-            {
-                branch.parent.current -= 1;
-            }
+                .for_each(|branch| branch.parent.current -= 1);
         }
         // Handle new branch.
         if !commands.is_empty() {
-            let old = self.branch();
             let new = self.next;
             self.next += 1;
-            self.branches.insert(
-                old,
-                Branch {
-                    parent: At {
-                        branch: new,
-                        current,
-                    },
-                    commands,
-                },
-            );
-            self.set_root(new, current);
-            match (self.record.saved, saved, self.saved) {
-                (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(new, old, current),
-                (None, Some(_), None) => {
-                    self.record.saved = saved;
-                    self.swap_saved(old, new, current);
-                }
-                (None, None, None) => (),
-                _ => unreachable!(),
-            }
+            self.branches
+                .insert(old.branch, Branch::new(new, old.current, commands));
+            self.set_root(new, old.current, saved);
             if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Branch { old, new });
+                slot(Signal::Branch {
+                    old: old.branch,
+                    new,
+                });
             }
         }
         Ok(())
@@ -329,7 +308,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         }
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
-            let old = self.branch();
             // Walk to `branch.current` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.current).unwrap() {
                 return Some(Err(err));
@@ -344,28 +322,9 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 };
                 // Handle new branch.
                 if !commands.is_empty() {
-                    self.branches.insert(
-                        self.root,
-                        Branch {
-                            parent: At {
-                                branch: new,
-                                current,
-                            },
-                            commands,
-                        },
-                    );
-                    self.set_root(new, current);
-                    match (self.record.saved, saved, self.saved) {
-                        (Some(_), None, None) | (None, None, Some(_)) => {
-                            self.swap_saved(new, old, current);
-                        }
-                        (None, Some(_), None) => {
-                            self.record.saved = saved;
-                            self.swap_saved(old, new, current);
-                        }
-                        (None, None, None) => (),
-                        _ => unreachable!(),
-                    }
+                    self.branches
+                        .insert(self.root, Branch::new(new, current, commands));
+                    self.set_root(new, current, saved);
                 }
             }
         }
@@ -435,24 +394,33 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.into_target()
     }
 
-    /// Sets the `root`.
-    #[inline]
-    fn set_root(&mut self, root: usize, current: usize) {
+    fn at(&self) -> At {
+        At {
+            branch: self.branch(),
+            current: self.current(),
+        }
+    }
+
+    fn set_root(&mut self, root: usize, current: usize, saved: Option<usize>) {
         let old = self.branch();
         self.root = root;
         debug_assert_ne!(old, root);
         // Handle the child branches.
-        for branch in self
-            .branches
+        self.branches
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
-        {
-            branch.parent.branch = root;
+            .for_each(|branch| branch.parent.branch = root);
+        match (self.record.saved, saved, self.saved) {
+            (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
+            (None, Some(_), None) => {
+                self.record.saved = saved;
+                self.swap_saved(old, root, current);
+            }
+            (None, None, None) => (),
+            _ => unreachable!(),
         }
     }
 
-    /// Swap the saved state if needed.
-    #[inline]
     fn swap_saved(&mut self, old: usize, new: usize, current: usize) {
         debug_assert_ne!(old, new);
         if let Some(At { current: saved, .. }) = self
@@ -476,8 +444,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         }
     }
 
-    /// Remove all children of the command at the given position.
-    #[inline]
     fn rm_child(&mut self, branch: usize, current: usize) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
@@ -500,8 +466,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         }
     }
 
-    /// Create a path between the current branch and the `to` branch.
-    #[inline]
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
         debug_assert_ne!(self.branch(), to);
         let mut dest = self.branches.remove(&to)?;
@@ -621,6 +585,15 @@ where
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
     pub(crate) commands: VecDeque<Entry<C>>,
+}
+
+impl<C> Branch<C> {
+    fn new(branch: usize, current: usize, commands: VecDeque<Entry<C>>) -> Branch<C> {
+        Branch {
+            parent: At { branch, current },
+            commands,
+        }
+    }
 }
 
 /// Builder for a History.
