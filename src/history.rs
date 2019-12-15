@@ -116,34 +116,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.limit()
     }
 
-    /// Sets the limit of the history and returns the new limit.
-    ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the history when new commands are applied. No limit is set by
-    /// default which means it may grow indefinitely.
-    ///
-    /// If `limit < len` the first commands will be removed until `len == limit`.
-    /// However, if the current active command is going to be removed, the limit is instead
-    /// adjusted to `len - active` so the active command is not removed.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
-    #[inline]
-    pub fn set_limit(&mut self, limit: usize) -> usize {
-        let len = self.len();
-        let limit = self.record.set_limit(limit);
-        let diff = len - self.len();
-        let root = self.branch();
-        for current in 0..diff {
-            self.rm_child(root, current);
-        }
-        self.branches
-            .values_mut()
-            .filter(|branch| branch.parent.branch == root)
-            .for_each(|branch| branch.parent.current -= diff);
-        limit
-    }
-
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
@@ -179,8 +151,8 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
-        self.record.set_saved(saved);
         self.saved = None;
+        self.record.set_saved(saved);
     }
 
     /// Revert the changes done to the target since the saved state.
