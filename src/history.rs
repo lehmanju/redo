@@ -70,7 +70,6 @@ pub struct History<C: Command, F = fn(Signal)> {
 
 impl<C: Command> History<C> {
     /// Returns a new history.
-    #[inline]
     pub fn new(target: C::Target) -> History<C> {
         History::from(Record::new(target))
     }
@@ -81,37 +80,31 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.record.reserve(additional);
     }
 
     /// Returns the capacity of the history.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.record.capacity()
     }
 
     /// Shrinks the capacity of the history as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.record.shrink_to_fit();
     }
 
     /// Returns the number of commands in the current branch of the history.
-    #[inline]
     pub fn len(&self) -> usize {
         self.record.len()
     }
 
     /// Returns `true` if the current branch of the history is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.record.is_empty()
     }
 
     /// Returns the limit of the history.
-    #[inline]
     pub fn limit(&self) -> usize {
         self.record.limit()
     }
@@ -119,13 +112,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
-    #[inline]
     pub fn connect(&mut self, slot: F) -> Option<F> {
         self.record.connect(slot)
     }
 
     /// Creates a new history that uses the provided slot.
-    #[inline]
     pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> History<C, G> {
         History {
             root: self.root,
@@ -137,26 +128,22 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Removes and returns the slot.
-    #[inline]
     pub fn disconnect(&mut self) -> Option<F> {
         self.record.disconnect()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
     pub fn is_saved(&self) -> bool {
         self.record.is_saved()
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
-    #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         self.saved = None;
         self.record.set_saved(saved);
     }
 
     /// Revert the changes done to the target since the saved state.
-    #[inline]
     pub fn revert(&mut self) -> Option<Result<C>> {
         if self.record.saved.is_some() {
             self.record.revert()
@@ -167,31 +154,26 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Returns `true` if the history can undo.
-    #[inline]
     pub fn can_undo(&self) -> bool {
         self.record.can_undo()
     }
 
     /// Returns `true` if the history can redo.
-    #[inline]
     pub fn can_redo(&self) -> bool {
         self.record.can_redo()
     }
 
     /// Returns the current branch.
-    #[inline]
     pub fn branch(&self) -> usize {
         self.root
     }
 
     /// Returns the position of the current command.
-    #[inline]
     pub fn current(&self) -> usize {
         self.record.current()
     }
 
     /// Removes all commands from the history without undoing them.
-    #[inline]
     pub fn clear(&mut self) {
         let old = self.branch();
         self.root = 0;
@@ -210,7 +192,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
         let old = self.at();
         let saved = self.record.saved.filter(|&saved| saved > old.current);
@@ -248,7 +229,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    #[inline]
     pub fn undo(&mut self) -> Option<Result<C>> {
         self.record.undo()
     }
@@ -260,7 +240,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
     pub fn redo(&mut self) -> Option<Result<C>> {
         self.record.redo()
     }
@@ -272,7 +251,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
         let root = self.root;
         if root == branch {
@@ -314,7 +292,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Go back or forward in the history to the command that was made closest to the datetime provided.
     ///
     /// This method does not jump across branches.
-    #[inline]
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
         self.record.time_travel(to)
@@ -326,7 +303,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
         for command in commands {
             self.apply(command)?;
@@ -335,19 +311,16 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
         Checkpoint::from(self)
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &C::Target {
         self.record.target()
     }
@@ -355,13 +328,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
     pub fn target_mut(&mut self) -> &mut C::Target {
         self.record.target_mut()
     }
 
     /// Consumes the history, returning the `target`.
-    #[inline]
     pub fn into_target(self) -> C::Target {
         self.record.into_target()
     }
@@ -457,7 +428,6 @@ impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
-    #[inline]
     pub fn to_undo_string(&self) -> Option<String> {
         self.record.to_undo_string()
     }
@@ -465,7 +435,6 @@ impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
     /// [`redo`]: struct.History.html#method.redo
-    #[inline]
     pub fn to_redo_string(&self) -> Option<String> {
         self.record.to_redo_string()
     }
@@ -473,7 +442,6 @@ impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
     /// Returns a structure for configurable formatting of the record.
     ///
     /// Requires the `display` feature to be enabled.
-    #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
@@ -483,17 +451,14 @@ impl<C: Command + ToString, F: FnMut(Signal)> History<C, F> {
 impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
     type Command = C;
 
-    #[inline]
     fn apply(&mut self, command: C) -> Result<C> {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result<C>> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result<C>> {
         self.redo()
     }
@@ -503,14 +468,12 @@ impl<C: Command> Default for History<C>
 where
     C::Target: Default,
 {
-    #[inline]
     fn default() -> History<C> {
         History::new(Default::default())
     }
 }
 
 impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
-    #[inline]
     fn from(record: Record<C, F>) -> Self {
         History {
             root: 0,
@@ -527,7 +490,6 @@ where
     C: fmt::Debug,
     C::Target: fmt::Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("History")
             .field("root", &self.root)
@@ -545,7 +507,6 @@ where
     C: fmt::Display,
     C::Target: fmt::Display,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
     }
@@ -596,7 +557,6 @@ pub struct HistoryBuilder {
 
 impl HistoryBuilder {
     /// Returns a builder for a history.
-    #[inline]
     pub fn new() -> HistoryBuilder {
         HistoryBuilder {
             inner: RecordBuilder::new(),
@@ -604,7 +564,6 @@ impl HistoryBuilder {
     }
 
     /// Sets the capacity for the history.
-    #[inline]
     pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder {
         self.inner.capacity(capacity);
         self
@@ -614,7 +573,6 @@ impl HistoryBuilder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    #[inline]
     pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder {
         self.inner.limit(limit);
         self
@@ -622,20 +580,17 @@ impl HistoryBuilder {
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    #[inline]
     pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder {
         self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
-    #[inline]
     pub fn build<C: Command>(&self, target: C::Target) -> History<C> {
         History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
-    #[inline]
     pub fn build_with<C: Command, F: FnMut(Signal)>(
         &self,
         target: C::Target,
@@ -645,7 +600,6 @@ impl HistoryBuilder {
     }
 
     /// Creates the history with a default `target`.
-    #[inline]
     pub fn default<C: Command>(&self) -> History<C>
     where
         C::Target: Default,
@@ -654,7 +608,6 @@ impl HistoryBuilder {
     }
 
     /// Creates the history with a default `target` and with the slot.
-    #[inline]
     pub fn default_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> History<C, F>
     where
         C::Target: Default,
@@ -664,7 +617,6 @@ impl HistoryBuilder {
 }
 
 impl Default for HistoryBuilder {
-    #[inline]
     fn default() -> Self {
         HistoryBuilder::new()
     }

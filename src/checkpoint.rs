@@ -43,7 +43,6 @@ pub struct Checkpoint<'a, T: Timeline> {
 
 impl<'a, T: Timeline> Checkpoint<'a, T> {
     /// Returns a checkpoint.
-    #[inline]
     pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
         Checkpoint {
             inner,
@@ -55,37 +54,31 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.actions.reserve(additional);
     }
 
     /// Returns the capacity of the checkpoint.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.actions.capacity()
     }
 
     /// Shrinks the capacity of the checkpoint as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.actions.shrink_to_fit();
     }
 
     /// Returns the number of commands in the checkpoint.
-    #[inline]
     pub fn len(&self) -> usize {
         self.actions.len()
     }
 
     /// Returns `true` if the checkpoint is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
 
     /// Calls the `undo` method.
-    #[inline]
     pub fn undo(&mut self) -> Option<Result<T::Command>> {
         let undo = self.inner.undo();
         if let Some(Ok(_)) = undo {
@@ -95,7 +88,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     }
 
     /// Calls the `redo` method.
-    #[inline]
     pub fn redo(&mut self) -> Option<Result<T::Command>> {
         let redo = self.inner.redo();
         if let Some(Ok(_)) = redo {
@@ -105,7 +97,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     }
 
     /// Commits the changes and consumes the checkpoint.
-    #[inline]
     pub fn commit(self) {}
 }
 
@@ -113,7 +104,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
-    #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
         let saved = self.inner.saved;
         let (_, commands) = self.inner.__apply(Entry::from(command))?;
@@ -124,7 +114,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// Calls the [`go_to`] method.
     ///
     /// [`go_to`]: struct.Record.html#method.go_to
-    #[inline]
     pub fn go_to(&mut self, current: usize) -> Option<Result<C>> {
         let old = self.inner.current();
         let go_to = self.inner.go_to(current);
@@ -137,7 +126,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// Calls the [`extend`] method.
     ///
     /// [`extend`]: struct.Record.html#method.extend
-    #[inline]
     pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
         for command in commands {
             self.apply(command)?;
@@ -150,7 +138,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
-    #[inline]
     pub fn cancel(self) -> Result<C> {
         for action in self.actions.into_iter().rev() {
             match action {
@@ -170,19 +157,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &C::Target {
         self.inner.target()
     }
@@ -190,7 +174,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
     pub fn target_mut(&mut self) -> &mut C::Target {
         self.inner.target_mut()
     }
@@ -200,7 +183,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
-    #[inline]
     pub fn apply(&mut self, command: C) -> Result<C> {
         let branch = self.inner.branch();
         let current = self.inner.current();
@@ -212,7 +194,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Calls the [`go_to`] method.
     ///
     /// [`go_to`]: struct.History.html#method.go_to
-    #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
         let root = self.inner.branch();
         let old = self.inner.current();
@@ -226,7 +207,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Calls the [`extend`] method.
     ///
     /// [`extend`]: struct.History.html#method.extend
-    #[inline]
     pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
         for command in commands {
             self.apply(command)?;
@@ -239,7 +219,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
-    #[inline]
     pub fn cancel(self) -> Result<C> {
         for action in self.actions.into_iter().rev() {
             match action {
@@ -262,19 +241,16 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &C::Target {
         self.inner.target()
     }
@@ -282,7 +258,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
     pub fn target_mut(&mut self) -> &mut C::Target {
         self.inner.target_mut()
     }
@@ -291,17 +266,14 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
 impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, Record<C, F>> {
     type Command = C;
 
-    #[inline]
     fn apply(&mut self, command: C) -> Result<C> {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result<C>> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result<C>> {
         self.redo()
     }
@@ -310,24 +282,20 @@ impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, Record<C, F>> {
 impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, History<C, F>> {
     type Command = C;
 
-    #[inline]
     fn apply(&mut self, command: C) -> Result<C> {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result<C>> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result<C>> {
         self.redo()
     }
 }
 
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
-    #[inline]
     fn from(inner: &'a mut T) -> Self {
         Checkpoint::new(inner)
     }

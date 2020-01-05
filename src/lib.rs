@@ -159,7 +159,6 @@ pub trait Command {
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.apply(target)
     }
@@ -210,7 +209,6 @@ pub trait Command {
     ///     Ok(())
     /// }
     /// ```
-    #[inline]
     fn merge(&mut self, command: Self) -> Merge<Self>
     where
         Self: Sized,
@@ -289,7 +287,6 @@ struct Entry<C> {
 }
 
 impl<C> From<C> for Entry<C> {
-    #[inline]
     fn from(command: C) -> Self {
         Entry {
             command,
@@ -303,22 +300,18 @@ impl<C: Command> Command for Entry<C> {
     type Target = C::Target;
     type Error = C::Error;
 
-    #[inline]
     fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.command.apply(target)
     }
 
-    #[inline]
     fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.command.undo(target)
     }
 
-    #[inline]
     fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.command.redo(target)
     }
 
-    #[inline]
     fn merge(&mut self, command: Self) -> Merge<Self>
     where
         Self: Sized,
@@ -332,7 +325,6 @@ impl<C: Command> Command for Entry<C> {
 }
 
 impl<C: fmt::Display> fmt::Display for Entry<C> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)
     }
