@@ -62,7 +62,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [signal]: enum.Signal.html
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Record<C: Command, F = fn(Signal)> {
-    pub(crate) commands: VecDeque<Entry<C>>,
+    pub(crate) entries: VecDeque<Entry<C>>,
     target: C::Target,
     current: usize,
     limit: NonZeroUsize,
@@ -84,27 +84,27 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.commands.reserve(additional);
+        self.entries.reserve(additional);
     }
 
     /// Returns the capacity of the record.
     pub fn capacity(&self) -> usize {
-        self.commands.capacity()
+        self.entries.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.commands.shrink_to_fit();
+        self.entries.shrink_to_fit();
     }
 
     /// Returns the number of commands in the record.
     pub fn len(&self) -> usize {
-        self.commands.len()
+        self.entries.len()
     }
 
     /// Returns `true` if the record is empty.
     pub fn is_empty(&self) -> bool {
-        self.commands.is_empty()
+        self.entries.is_empty()
     }
 
     /// Returns the limit of the record.
@@ -122,7 +122,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Creates a new record that uses the provided slot.
     pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> Record<C, G> {
         Record {
-            commands: self.commands,
+            entries: self.entries,
             target: self.target,
             current: self.current,
             limit: self.limit,
@@ -183,16 +183,12 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 
     /// Removes all commands from the record without undoing them.
     pub fn clear(&mut self) {
-        let old = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
-        self.commands.clear();
+        self.entries.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
         if let Some(ref mut slot) = self.slot {
-            if old != 0 {
-                slot(Signal::Current { old, new: 0 });
-            }
             if could_undo {
                 slot(Signal::Undo(false));
             }
@@ -222,41 +218,36 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Pop off all elements after len from record.
-        let v = self.commands.split_off(current);
+        let tail = self.entries.split_off(current);
         debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
-        let merged = match self.commands.back_mut() {
+        let merged = match self.entries.back_mut() {
             Some(ref mut last) if !was_saved => last.merge(entry),
             _ => Merge::No(entry),
         };
         let merged_or_annulled = match merged {
             Merge::Yes => true,
             Merge::Annul => {
-                self.commands.pop_back();
+                self.entries.pop_back();
                 true
             }
             // If commands are not merged or annulled push it onto the record.
             Merge::No(entry) => {
                 // If limit is reached, pop off the first command.
                 if self.limit() == self.current() {
-                    self.commands.pop_front();
+                    self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
                     self.current += 1;
                 }
-                self.commands.push_back(entry);
+                self.entries.push_back(entry);
                 false
             }
         };
         debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut slot) = self.slot {
-            // We emit this signal even if the commands might have been merged.
-            slot(Signal::Current {
-                old: current,
-                new: self.current,
-            });
             if could_redo {
                 slot(Signal::Redo(false));
             }
@@ -267,7 +258,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 slot(Signal::Saved(false));
             }
         }
-        Ok((merged_or_annulled, v))
+        Ok((merged_or_annulled, tail))
     }
 
     /// Calls the [`undo`] method for the active command and sets
@@ -283,17 +274,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.commands[self.current - 1].undo(&mut self.target) {
+        if let Err(error) = self.entries[self.current - 1].undo(&mut self.target) {
             return Some(Err(error));
         }
         self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
             if old == len {
                 slot(Signal::Redo(true));
             }
@@ -320,17 +307,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.commands[self.current].redo(&mut self.target) {
+        if let Err(error) = self.entries[self.current].redo(&mut self.target) {
             return Some(Err(error));
         }
         self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
             if old == len - 1 {
                 slot(Signal::Redo(false));
             }
@@ -358,7 +341,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        let old = self.current();
         // Temporarily remove slot so they are not called each iteration.
         let slot = self.slot.take();
         while self.current() != current {
@@ -379,12 +361,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            if old != self.current {
-                slot(Signal::Current {
-                    old,
-                    new: self.current,
-                });
-            }
             if could_undo != can_undo {
                 slot(Signal::Undo(can_undo));
             }
@@ -402,7 +378,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
         let to = to.with_timezone(&Utc);
-        let current = match self.commands.as_slices() {
+        let current = match self.entries.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
@@ -471,7 +447,7 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
     /// [`undo`]: struct.Record.html#method.undo
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.commands[self.current - 1].command.to_string())
+            Some(self.entries[self.current - 1].command.to_string())
         } else {
             None
         }
@@ -482,7 +458,7 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
     /// [`redo`]: struct.Record.html#method.redo
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.commands[self.current].command.to_string())
+            Some(self.entries[self.current].command.to_string())
         } else {
             None
         }
@@ -535,7 +511,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
-            .field("commands", &self.commands)
+            .field("entries", &self.entries)
             .field("target", &self.target)
             .field("current", &self.current)
             .field("limit", &self.limit)
@@ -618,7 +594,7 @@ impl RecordBuilder {
     /// Builds the record.
     pub fn build<C: Command>(&self, target: C::Target) -> Record<C> {
         Record {
-            commands: VecDeque::with_capacity(self.capacity),
+            entries: VecDeque::with_capacity(self.capacity),
             target,
             current: 0,
             limit: self.limit,
@@ -634,7 +610,7 @@ impl RecordBuilder {
         slot: F,
     ) -> Record<C, F> {
         Record {
-            commands: VecDeque::with_capacity(self.capacity),
+            entries: VecDeque::with_capacity(self.capacity),
             target,
             current: 0,
             limit: self.limit,

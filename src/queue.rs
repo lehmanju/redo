@@ -41,14 +41,6 @@ pub struct Queue<'a, T: Timeline> {
 }
 
 impl<'a, T: Timeline> Queue<'a, T> {
-    /// Returns a queue.
-    pub fn new(inner: &'a mut T) -> Queue<'a, T> {
-        Queue {
-            inner,
-            actions: Vec::new(),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the queue.
     ///
     /// # Panics
@@ -92,23 +84,11 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.actions.push(Action::Redo);
     }
 
-    /// Queues an `apply` action for each command in the iterator.
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = T::Command>) {
-        for command in commands {
-            self.apply(command);
-        }
-    }
-
     /// Cancels the queued actions.
     pub fn cancel(self) {}
 }
 
 impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
-    /// Queues a `go_to` action.
-    pub fn go_to(&mut self, current: usize) {
-        self.actions.push(Action::GoTo(0, current));
-    }
-
     /// Applies the actions that is queued.
     ///
     /// # Errors
@@ -124,11 +104,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
                 }
                 Action::Redo => {
                     if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(_, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(current) {
                         return Err(error);
                     }
                 }
@@ -151,21 +126,9 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     pub fn target(&self) -> &C::Target {
         self.inner.target()
     }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.inner.target_mut()
-    }
 }
 
 impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
-    /// Queues a `go_to` action.
-    pub fn go_to(&mut self, branch: usize, current: usize) {
-        self.actions.push(Action::GoTo(branch, current));
-    }
-
     /// Applies the actions that is queued.
     ///
     /// # Errors
@@ -181,11 +144,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
                 }
                 Action::Redo => {
                     if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(branch, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(branch, current) {
                         return Err(error);
                     }
                 }
@@ -207,13 +165,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     /// Returns a reference to the `target`.
     pub fn target(&self) -> &C::Target {
         self.inner.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.inner.target_mut()
     }
 }
 
@@ -238,7 +189,10 @@ impl<T: Timeline> Timeline for Queue<'_, T> {
 
 impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     fn from(inner: &'a mut T) -> Self {
-        Queue::new(inner)
+        Queue {
+            inner,
+            actions: Vec::new(),
+        }
     }
 }
 
@@ -248,7 +202,6 @@ enum Action<C> {
     Apply(C),
     Undo,
     Redo,
-    GoTo(usize, usize),
 }
 
 #[cfg(test)]

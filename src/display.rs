@@ -24,7 +24,7 @@ use core::fmt::{self, Write};
 /// # }
 /// # fn foo() -> History<Add> {
 /// let history = History::default();
-/// println!("{}", history.display().graph(true).colored(true));
+/// println!("{}", history.display().colored(true).detailed(false));
 /// # history
 /// # }
 /// ```
@@ -66,14 +66,6 @@ impl<T> Display<'_, T> {
     }
 }
 
-impl<C: Command, F> Display<'_, History<C, F>> {
-    /// Show the history as a graph (off by default).
-    pub fn graph(&mut self, on: bool) -> &mut Self {
-        self.config.graph = on;
-        self
-    }
-}
-
 impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, Record<C, F>> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
         self.config.mark(f, 0)?;
@@ -82,22 +74,10 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, Record<C, F>> {
             #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
-        self.config.current(
-            f,
-            at,
-            At {
-                branch: 0,
-                current: self.data.current(),
-            },
-        )?;
-        self.config.saved(
-            f,
-            at,
-            self.data.saved.map(|saved| At {
-                branch: 0,
-                current: saved,
-            }),
-        )?;
+        self.config
+            .current(f, at, At::new(0, self.data.current()))?;
+        self.config
+            .saved(f, at, self.data.saved.map(|saved| At::new(0, saved)))?;
         if self.config.detailed {
             writeln!(f)?;
             self.config.message(f, entry, 0)
@@ -123,24 +103,15 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, History<C, F>> {
             #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
-        self.config.current(
-            f,
-            at,
-            At {
-                branch: self.data.branch(),
-                current: self.data.current(),
-            },
-        )?;
+        self.config
+            .current(f, at, At::new(self.data.branch(), self.data.current()))?;
         self.config.saved(
             f,
             at,
             self.data
                 .record
                 .saved
-                .map(|saved| At {
-                    branch: self.data.branch(),
-                    current: saved,
-                })
+                .map(|saved| At::new(self.data.branch(), saved))
                 .or(self.data.saved),
         )?;
         if self.config.detailed {
@@ -166,12 +137,9 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, History<C, F>> {
             .iter()
             .filter(|(_, branch)| branch.parent == at)
         {
-            for (j, cmd) in branch.commands.iter().enumerate().rev() {
-                let at = At {
-                    branch: i,
-                    current: j + branch.parent.current + 1,
-                };
-                self.fmt_graph(f, at, cmd, level + 1)?;
+            for (j, entry) in branch.commands.iter().enumerate().rev() {
+                let at = At::new(i, j + branch.parent.current + 1);
+                self.fmt_graph(f, at, entry, level + 1)?;
             }
             for j in 0..level {
                 self.config.edge(f, j)?;
@@ -199,12 +167,9 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
 
 impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, Record<C, F>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, cmd) in self.data.commands.iter().enumerate().rev() {
-            let at = At {
-                branch: 0,
-                current: i + 1,
-            };
-            self.fmt_list(f, at, cmd)?;
+        for (i, entry) in self.data.entries.iter().enumerate().rev() {
+            let at = At::new(0, i + 1);
+            self.fmt_list(f, at, entry)?;
         }
         Ok(())
     }
@@ -216,16 +181,9 @@ where
     C::Target: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
-            let at = At {
-                branch: self.data.branch(),
-                current: i + 1,
-            };
-            if self.config.graph {
-                self.fmt_graph(f, at, cmd, 0)?;
-            } else {
-                self.fmt_list(f, at, cmd, 0)?;
-            }
+        for (i, entry) in self.data.record.entries.iter().enumerate().rev() {
+            let at = At::new(self.data.branch(), i + 1);
+            self.fmt_graph(f, at, entry, 0)?;
         }
         Ok(())
     }
@@ -236,7 +194,6 @@ struct Config {
     colored: bool,
     current: bool,
     detailed: bool,
-    graph: bool,
     position: bool,
     saved: bool,
 }
@@ -247,7 +204,6 @@ impl Default for Config {
             colored: false,
             current: true,
             detailed: true,
-            graph: false,
             position: true,
             saved: true,
         }

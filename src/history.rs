@@ -175,15 +175,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 
     /// Removes all commands from the history without undoing them.
     pub fn clear(&mut self) {
-        let old = self.branch();
         self.root = 0;
         self.next = 1;
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Branch { old, new: 0 });
-        }
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -193,11 +189,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     pub fn apply(&mut self, command: C) -> Result<C> {
-        let old = self.at();
-        let saved = self.record.saved.filter(|&saved| saved > old.current);
-        let (merged, commands) = self.record.__apply(Entry::from(command))?;
+        let at = self.at();
+        let saved = self.record.saved.filter(|&saved| saved > at.current);
+        let (merged, tail) = self.record.__apply(Entry::from(command))?;
         // Check if the limit has been reached.
-        if !merged && old.current == self.current() {
+        if !merged && at.current == self.current() {
             let root = self.branch();
             self.rm_child(root, 0);
             self.branches
@@ -206,18 +202,12 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 .for_each(|branch| branch.parent.current -= 1);
         }
         // Handle new branch.
-        if !commands.is_empty() {
+        if !tail.is_empty() {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(old.branch, Branch::new(new, old.current, commands));
-            self.set_root(new, old.current, saved);
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Branch {
-                    old: old.branch,
-                    new,
-                });
-            }
+                .insert(at.branch, Branch::new(new, at.current, tail));
+            self.set_root(new, at.current, saved);
         }
         Ok(())
     }
@@ -278,15 +268,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 }
             }
         }
-        if let Err(err) = self.record.go_to(current)? {
-            return Some(Err(err));
-        } else if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Branch {
-                old: root,
-                new: self.root,
-            });
-        }
-        Some(Ok(()))
+        self.record.go_to(current)
     }
 
     /// Go back or forward in the history to the command that was made closest to the datetime provided.
@@ -338,10 +320,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 
     fn at(&self) -> At {
-        At {
-            branch: self.branch(),
-            current: self.current(),
-        }
+        At::new(self.branch(), self.current())
     }
 
     fn set_root(&mut self, root: usize, current: usize, saved: Option<usize>) {
@@ -376,10 +355,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 slot(Signal::Saved(true));
             }
         } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At {
-                branch: old,
-                current: saved,
-            });
+            self.saved = Some(At::new(old, saved));
             self.record.saved = None;
             if let Some(ref mut slot) = self.record.slot {
                 slot(Signal::Saved(false));
@@ -392,7 +368,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(_, child)| child.parent == At { branch, current })
+            .filter(|&(_, child)| child.parent == At::new(branch, current))
             .map(|(&id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {
@@ -523,7 +499,7 @@ pub(crate) struct Branch<C> {
 impl<C> Branch<C> {
     fn new(branch: usize, current: usize, commands: VecDeque<Entry<C>>) -> Branch<C> {
         Branch {
-            parent: At { branch, current },
+            parent: At::new(branch, current),
             commands,
         }
     }

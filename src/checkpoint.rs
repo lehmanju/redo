@@ -42,14 +42,6 @@ pub struct Checkpoint<'a, T: Timeline> {
 }
 
 impl<'a, T: Timeline> Checkpoint<'a, T> {
-    /// Returns a checkpoint.
-    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
-        Checkpoint {
-            inner,
-            actions: Vec::new(),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the checkpoint.
     ///
     /// # Panics
@@ -106,30 +98,8 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     /// [`apply`]: struct.Record.html#method.apply
     pub fn apply(&mut self, command: C) -> Result<C> {
         let saved = self.inner.saved;
-        let (_, commands) = self.inner.__apply(Entry::from(command))?;
-        self.actions.push(Action::Apply(saved, commands));
-        Ok(())
-    }
-
-    /// Calls the [`go_to`] method.
-    ///
-    /// [`go_to`]: struct.Record.html#method.go_to
-    pub fn go_to(&mut self, current: usize) -> Option<Result<C>> {
-        let old = self.inner.current();
-        let go_to = self.inner.go_to(current);
-        if let Some(Ok(_)) = go_to {
-            self.actions.push(Action::GoTo(0, old));
-        }
-        go_to
-    }
-
-    /// Calls the [`extend`] method.
-    ///
-    /// [`extend`]: struct.Record.html#method.extend
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
-        for command in commands {
-            self.apply(command)?;
-        }
+        let (_, tail) = self.inner.__apply(Entry::from(command))?;
+        self.actions.push(Action::Apply(saved, tail));
         Ok(())
     }
 
@@ -141,16 +111,15 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     pub fn cancel(self) -> Result<C> {
         for action in self.actions.into_iter().rev() {
             match action {
-                Action::Apply(saved, mut commands) => {
+                Action::Apply(saved, mut entries) => {
                     self.inner.undo().unwrap()?;
-                    self.inner.commands.pop_back();
-                    self.inner.commands.append(&mut commands);
+                    self.inner.entries.pop_back();
+                    self.inner.entries.append(&mut entries);
                     self.inner.saved = saved;
                 }
                 Action::Branch(_, _) => unreachable!(),
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
-                Action::GoTo(_, current) => self.inner.go_to(current).unwrap()?,
             }
         }
         Ok(())
@@ -170,13 +139,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
     pub fn target(&self) -> &C::Target {
         self.inner.target()
     }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.inner.target_mut()
-    }
 }
 
 impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
@@ -188,29 +150,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         let current = self.inner.current();
         self.inner.apply(command)?;
         self.actions.push(Action::Branch(branch, current));
-        Ok(())
-    }
-
-    /// Calls the [`go_to`] method.
-    ///
-    /// [`go_to`]: struct.History.html#method.go_to
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
-        let root = self.inner.branch();
-        let old = self.inner.current();
-        let go_to = self.inner.go_to(branch, current);
-        if let Some(Ok(_)) = go_to {
-            self.actions.push(Action::GoTo(root, old));
-        }
-        go_to
-    }
-
-    /// Calls the [`extend`] method.
-    ///
-    /// [`extend`]: struct.History.html#method.extend
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
-        for command in commands {
-            self.apply(command)?;
-        }
         Ok(())
     }
 
@@ -227,14 +166,13 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
                     let root = self.inner.branch();
                     self.inner.go_to(branch, current).unwrap()?;
                     if root == branch {
-                        self.inner.record.commands.pop_back();
+                        self.inner.record.entries.pop_back();
                     } else {
                         self.inner.branches.remove(&root).unwrap();
                     }
                 }
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
-                Action::GoTo(branch, current) => self.inner.go_to(branch, current).unwrap()?,
             }
         }
         Ok(())
@@ -253,13 +191,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// Returns a reference to the `target`.
     pub fn target(&self) -> &C::Target {
         self.inner.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.inner.target_mut()
     }
 }
 
@@ -297,7 +228,10 @@ impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, History<C, F>> {
 
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     fn from(inner: &'a mut T) -> Self {
-        Checkpoint::new(inner)
+        Checkpoint {
+            inner,
+            actions: Vec::new(),
+        }
     }
 }
 
@@ -308,7 +242,6 @@ enum Action<C> {
     Branch(usize, usize),
     Undo,
     Redo,
-    GoTo(usize, usize),
 }
 
 #[cfg(test)]
