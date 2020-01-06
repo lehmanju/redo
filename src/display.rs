@@ -137,7 +137,7 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, History<C, F>> {
             .iter()
             .filter(|(_, branch)| branch.parent == at)
         {
-            for (j, entry) in branch.commands.iter().enumerate().rev() {
+            for (j, entry) in branch.entries.iter().enumerate().rev() {
                 let at = At::new(i, j + branch.parent.current + 1);
                 self.fmt_graph(f, at, entry, level + 1)?;
             }

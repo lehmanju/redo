@@ -117,7 +117,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
                     self.inner.entries.append(&mut entries);
                     self.inner.saved = saved;
                 }
-                Action::Branch(_, _) => unreachable!(),
+                Action::Branch(_) => unreachable!(),
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
             }
@@ -147,9 +147,8 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     /// [`apply`]: struct.History.html#method.apply
     pub fn apply(&mut self, command: C) -> Result<C> {
         let branch = self.inner.branch();
-        let current = self.inner.current();
         self.inner.apply(command)?;
-        self.actions.push(Action::Branch(branch, current));
+        self.actions.push(Action::Branch(branch));
         Ok(())
     }
 
@@ -162,9 +161,9 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(_, _) => unreachable!(),
-                Action::Branch(branch, current) => {
+                Action::Branch(branch) => {
                     let root = self.inner.branch();
-                    self.inner.go_to(branch, current).unwrap()?;
+                    self.inner.jump_to(branch);
                     if root == branch {
                         self.inner.record.entries.pop_back();
                     } else {
@@ -239,7 +238,7 @@ impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 enum Action<C> {
     Apply(Option<usize>, VecDeque<Entry<C>>),
-    Branch(usize, usize),
+    Branch(usize),
     Undo,
     Redo,
 }
