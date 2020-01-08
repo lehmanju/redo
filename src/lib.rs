@@ -85,16 +85,8 @@
 //! [merge]: trait.Command.html#method.merge
 
 #![no_std]
-#![doc(html_root_url = "https://docs.rs/redo/latest")]
-#![deny(
-    bad_style,
-    bare_trait_objects,
-    missing_debug_implementations,
-    missing_docs,
-    unused_import_braces,
-    unsafe_code,
-    unstable_features
-)]
+#![doc(html_root_url = "https://docs.rs/redo")]
+#![deny(missing_docs)]
 
 extern crate alloc;
 
@@ -217,9 +209,8 @@ pub trait Command {
     }
 }
 
-/// The signal sent when the record, the history, or the target changes.
+/// The signal used for communicating state changes.
 ///
-/// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

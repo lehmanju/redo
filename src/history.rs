@@ -61,7 +61,7 @@ pub struct History<C: Command, F = fn(Signal)> {
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<C, F>,
     pub(crate) branches: BTreeMap<usize, Branch<C>>,
-    archive: Archive,
+    trunk: Trunk,
 }
 
 impl<C: Command> History<C> {
@@ -120,7 +120,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
             saved: self.saved,
             record: self.record.connect_with(slot),
             branches: self.branches,
-            archive: Archive::default(),
+            trunk: self.trunk,
         }
     }
 
@@ -167,7 +167,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        self.archive.clear();
+        self.trunk.clear();
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -197,7 +197,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
-        self.archive.apply(self.branch());
+        self.trunk.apply(self.branch());
         Ok(())
     }
 
@@ -209,7 +209,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     pub fn undo(&mut self) -> Option<Result<C>> {
-        let root = self.archive.undo()?;
+        let root = self.trunk.undo()?;
         if root == self.branch() {
             self.record.undo()
         } else {
@@ -226,7 +226,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self) -> Option<Result<C>> {
-        let root = self.archive.redo()?;
+        let root = self.trunk.redo()?;
         if root == self.branch() {
             self.record.redo()
         } else {
@@ -248,19 +248,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.branches
             .insert(self.root, Branch::new(root, current, tail));
         self.set_root(root, current, saved);
-    }
-
-    /// Applies each command in the iterator.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
-        for command in commands {
-            self.apply(command)?;
-        }
-        Ok(())
     }
 
     /// Returns a queue.
@@ -371,8 +358,8 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`undo`]: struct.History.html#method.undo
     pub fn to_undo_string(&self) -> Option<String> {
-        let current = self.archive.current.checked_sub(1)?;
-        let branch = self.archive.branches[current];
+        let current = self.trunk.current.checked_sub(1)?;
+        let branch = self.trunk.branches[current];
         Some(self.entry(At::new(branch, current)).to_string())
     }
 
@@ -380,8 +367,8 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`redo`]: struct.History.html#method.redo
     pub fn to_redo_string(&self) -> Option<String> {
-        let current = self.archive.current;
-        let branch = self.archive.branches[current];
+        let current = self.trunk.current;
+        let branch = self.trunk.branches[current];
         Some(self.entry(At::new(branch, current)).to_string())
     }
 
@@ -427,7 +414,7 @@ impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
             saved: None,
             record,
             branches: BTreeMap::default(),
-            archive: Archive::default(),
+            trunk: Trunk::default(),
         }
     }
 }
@@ -444,7 +431,7 @@ where
             .field("saved", &self.saved)
             .field("record", &self.record)
             .field("branches", &self.branches)
-            .field("archive", &self.archive)
+            .field("trunk", &self.trunk)
             .finish()
     }
 }
@@ -479,12 +466,12 @@ impl<C> Branch<C> {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Archive {
+struct Trunk {
     current: usize,
     branches: Vec<usize>,
 }
 
-impl Archive {
+impl Trunk {
     fn apply(&mut self, root: usize) {
         self.branches.push(root);
         self.current = self.branches.len();
@@ -627,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn actions() {
+    fn jump_to() {
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();

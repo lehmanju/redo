@@ -1,4 +1,4 @@
-![redo](https://raw.githubusercontent.com/evenorog/redo/master/redo.svg?sanitize=true)
+# redo
 
 [![Travis](https://travis-ci.com/evenorog/redo.svg?branch=master)](https://travis-ci.com/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
@@ -13,7 +13,7 @@ it is easy to apply, undo, and redo changes made to a target.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
 
-# Contents
+## Contents
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.
@@ -25,7 +25,7 @@ the [Record] and [History] data structures.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 * The library can be used as `no_std` by default.
 
-# Concepts
+## Concepts
 
 * Commands can be merged into a single command by implementing the [merge] method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
@@ -34,7 +34,7 @@ the [Record] and [History] data structures.
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 
-# Examples
+## Examples
 
 Add this to `Cargo.toml`:
 

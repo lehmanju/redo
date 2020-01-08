@@ -13,7 +13,6 @@ use {
     core::cmp::Ordering,
 };
 
-#[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
 
 /// A record of commands.
@@ -343,13 +342,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
         let slot = self.slot.take();
+        // Decide if we need to undo or redo to reach current.
+        let f = if current > self.current() {
+            Record::redo
+        } else {
+            Record::undo
+        };
         while self.current() != current {
-            // Decide if we need to undo or redo to reach current.
-            let f = if current > self.current() {
-                Record::redo
-            } else {
-                Record::undo
-            };
             if let Err(err) = f(self).unwrap() {
                 self.slot = slot;
                 return Some(Err(err));
@@ -397,20 +396,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
             },
         };
         self.go_to(current)
-    }
-
-    /// Applies each command in the iterator.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the remaining commands in the iterator are discarded.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = C>) -> Result<C> {
-        for command in commands {
-            self.apply(command)?;
-        }
-        Ok(())
     }
 
     /// Returns a queue.
