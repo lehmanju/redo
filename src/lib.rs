@@ -14,19 +14,16 @@
 //! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-//! * Configurable display formatting is provided when the `display` feature is enabled.
-//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
-//! * Serialization and deserialization is provided when the `serde` feature is enabled.
-//! * The library can be used as `no_std` by default.
-//!
-//! # Concepts
-//!
 //! * Commands can be merged into a single command by implementing the [merge] method on the command.
 //!   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
 //!   merged into larger changes that can be undone and redone in a single step.
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
 //!   when it changes.
-//! * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
+//! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
+//! * Configurable display formatting is provided when the `display` feature is enabled.
+//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
+//! * Serialization and deserialization is provided when the `serde` feature is enabled.
+//! * The library can be used as `no_std` by default.
 //!
 //! # Examples
 //!
@@ -217,16 +214,10 @@ pub trait Command {
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
-    ///
-    /// This signal will be emitted when the records ability to undo changes.
     Undo(bool),
     /// Says if the record can redo.
-    ///
-    /// This signal will be emitted when the records ability to redo changes.
     Redo(bool),
     /// Says if the target is in a saved state.
-    ///
-    /// This signal will be emitted when the record enters or leaves its targets saved state.
     Saved(bool),
 }
 
