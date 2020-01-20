@@ -1,6 +1,4 @@
-#[cfg(feature = "display")]
-use crate::Display;
-use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal, Timeline};
+use crate::{Checkpoint, Command, Display, Entry, History, Merge, Queue, Result, Signal, Timeline};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use core::fmt;
@@ -450,9 +448,6 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
     }
 
     /// Returns a structure for configurable formatting of the record.
-    ///
-    /// Requires the `display` feature to be enabled.
-    #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
@@ -505,7 +500,6 @@ where
     }
 }
 
-#[cfg(feature = "display")]
 impl<C: Command, F: FnMut(Signal)> fmt::Display for Record<C, F>
 where
     C: fmt::Display,

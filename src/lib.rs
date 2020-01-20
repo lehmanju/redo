@@ -20,7 +20,7 @@
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-//! * Configurable display formatting is provided when the `display` feature is enabled.
+//! * Configurable display formatting using [Display].
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //! * Serialization and deserialization is provided when the `serde` feature is enabled.
 //! * The library can be used as `no_std` by default.
@@ -80,6 +80,7 @@
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
 //! [merge]: trait.Command.html#method.merge
+//! [Display]: struct.Display.html
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/redo")]
@@ -88,7 +89,6 @@
 extern crate alloc;
 
 mod checkpoint;
-#[cfg(feature = "display")]
 mod display;
 mod history;
 mod queue;
@@ -100,10 +100,9 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "display")]
-pub use self::display::Display;
 pub use self::{
     checkpoint::Checkpoint,
+    display::Display,
     history::{History, HistoryBuilder},
     queue::Queue,
     record::{Record, RecordBuilder},

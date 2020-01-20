@@ -1,7 +1,5 @@
-#[cfg(feature = "display")]
-use crate::Display;
 use crate::{
-    At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
+    At, Checkpoint, Command, Display, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
 };
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -373,9 +371,6 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Returns a structure for configurable formatting of the record.
-    ///
-    /// Requires the `display` feature to be enabled.
-    #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
@@ -436,7 +431,6 @@ where
     }
 }
 
-#[cfg(feature = "display")]
 impl<C: Command, F: FnMut(Signal)> fmt::Display for History<C, F>
 where
     C: fmt::Display,

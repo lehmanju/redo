@@ -17,13 +17,9 @@ chrono = { version = "0.4.10", optional = true, features = ["serde"] }
 colored = { version = "1", optional = true }
 serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive"] }
 
-[features]
-default = []
-display = ["colored"]
-
 [badges]
 travis-ci = { repository = "evenorog/redo" }
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["chrono", "display", "serde"]
+features = ["chrono", "colored", "serde"]
