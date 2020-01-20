@@ -145,25 +145,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
     }
 }
 
-impl<T: Timeline> Timeline for Queue<'_, T> {
-    type Command = T::Command;
-
-    fn apply(&mut self, command: T::Command) -> Result<T::Command> {
-        self.apply(command);
-        Ok(())
-    }
-
-    fn undo(&mut self) -> Option<Result<T::Command>> {
-        self.undo();
-        Some(Ok(()))
-    }
-
-    fn redo(&mut self) -> Option<Result<T::Command>> {
-        self.redo();
-        Some(Ok(()))
-    }
-}
-
 impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     fn from(inner: &'a mut T) -> Self {
         Queue {

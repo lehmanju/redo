@@ -193,38 +193,6 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, Record<C, F>> {
-    type Command = C;
-
-    fn apply(&mut self, command: C) -> Result<C> {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Option<Result<C>> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Option<Result<C>> {
-        self.redo()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> Timeline for Checkpoint<'_, History<C, F>> {
-    type Command = C;
-
-    fn apply(&mut self, command: C) -> Result<C> {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Option<Result<C>> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Option<Result<C>> {
-        self.redo()
-    }
-}
-
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     fn from(inner: &'a mut T) -> Self {
         Checkpoint {
