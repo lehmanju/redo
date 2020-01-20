@@ -13,7 +13,7 @@ it is easy to apply, undo, and redo changes made to a target.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
 
-## Contents
+## Features
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.
@@ -23,7 +23,7 @@ the [Record] and [History] data structures.
 * Commands can be merged into a single command by implementing the [merge] method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
   merged into larger changes that can be undone and redone in a single step.
-* The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+* The target can be marked as being saved to disk and the data-structures can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 * Configurable display formatting is provided when the `display` feature is enabled.

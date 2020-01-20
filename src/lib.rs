@@ -7,7 +7,7 @@
 //! Both linear and non-linear undo-redo functionality is provided through
 //! the [Record] and [History] data structures.
 //!
-//! # Contents
+//! # Features
 //!
 //! * [Command] provides the base functionality for all commands.
 //! * [Record] provides linear undo-redo functionality.
@@ -17,7 +17,7 @@
 //! * Commands can be merged into a single command by implementing the [merge] method on the command.
 //!   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
 //!   merged into larger changes that can be undone and redone in a single step.
-//! * The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+//! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting is provided when the `display` feature is enabled.
@@ -152,52 +152,7 @@ pub trait Command {
         self.apply(target)
     }
 
-    /// Used for manual merging of two commands.
-    ///
-    /// # Examples
-    /// ```
-    /// use redo::{Command, Merge, Record};
-    /// use std::convert::Infallible;
-    ///
-    /// struct Add(String);
-    ///
-    /// impl Command for Add {
-    ///     type Target = String;
-    ///     type Error = Infallible;
-    ///
-    ///     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
-    ///         s.push_str(&self.0);
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-    ///         let len = s.len() - self.0.len();
-    ///         s.truncate(len);
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn merge(&mut self, Add(s): Self) -> Merge<Add> {
-    ///         self.0.push_str(&s);
-    ///         Merge::Yes
-    ///     }
-    /// }
-    ///
-    /// fn main() -> redo::Result<Add> {
-    ///     let mut record = Record::default();
-    ///     // The `a`, `b`, and `c` commands are merged.
-    ///     record.apply(Add("a".into()))?;
-    ///     record.apply(Add("b".into()))?;
-    ///     record.apply(Add("c".into()))?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     // Calling `undo` once will undo all the merged commands.
-    ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.target(), "");
-    ///     // Calling `redo` once will redo all the merged commands.
-    ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     Ok(())
-    /// }
-    /// ```
+    /// Used for manual merging of commands.
     fn merge(&mut self, command: Self) -> Merge<Self>
     where
         Self: Sized,

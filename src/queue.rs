@@ -35,7 +35,7 @@ use alloc::vec::Vec;
 /// # }
 /// ```
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Queue<'a, T: Timeline> {
+pub struct Queue<'a, T: Timeline + ?Sized> {
     inner: &'a mut T,
     actions: Vec<Action<T::Command>>,
 }
@@ -84,16 +84,11 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.actions.push(Action::Redo);
     }
 
-    /// Cancels the queued actions.
-    pub fn cancel(self) {}
-}
-
-impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     /// Applies the actions that is queued.
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self) -> Result<C> {
+    pub fn commit(self) -> Result<T::Command> {
         for action in self.actions {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -112,6 +107,11 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
         Ok(())
     }
 
+    /// Cancels the queued actions.
+    pub fn cancel(self) {}
+}
+
+impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<Record<C, F>> {
         self.inner.queue()
@@ -129,29 +129,6 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, Record<C, F>> {
 }
 
 impl<C: Command, F: FnMut(Signal)> Queue<'_, History<C, F>> {
-    /// Applies the actions that is queued.
-    ///
-    /// # Errors
-    /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self) -> Result<C> {
-        for action in self.actions {
-            match action {
-                Action::Apply(command) => self.inner.apply(command)?,
-                Action::Undo => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<History<C, F>> {
         self.inner.queue()

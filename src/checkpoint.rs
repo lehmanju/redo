@@ -36,7 +36,7 @@ use alloc::vec::Vec;
 /// # }
 /// ```
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Checkpoint<'a, T: Timeline> {
+pub struct Checkpoint<'a, T: Timeline + ?Sized> {
     inner: &'a mut T,
     actions: Vec<Action<T::Command>>,
 }
