@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -70,24 +70,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
         self.actions.is_empty()
     }
 
-    /// Calls the `undo` method.
-    pub fn undo(&mut self) -> Option<Result<T::Command>> {
-        let undo = self.inner.undo();
-        if let Some(Ok(_)) = undo {
-            self.actions.push(Action::Undo);
-        }
-        undo
-    }
-
-    /// Calls the `redo` method.
-    pub fn redo(&mut self) -> Option<Result<T::Command>> {
-        let redo = self.inner.redo();
-        if let Some(Ok(_)) = redo {
-            self.actions.push(Action::Redo);
-        }
-        redo
-    }
-
     /// Commits the changes and consumes the checkpoint.
     pub fn commit(self) {}
 }
@@ -103,6 +85,24 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
         Ok(())
     }
 
+    /// Calls the `undo` method.
+    pub fn undo(&mut self) -> Result<C> {
+        if self.inner.can_undo() {
+            self.inner.undo()?;
+            self.actions.push(Action::Undo);
+        }
+        Ok(())
+    }
+
+    /// Calls the `redo` method.
+    pub fn redo(&mut self) -> Result<C> {
+        if self.inner.can_redo() {
+            self.inner.redo()?;
+            self.actions.push(Action::Redo);
+        }
+        Ok(())
+    }
+
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
@@ -112,14 +112,14 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, Record<C, F>> {
         for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(saved, mut entries) => {
-                    self.inner.undo().unwrap()?;
+                    self.inner.undo()?;
                     self.inner.entries.pop_back();
                     self.inner.entries.append(&mut entries);
                     self.inner.saved = saved;
                 }
                 Action::Branch(_) => unreachable!(),
-                Action::Undo => self.inner.redo().unwrap()?,
-                Action::Redo => self.inner.undo().unwrap()?,
+                Action::Undo => self.inner.redo()?,
+                Action::Redo => self.inner.undo()?,
             }
         }
         Ok(())
@@ -152,6 +152,24 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
         Ok(())
     }
 
+    /// Calls the `undo` method.
+    pub fn undo(&mut self) -> Result<C> {
+        if self.inner.can_undo() {
+            self.inner.undo()?;
+            self.actions.push(Action::Undo);
+        }
+        Ok(())
+    }
+
+    /// Calls the `redo` method.
+    pub fn redo(&mut self) -> Result<C> {
+        if self.inner.can_redo() {
+            self.inner.redo()?;
+            self.actions.push(Action::Redo);
+        }
+        Ok(())
+    }
+
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
@@ -170,8 +188,8 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, History<C, F>> {
                         self.inner.branches.remove(&root).unwrap();
                     }
                 }
-                Action::Undo => self.inner.redo().unwrap()?,
-                Action::Redo => self.inner.undo().unwrap()?,
+                Action::Undo => self.inner.redo()?,
+                Action::Redo => self.inner.undo()?,
             }
         }
         Ok(())
@@ -228,7 +246,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result<Add> {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }
@@ -288,9 +306,9 @@ mod tests {
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
         record.set_saved(true);
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
+        record.undo().unwrap();
+        record.undo().unwrap();
+        record.undo().unwrap();
         let mut cp = record.checkpoint();
         cp.apply(Add('d')).unwrap();
         cp.apply(Add('e')).unwrap();
@@ -298,9 +316,9 @@ mod tests {
         assert_eq!(cp.target(), "def");
         cp.cancel().unwrap();
         assert_eq!(record.target(), "");
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
+        record.redo().unwrap();
+        record.redo().unwrap();
+        record.redo().unwrap();
         assert!(record.is_saved());
         assert_eq!(record.target(), "abc");
     }

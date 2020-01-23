@@ -4,22 +4,20 @@
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
 
-Provides undo-redo functionality with static dispatch and manual command merging.
+Provides advanced undo-redo functionality with static dispatch.
 
 It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a target.
-Both linear and non-linear undo-redo functionality is provided through
-the [Record] and [History] data structures.
 
 ## Features
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.
 * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
-* [Queue] wraps a [Record] or [History] and extends them with queue functionality.
-* [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
+* [Queue] wraps a record or history and extends them with queue functionality.
+* [Checkpoint] wraps a record or history and extends them with checkpoint functionality.
 * Commands can be merged into a single command by implementing the [merge] method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
   merged into larger changes that can be undone and redone in a single step.
@@ -57,7 +55,7 @@ impl Command for Add {
     }
 
     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-        self.0 = s.pop().ok_or("`s` is empty")?;
+        self.0 = s.pop().ok_or("s is empty")?;
         Ok(())
     }
 }
@@ -68,13 +66,13 @@ fn main() -> redo::Result<Add> {
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
     assert_eq!(record.target(), "abc");
-    record.undo().unwrap()?;
-    record.undo().unwrap()?;
-    record.undo().unwrap()?;
+    record.undo()?;
+    record.undo()?;
+    record.undo()?;
     assert_eq!(record.target(), "");
-    record.redo().unwrap()?;
-    record.redo().unwrap()?;
-    record.redo().unwrap()?;
+    record.redo()?;
+    record.redo()?;
+    record.redo()?;
     assert_eq!(record.target(), "abc");
     Ok(())
 }

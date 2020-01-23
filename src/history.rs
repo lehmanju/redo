@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -34,11 +34,11 @@ use serde::{Deserialize, Serialize};
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
 /// assert_eq!(history.target(), "ab");
-/// history.undo().unwrap()?;
+/// history.undo()?;
 /// history.apply(Add('c'))?;
 /// assert_eq!(history.target(), "ac");
-/// history.undo().unwrap()?;
-/// history.undo().unwrap()?;
+/// history.undo()?;
+/// history.undo()?;
 /// assert_eq!(history.target(), "ab");
 /// # Ok(())
 /// # }
@@ -108,18 +108,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
         self.record.connect(slot)
-    }
-
-    /// Creates a new history that uses the provided slot.
-    pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> History<C, G> {
-        History {
-            root: self.root,
-            next: self.next,
-            saved: self.saved,
-            record: self.record.connect_with(slot),
-            branches: self.branches,
-            trunk: self.trunk,
-        }
     }
 
     /// Removes and returns the slot.
@@ -206,13 +194,17 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    pub fn undo(&mut self) -> Option<Result<C>> {
-        let root = self.trunk.undo()?;
-        if root == self.branch() {
-            self.record.undo()
-        } else {
-            self.jump_to(root);
-            self.record.redo()
+    pub fn undo(&mut self) -> Result<C> {
+        match self.trunk.undo() {
+            Some(root) => {
+                if root == self.branch() {
+                    self.record.undo()
+                } else {
+                    self.jump_to(root);
+                    self.record.redo()
+                }
+            }
+            None => Ok(()),
         }
     }
 
@@ -223,16 +215,18 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self) -> Option<Result<C>> {
-        let root = self.trunk.redo()?;
-        if root == self.branch() {
-            self.record.redo()
-        } else {
-            let ok = self.record.undo();
-            if let Some(Ok(_)) = ok {
-                self.jump_to(root);
+    pub fn redo(&mut self) -> Result<C> {
+        match self.trunk.redo() {
+            Some(root) => {
+                if root == self.branch() {
+                    self.record.redo()
+                } else {
+                    self.record.undo()?;
+                    self.jump_to(root);
+                    Ok(())
+                }
             }
-            ok
+            None => Ok(()),
         }
     }
 
@@ -383,11 +377,11 @@ impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
         self.apply(command)
     }
 
-    fn undo(&mut self) -> Option<Result<C>> {
+    fn undo(&mut self) -> Result<C> {
         self.undo()
     }
 
-    fn redo(&mut self) -> Option<Result<C>> {
+    fn redo(&mut self) -> Result<C> {
         self.redo()
     }
 }
@@ -428,16 +422,6 @@ where
             .field("branches", &self.branches)
             .field("trunk", &self.trunk)
             .finish()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> fmt::Display for History<C, F>
-where
-    C: fmt::Display,
-    C::Target: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.display() as &dyn fmt::Display).fmt(f)
     }
 }
 
@@ -596,13 +580,13 @@ mod tests {
         type Target = String;
         type Error = &'static str;
 
-        fn apply(&mut self, target: &mut String) -> Result<Add> {
-            target.push(self.0);
+        fn apply(&mut self, s: &mut String) -> Result<Add> {
+            s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, target: &mut String) -> Result<Add> {
-            self.0 = target.pop().ok_or("`target` is empty")?;
+        fn undo(&mut self, s: &mut String) -> Result<Add> {
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }
@@ -612,25 +596,25 @@ mod tests {
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();
-        history.undo().unwrap().unwrap();
+        history.undo().unwrap();
         history.apply(Add('c')).unwrap();
-        history.undo().unwrap().unwrap();
-        history.undo().unwrap().unwrap();
+        history.undo().unwrap();
+        history.undo().unwrap();
         assert_eq!(history.target(), "ab");
-        history.redo().unwrap().unwrap();
-        history.redo().unwrap().unwrap();
+        history.redo().unwrap();
+        history.redo().unwrap();
         assert_eq!(history.target(), "ac");
-        history.undo().unwrap().unwrap();
-        history.undo().unwrap().unwrap();
+        history.undo().unwrap();
+        history.undo().unwrap();
         assert_eq!(history.target(), "ab");
-        history.undo().unwrap().unwrap();
-        history.undo().unwrap().unwrap();
+        history.undo().unwrap();
+        history.undo().unwrap();
         assert_eq!(history.target(), "");
-        history.redo().unwrap().unwrap();
-        history.redo().unwrap().unwrap();
+        history.redo().unwrap();
+        history.redo().unwrap();
         assert_eq!(history.target(), "ab");
-        history.redo().unwrap().unwrap();
-        history.redo().unwrap().unwrap();
+        history.redo().unwrap();
+        history.redo().unwrap();
         assert_eq!(history.target(), "ac");
     }
 }

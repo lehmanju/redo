@@ -33,7 +33,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -43,13 +43,13 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// record.apply(Add('b'))?;
 /// record.apply(Add('c'))?;
 /// assert_eq!(record.target(), "abc");
-/// record.undo().unwrap()?;
-/// record.undo().unwrap()?;
-/// record.undo().unwrap()?;
+/// record.undo()?;
+/// record.undo()?;
+/// record.undo()?;
 /// assert_eq!(record.target(), "");
-/// record.redo().unwrap()?;
-/// record.redo().unwrap()?;
-/// record.redo().unwrap()?;
+/// record.redo()?;
+/// record.redo()?;
+/// record.redo()?;
 /// assert_eq!(record.target(), "abc");
 /// # Ok(())
 /// # }
@@ -114,18 +114,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
         self.slot.replace(slot)
-    }
-
-    /// Creates a new record that uses the provided slot.
-    pub fn connect_with<G: FnMut(Signal)>(self, slot: G) -> Record<C, G> {
-        Record {
-            entries: self.entries,
-            target: self.target,
-            current: self.current,
-            limit: self.limit,
-            saved: self.saved,
-            slot: Some(slot),
-        }
     }
 
     /// Removes and returns the slot.
@@ -265,15 +253,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
-    pub fn undo(&mut self) -> Option<Result<C>> {
+    pub fn undo(&mut self) -> Result<C> {
         if !self.can_undo() {
-            return None;
+            return Ok(());
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.entries[self.current - 1].undo(&mut self.target) {
-            return Some(Err(error));
-        }
+        self.entries[self.current - 1].undo(&mut self.target)?;
         self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -288,7 +274,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 slot(Signal::Saved(is_saved));
             }
         }
-        Some(Ok(()))
+        Ok(())
     }
 
     /// Calls the [`redo`] method for the active command and sets
@@ -298,15 +284,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self) -> Option<Result<C>> {
+    pub fn redo(&mut self) -> Result<C> {
         if !self.can_redo() {
-            return None;
+            return Ok(());
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.entries[self.current].redo(&mut self.target) {
-            return Some(Err(error));
-        }
+        self.entries[self.current].redo(&mut self.target)?;
         self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -321,7 +305,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 slot(Signal::Saved(is_saved));
             }
         }
-        Some(Ok(()))
+        Ok(())
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
@@ -347,7 +331,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
             Record::undo
         };
         while self.current() != current {
-            if let Err(err) = f(self).unwrap() {
+            if let Err(err) = f(self) {
                 self.slot = slot;
                 return Some(Err(err));
             }
@@ -460,11 +444,11 @@ impl<C: Command, F: FnMut(Signal)> Timeline for Record<C, F> {
         self.apply(command)
     }
 
-    fn undo(&mut self) -> Option<Result<C>> {
+    fn undo(&mut self) -> Result<C> {
         self.undo()
     }
 
-    fn redo(&mut self) -> Option<Result<C>> {
+    fn redo(&mut self) -> Result<C> {
         self.redo()
     }
 }
@@ -497,16 +481,6 @@ where
             .field("limit", &self.limit)
             .field("saved", &self.saved)
             .finish()
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> fmt::Display for Record<C, F>
-where
-    C: fmt::Display,
-    C::Target: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.display() as &dyn fmt::Display).fmt(f)
     }
 }
 
@@ -638,7 +612,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result<Add> {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }

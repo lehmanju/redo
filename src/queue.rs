@@ -18,7 +18,7 @@ use alloc::vec::Vec;
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -92,16 +92,8 @@ impl<'a, T: Timeline> Queue<'a, T> {
         for action in self.actions {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
-                Action::Undo => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
+                Action::Undo => self.inner.undo()?,
+                Action::Redo => self.inner.redo()?,
             }
         }
         Ok(())
@@ -179,7 +171,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result<Add> {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }
