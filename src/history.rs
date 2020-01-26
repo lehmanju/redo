@@ -2,8 +2,11 @@ use crate::{
     At, Checkpoint, Command, Display, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
 };
 use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::{String, ToString};
+use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
+#[cfg(feature = "chrono")]
+use chrono::{DateTime, TimeZone};
 use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -33,13 +36,14 @@ use serde::{Deserialize, Serialize};
 /// let mut history = History::default();
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
-/// assert_eq!(history.target(), "ab");
-/// history.undo()?;
 /// history.apply(Add('c'))?;
-/// assert_eq!(history.target(), "ac");
-/// history.undo()?;
-/// history.undo()?;
-/// assert_eq!(history.target(), "ab");
+/// let abc = history.branch();
+/// history.go_to(abc, 1).unwrap()?;
+/// history.apply(Add('f'))?;
+/// history.apply(Add('g'))?;
+/// assert_eq!(history.target(), "afg");
+/// history.go_to(abc, 3).unwrap()?;
+/// assert_eq!(history.target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
@@ -59,7 +63,6 @@ pub struct History<C: Command, F = fn(Signal)> {
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<C, F>,
     pub(crate) branches: BTreeMap<usize, Branch<C>>,
-    trunk: Trunk,
 }
 
 impl<C: Command> History<C> {
@@ -153,7 +156,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        self.trunk.clear();
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -183,7 +185,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
-        self.trunk.apply(self.branch());
         Ok(())
     }
 
@@ -195,17 +196,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     pub fn undo(&mut self) -> Result<C> {
-        match self.trunk.undo() {
-            Some(root) => {
-                if root == self.branch() {
-                    self.record.undo()
-                } else {
-                    self.jump_to(root);
-                    self.record.redo()
-                }
-            }
-            None => Ok(()),
-        }
+        self.record.undo()
     }
 
     /// Calls the [`redo`] method for the active command
@@ -216,30 +207,51 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self) -> Result<C> {
-        match self.trunk.redo() {
-            Some(root) => {
-                if root == self.branch() {
-                    self.record.redo()
-                } else {
-                    self.record.undo()?;
-                    self.jump_to(root);
-                    Ok(())
-                }
-            }
-            None => Ok(()),
-        }
+        self.record.redo()
     }
 
-    pub(crate) fn jump_to(&mut self, root: usize) {
-        let mut branch = self.branches.remove(&root).unwrap();
-        debug_assert_eq!(branch.parent, self.at());
-        let current = self.current();
-        let saved = self.record.saved.filter(|&saved| saved > current);
-        let tail = self.record.entries.split_off(current);
-        self.record.entries.append(&mut branch.entries);
-        self.branches
-            .insert(self.root, Branch::new(root, current, tail));
-        self.set_root(root, current, saved);
+    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
+        let root = self.root;
+        if root == branch {
+            return self.record.go_to(current);
+        }
+        // Walk the path from `root` to `branch`.
+        for (new, branch) in self.mk_path(branch)? {
+            // Walk to `branch.current` either by undoing or redoing.
+            if let Err(err) = self.record.go_to(branch.parent.current).unwrap() {
+                return Some(Err(err));
+            }
+            // Apply the commands in the branch and move older commands into their own branch.
+            for entry in branch.entries {
+                let current = self.current();
+                let saved = self.record.saved.filter(|&saved| saved > current);
+                let entries = match self.record.__apply(entry) {
+                    Ok((_, entries)) => entries,
+                    Err(err) => return Some(Err(err)),
+                };
+                if !entries.is_empty() {
+                    self.branches
+                        .insert(self.root, Branch::new(new, current, entries));
+                    self.set_root(new, current, saved);
+                }
+            }
+        }
+        self.record.go_to(current)
+    }
+
+    /// Go back or forward in the history to the command that was made closest to the datetime provided.
+    ///
+    /// This method does not jump across branches.
+    #[cfg(feature = "chrono")]
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
+        self.record.time_travel(to)
     }
 
     /// Returns a queue.
@@ -271,6 +283,18 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 
     fn at(&self) -> At {
         At::new(self.branch(), self.current())
+    }
+
+    pub(crate) fn jump_to(&mut self, root: usize) {
+        let mut branch = self.branches.remove(&root).unwrap();
+        debug_assert_eq!(branch.parent, self.at());
+        let current = self.current();
+        let saved = self.record.saved.filter(|&saved| saved > current);
+        let tail = self.record.entries.split_off(current);
+        self.record.entries.append(&mut branch.entries);
+        self.branches
+            .insert(self.root, Branch::new(root, current, tail));
+        self.set_root(root, current, saved);
     }
 
     fn set_root(&mut self, root: usize, current: usize, saved: Option<usize>) {
@@ -335,13 +359,18 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         }
     }
 
-    fn entry(&self, at: At) -> &Entry<C> {
-        if at.branch == self.root {
-            &self.record.entries[at.current]
-        } else {
-            let branch = &self.branches[&at.branch];
-            &branch.entries[self.current() - at.current]
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
+        debug_assert_ne!(self.branch(), to);
+        let mut dest = self.branches.remove(&to)?;
+        let mut i = dest.parent.branch;
+        let mut path = vec![(to, dest)];
+        while i != self.branch() {
+            dest = self.branches.remove(&i).unwrap();
+            to = i;
+            i = dest.parent.branch;
+            path.push((to, dest));
         }
+        Some(path.into_iter().rev())
     }
 }
 
@@ -350,18 +379,14 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     ///
     /// [`undo`]: struct.History.html#method.undo
     pub fn to_undo_string(&self) -> Option<String> {
-        let current = self.trunk.current.checked_sub(1)?;
-        let branch = self.trunk.branches[current];
-        Some(self.entry(At::new(branch, current)).to_string())
+        self.record.to_undo_string()
     }
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
     /// [`redo`]: struct.History.html#method.redo
     pub fn to_redo_string(&self) -> Option<String> {
-        let current = self.trunk.current;
-        let branch = self.trunk.branches[current];
-        Some(self.entry(At::new(branch, current)).to_string())
+        self.record.to_redo_string()
     }
 
     /// Returns a structure for configurable formatting of the record.
@@ -403,7 +428,6 @@ impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
             saved: None,
             record,
             branches: BTreeMap::default(),
-            trunk: Trunk::default(),
         }
     }
 }
@@ -420,7 +444,6 @@ where
             .field("saved", &self.saved)
             .field("record", &self.record)
             .field("branches", &self.branches)
-            .field("trunk", &self.trunk)
             .finish()
     }
 }
@@ -439,40 +462,6 @@ impl<C> Branch<C> {
             parent: At::new(branch, current),
             entries,
         }
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Trunk {
-    current: usize,
-    branches: Vec<usize>,
-}
-
-impl Trunk {
-    fn apply(&mut self, root: usize) {
-        self.branches.push(root);
-        self.current = self.branches.len();
-    }
-
-    fn undo(&mut self) -> Option<usize> {
-        let index = self.current.checked_sub(1)?;
-        let root = *self.branches.get(index)?;
-        self.branches.push(root);
-        self.current -= 1;
-        Some(root)
-    }
-
-    fn redo(&mut self) -> Option<usize> {
-        let root = *self.branches.get(self.current + 1)?;
-        self.branches.push(root);
-        self.current += 1;
-        Some(root)
-    }
-
-    fn clear(&mut self) {
-        self.current = 0;
-        self.branches.clear();
     }
 }
 
@@ -592,29 +581,77 @@ mod tests {
     }
 
     #[test]
-    fn jump_to() {
+    fn go_to() {
+        //          m
+        //          |
+        //    j  k  l
+        //     \ | /
+        //       i
+        //       |
+        // e  g  h
+        // |  | /
+        // d  f  p - q *
+        // | /  /
+        // c  n - o
+        // | /
+        // b
+        // |
+        // a
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();
-        history.undo().unwrap();
         history.apply(Add('c')).unwrap();
+        history.apply(Add('d')).unwrap();
+        history.apply(Add('e')).unwrap();
+        assert_eq!(history.target(), "abcde");
         history.undo().unwrap();
         history.undo().unwrap();
-        assert_eq!(history.target(), "ab");
-        history.redo().unwrap();
-        history.redo().unwrap();
-        assert_eq!(history.target(), "ac");
+        assert_eq!(history.target(), "abc");
+        let abcde = history.branch();
+        history.apply(Add('f')).unwrap();
+        history.apply(Add('g')).unwrap();
+        assert_eq!(history.target(), "abcfg");
         history.undo().unwrap();
+        let abcfg = history.branch();
+        history.apply(Add('h')).unwrap();
+        history.apply(Add('i')).unwrap();
+        history.apply(Add('j')).unwrap();
+        assert_eq!(history.target(), "abcfhij");
         history.undo().unwrap();
-        assert_eq!(history.target(), "ab");
+        let abcfhij = history.branch();
+        history.apply(Add('k')).unwrap();
+        assert_eq!(history.target(), "abcfhik");
         history.undo().unwrap();
+        let abcfhik = history.branch();
+        history.apply(Add('l')).unwrap();
+        assert_eq!(history.target(), "abcfhil");
+        history.apply(Add('m')).unwrap();
+        assert_eq!(history.target(), "abcfhilm");
+        let abcfhilm = history.branch();
+        history.go_to(abcde, 2).unwrap().unwrap();
+        history.apply(Add('n')).unwrap();
+        history.apply(Add('o')).unwrap();
+        assert_eq!(history.target(), "abno");
         history.undo().unwrap();
-        assert_eq!(history.target(), "");
-        history.redo().unwrap();
-        history.redo().unwrap();
-        assert_eq!(history.target(), "ab");
-        history.redo().unwrap();
-        history.redo().unwrap();
-        assert_eq!(history.target(), "ac");
+        let abno = history.branch();
+        history.apply(Add('p')).unwrap();
+        history.apply(Add('q')).unwrap();
+        assert_eq!(history.target(), "abnpq");
+
+        let abnpq = history.branch();
+        history.go_to(abcde, 5).unwrap().unwrap();
+        assert_eq!(history.target(), "abcde");
+        history.go_to(abcfg, 5).unwrap().unwrap();
+        assert_eq!(history.target(), "abcfg");
+        history.go_to(abcfhij, 7).unwrap().unwrap();
+        assert_eq!(history.target(), "abcfhij");
+        history.go_to(abcfhik, 7).unwrap().unwrap();
+        assert_eq!(history.target(), "abcfhik");
+        history.go_to(abcfhilm, 8).unwrap().unwrap();
+        assert_eq!(history.target(), "abcfhilm");
+        history.go_to(abno, 4).unwrap().unwrap();
+        assert_eq!(history.target(), "abno");
+        history.go_to(abnpq, 5).unwrap().unwrap();
+        assert_eq!(history.target(), "abnpq");
     }
 }

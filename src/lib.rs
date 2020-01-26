@@ -86,6 +86,7 @@
 
 extern crate alloc;
 
+mod archive;
 mod checkpoint;
 mod display;
 mod history;
@@ -99,6 +100,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 
 pub use self::{
+    archive::Archive,
     checkpoint::Checkpoint,
     display::Display,
     history::{History, HistoryBuilder},
