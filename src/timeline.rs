@@ -1,13 +1,15 @@
+//! A timeline of commands.
+
 use crate::{Command, History, Result, Signal};
 use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// An archive of commands.
+/// A timeline of commands.
 ///
 /// # Examples
 /// ```
-/// # use redo::{Command, Archive};
+/// # use redo::{Command, Timeline};
 /// # struct Add(char);
 /// # impl Command for Add {
 /// #     type Target = String;
@@ -22,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// #     }
 /// # }
 /// # fn main() -> redo::Result<Add> {
-/// let mut history = Archive::default();
+/// let mut history = Timeline::default();
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
 /// assert_eq!(history.target(), "ab");
@@ -43,16 +45,16 @@ use serde::{Deserialize, Serialize};
         deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
     ))
 )]
-pub struct Archive<C: Command, F = fn(Signal)> {
+pub struct Timeline<C: Command, F = fn(Signal)> {
     current: usize,
     branches: Vec<usize>,
     history: History<C, F>,
 }
 
-impl<C: Command> Archive<C> {
+impl<C: Command> Timeline<C> {
     /// Returns a new archive.
-    pub fn new(target: C::Target) -> Archive<C> {
-        Archive {
+    pub fn new(target: C::Target) -> Timeline<C> {
+        Timeline {
             current: 0,
             branches: Vec::new(),
             history: History::new(target),
@@ -60,12 +62,12 @@ impl<C: Command> Archive<C> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Archive<C, F> {
+impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     /// Removes all commands from the archive without undoing them.
     pub fn clear(&mut self) {
-        self.history.clear();
         self.current = 0;
         self.branches.clear();
+        self.history.clear();
     }
 
     /// Pushes the command to the top of the archive and executes its [`apply`] method.
@@ -111,7 +113,7 @@ impl<C: Command, F: FnMut(Signal)> Archive<C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self) -> Result<C> {
-        if self.current == self.branches.len() - 2 {
+        if self.current == self.branches.len() - 1 {
             return Ok(());
         }
         self.current += 1;
@@ -144,12 +146,12 @@ impl<C: Command, F: FnMut(Signal)> Archive<C, F> {
     }
 }
 
-impl<C: Command> Default for Archive<C>
+impl<C: Command> Default for Timeline<C>
 where
     C::Target: Default,
 {
-    fn default() -> Archive<C> {
-        Archive::new(Default::default())
+    fn default() -> Timeline<C> {
+        Timeline::new(Default::default())
     }
 }
 
@@ -177,7 +179,7 @@ mod tests {
 
     #[test]
     fn jump_to() {
-        let mut archive = Archive::default();
+        let mut archive = Timeline::default();
         archive.apply(Add('a')).unwrap();
         archive.apply(Add('b')).unwrap();
         archive.undo().unwrap();

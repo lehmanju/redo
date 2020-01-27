@@ -86,12 +86,10 @@
 
 extern crate alloc;
 
-mod archive;
-mod checkpoint;
 mod display;
-mod history;
-mod queue;
-mod record;
+pub mod history;
+pub mod record;
+pub mod timeline;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -99,35 +97,13 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use self::{
-    archive::Archive,
-    checkpoint::Checkpoint,
-    display::Display,
-    history::{History, HistoryBuilder},
-    queue::Queue,
-    record::{Record, RecordBuilder},
-};
+pub use self::{display::Display, history::History, record::Record, timeline::Timeline};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
 
-/// Base functionality for data structures that can use commands.
-pub trait Timeline {
-    /// The command type used.
-    type Command: Command;
-
-    /// Applies the command to the record.
-    fn apply(&mut self, command: Self::Command) -> Result<Self::Command>;
-
-    /// Calls the undo method on the current command.
-    fn undo(&mut self) -> Result<Self::Command>;
-
-    /// Calls the redo method on the current command.
-    fn redo(&mut self) -> Result<Self::Command>;
-}
-
 /// Base functionality for all commands.
-pub trait Command {
+pub trait Command: Sized {
     /// The target type.
     type Target;
     /// The error type.
@@ -152,10 +128,7 @@ pub trait Command {
     }
 
     /// Used for manual merging of commands.
-    fn merge(&mut self, command: Self) -> Merge<Self>
-    where
-        Self: Sized,
-    {
+    fn merge(&mut self, command: Self) -> Merge<Self> {
         Merge::No(command)
     }
 }
@@ -183,7 +156,7 @@ pub enum Merge<C> {
     Yes,
     /// The commands have not been merged.
     No(C),
-    /// The two commands cancels each other out. This removes both commands.
+    /// The two commands cancels each other out.
     Annul,
 }
 
@@ -235,10 +208,7 @@ impl<C: Command> Command for Entry<C> {
         self.command.redo(target)
     }
 
-    fn merge(&mut self, command: Self) -> Merge<Self>
-    where
-        Self: Sized,
-    {
+    fn merge(&mut self, command: Self) -> Merge<Self> {
         match self.command.merge(command.command) {
             Merge::Yes => Merge::Yes,
             Merge::No(command) => Merge::No(Entry::from(command)),

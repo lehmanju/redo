@@ -1,6 +1,6 @@
-use crate::{
-    At, Checkpoint, Command, Display, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
-};
+//! A history of commands.
+
+use crate::{At, Command, Display, Entry, Record, Result, Signal};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
 use alloc::vec;
@@ -255,13 +255,19 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<History<C, F>> {
-        Queue::from(self)
+    pub fn queue(&mut self) -> Queue<C, F> {
+        Queue {
+            history: self,
+            commands: Vec::new(),
+        }
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<History<C, F>> {
-        Checkpoint::from(self)
+    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+        Checkpoint {
+            history: self,
+            commands: Vec::new(),
+        }
     }
 
     /// Returns a reference to the `target`.
@@ -378,36 +384,20 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
-    pub fn to_undo_string(&self) -> Option<String> {
-        self.record.to_undo_string()
+    pub fn undo_text(&self) -> Option<String> {
+        self.record.undo_text()
     }
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
     /// [`redo`]: struct.History.html#method.redo
-    pub fn to_redo_string(&self) -> Option<String> {
-        self.record.to_redo_string()
+    pub fn redo_text(&self) -> Option<String> {
+        self.record.redo_text()
     }
 
     /// Returns a structure for configurable formatting of the record.
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
-    }
-}
-
-impl<C: Command, F: FnMut(Signal)> Timeline for History<C, F> {
-    type Command = C;
-
-    fn apply(&mut self, command: C) -> Result<C> {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Result<C> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Result<C> {
-        self.redo()
     }
 }
 
@@ -466,41 +456,22 @@ impl<C> Branch<C> {
 }
 
 /// Builder for a History.
-///
-/// # Examples
-/// ```
-/// # use redo::{self, Command, History, HistoryBuilder};
-/// # struct Add(char);
-/// # impl Command for Add {
-/// #     type Target = String;
-/// #     type Error = ();
-/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
-/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> { Ok(()) }
-/// # }
-/// # fn foo() -> History<Add> {
-/// HistoryBuilder::new()
-///     .capacity(100)
-///     .limit(100)
-///     .saved(false)
-///     .default()
-/// # }
-/// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct HistoryBuilder {
-    inner: RecordBuilder,
+pub struct Builder {
+    inner: crate::record::Builder,
 }
 
-impl HistoryBuilder {
+impl Builder {
     /// Returns a builder for a history.
-    pub fn new() -> HistoryBuilder {
-        HistoryBuilder {
-            inner: RecordBuilder::new(),
+    pub fn new() -> Builder {
+        Builder {
+            inner: crate::record::Builder::new(),
         }
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder {
+    pub fn capacity(&mut self, capacity: usize) -> &mut Builder {
         self.inner.capacity(capacity);
         self
     }
@@ -509,14 +480,14 @@ impl HistoryBuilder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder {
+    pub fn limit(&mut self, limit: usize) -> &mut Builder {
         self.inner.limit(limit);
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder {
+    pub fn saved(&mut self, saved: bool) -> &mut Builder {
         self.inner.saved(saved);
         self
     }
@@ -552,9 +523,184 @@ impl HistoryBuilder {
     }
 }
 
-impl Default for HistoryBuilder {
+impl Default for Builder {
     fn default() -> Self {
-        HistoryBuilder::new()
+        Builder::new()
+    }
+}
+
+#[derive(Debug)]
+enum QueueCommand<C> {
+    Apply(C),
+    Undo,
+    Redo,
+}
+
+/// Wraps a record and gives it batch queue functionality.
+///
+/// # Examples
+/// ```
+/// # use redo::{Command, Record};
+/// # struct Add(char);
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
+/// #         self.0 = s.pop().ok_or("s is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> redo::Result<Add> {
+/// let mut record = Record::default();
+/// let mut queue = record.queue();
+/// queue.apply(Add('a'));
+/// queue.apply(Add('b'));
+/// queue.apply(Add('c'));
+/// assert_eq!(queue.target(), "");
+/// queue.commit()?;
+/// assert_eq!(record.target(), "abc");
+/// # Ok(())
+/// # }
+/// ```
+pub struct Queue<'a, C: Command, F> {
+    history: &'a mut History<C, F>,
+    commands: Vec<QueueCommand<C>>,
+}
+
+impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
+    /// Queues an `apply` action.
+    pub fn apply(&mut self, command: C) {
+        self.commands.push(QueueCommand::Apply(command));
+    }
+
+    /// Queues an `undo` action.
+    pub fn undo(&mut self) {
+        self.commands.push(QueueCommand::Undo);
+    }
+
+    /// Queues a `redo` action.
+    pub fn redo(&mut self) {
+        self.commands.push(QueueCommand::Redo);
+    }
+
+    /// Applies the queued commands.
+    ///
+    /// # Errors
+    /// If an error occurs, it stops applying the commands and returns the error.
+    pub fn commit(self) -> Result<C> {
+        for command in self.commands {
+            match command {
+                QueueCommand::Apply(command) => self.history.apply(command)?,
+                QueueCommand::Undo => self.history.undo()?,
+                QueueCommand::Redo => self.history.redo()?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Cancels the queued actions.
+    pub fn cancel(self) {}
+
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<C, F> {
+        self.history.queue()
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+        self.history.checkpoint()
+    }
+
+    /// Returns a reference to the target.
+    pub fn target(&self) -> &C::Target {
+        self.history.target()
+    }
+}
+
+#[derive(Debug)]
+enum CheckpointCommand {
+    Apply(usize),
+    Undo,
+    Redo,
+}
+
+/// A checkpoint wrapper.
+pub struct Checkpoint<'a, C: Command, F> {
+    history: &'a mut History<C, F>,
+    commands: Vec<CheckpointCommand>,
+}
+
+impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
+    /// Calls the `apply` method.
+    pub fn apply(&mut self, command: C) -> Result<C> {
+        let branch = self.history.branch();
+        self.history.apply(command)?;
+        self.commands.push(CheckpointCommand::Apply(branch));
+        Ok(())
+    }
+
+    /// Calls the `undo` method.
+    pub fn undo(&mut self) -> Result<C> {
+        if self.history.can_undo() {
+            self.history.undo()?;
+            self.commands.push(CheckpointCommand::Undo);
+        }
+        Ok(())
+    }
+
+    /// Calls the `redo` method.
+    pub fn redo(&mut self) -> Result<C> {
+        if self.history.can_redo() {
+            self.history.redo()?;
+            self.commands.push(CheckpointCommand::Redo);
+        }
+        Ok(())
+    }
+
+    /// Commits the changes and consumes the checkpoint.
+    pub fn commit(self) {}
+
+    /// Cancels the changes and consumes the checkpoint.
+    ///
+    /// # Errors
+    /// If an error occur when canceling the changes, the error is returned
+    /// and the remaining commands are not canceled.
+    pub fn cancel(self) -> Result<C> {
+        for command in self.commands.into_iter().rev() {
+            match command {
+                CheckpointCommand::Apply(branch) => {
+                    let root = self.history.branch();
+                    self.history.jump_to(branch);
+                    if root == branch {
+                        self.history.record.entries.pop_back();
+                    } else {
+                        self.history.branches.remove(&root).unwrap();
+                    }
+                }
+                CheckpointCommand::Undo => self.history.redo()?,
+                CheckpointCommand::Redo => self.history.undo()?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<C, F> {
+        self.history.queue()
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+        self.history.checkpoint()
+    }
+
+    /// Returns a reference to the target.
+    pub fn target(&self) -> &C::Target {
+        self.history.target()
     }
 }
 
