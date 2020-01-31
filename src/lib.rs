@@ -25,15 +25,6 @@
 //!
 //! # Examples
 //!
-//! Add this to `Cargo.toml`:
-//!
-//! ```toml
-//! [dependencies]
-//! redo = "0.40"
-//! ```
-//!
-//! And this to `main.rs`:
-//!
 //! ```
 //! use redo::{Command, Record};
 //!

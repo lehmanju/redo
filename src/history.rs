@@ -1,10 +1,12 @@
 //! A history of commands.
 
 use crate::{At, Command, Display, Entry, Record, Result, Signal};
-use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::String;
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    string::String,
+    vec,
+    vec::Vec,
+};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use core::fmt;
@@ -167,7 +169,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     pub fn apply(&mut self, command: C) -> Result<C> {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (merged, tail) = self.record.__apply(Entry::from(command))?;
+        let (merged, tail) = self.record.__apply(command)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -232,7 +234,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
             for entry in branch.entries {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.__apply(entry) {
+                let entries = match self.record.__apply(entry.command) {
                     Ok((_, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };

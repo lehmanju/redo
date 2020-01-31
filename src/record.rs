@@ -75,11 +75,6 @@ impl<C: Command> Record<C> {
     pub fn new(target: C::Target) -> Record<C> {
         Builder::new().build(target)
     }
-
-    /// Returns a new record builder.
-    pub fn builder() -> Builder {
-        Builder::new()
-    }
 }
 
 impl<C: Command, F: FnMut(Signal)> Record<C, F> {
@@ -197,14 +192,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     pub fn apply(&mut self, command: C) -> Result<C> {
-        self.__apply(Entry::from(command)).map(|_| ())
+        self.__apply(command).map(|_| ())
     }
 
     pub(crate) fn __apply(
         &mut self,
-        mut entry: Entry<C>,
+        mut command: C,
     ) -> core::result::Result<(bool, VecDeque<Entry<C>>), C::Error> {
-        entry.apply(&mut self.target)?;
+        command.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -216,8 +211,8 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(ref mut last) if !was_saved => last.merge(entry),
-            _ => Merge::No(entry),
+            Some(ref mut last) if !was_saved => last.command.merge(command),
+            _ => Merge::No(command),
         };
         let merged_or_annulled = match merged {
             Merge::Yes => true,
@@ -226,7 +221,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 true
             }
             // If commands are not merged or annulled push it onto the record.
-            Merge::No(entry) => {
+            Merge::No(command) => {
                 // If limit is reached, pop off the first command.
                 if self.limit() == self.current() {
                     self.entries.pop_front();
@@ -234,7 +229,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 } else {
                     self.current += 1;
                 }
-                self.entries.push_back(entry);
+                self.entries.push_back(Entry::from(command));
                 false
             }
         };
@@ -682,7 +677,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, command: C) -> Result<C> {
         let saved = self.record.saved;
-        let (_, tail) = self.record.__apply(Entry::from(command))?;
+        let (_, tail) = self.record.__apply(command)?;
         self.commands.push(CheckpointCommand::Apply(saved, tail));
         Ok(())
     }
