@@ -1,6 +1,6 @@
 //! A record of commands.
 
-use crate::{Command, Display, Entry, History, Merge, Result, Signal};
+use crate::{Command, Display, Entry, History, Merge, Result, Signal, Slot};
 use alloc::{
     collections::VecDeque,
     string::{String, ToString},
@@ -59,15 +59,21 @@ use {
 ///
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound(
+        serialize = "C: Command + Serialize, C::Target: Serialize",
+        deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
+    ))
+)]
 pub struct Record<C: Command, F = fn(Signal)> {
     pub(crate) entries: VecDeque<Entry<C>>,
     target: C::Target,
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
-    #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
-    pub(crate) slot: Option<F>,
+    pub(crate) slot: Slot<F>,
 }
 
 impl<C: Command> Record<C> {
@@ -115,12 +121,12 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     ///
     /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.replace(slot)
+        self.slot.f.replace(slot)
     }
 
     /// Removes and returns the slot.
     pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.take()
+        self.slot.f.take()
     }
 
     /// Returns `true` if the record can undo.
@@ -143,18 +149,10 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.current());
-            if let Some(ref mut slot) = self.slot {
-                if !was_saved {
-                    slot(Signal::Saved(true));
-                }
-            }
+            self.slot.emit_if(!was_saved, Signal::Saved(true));
         } else {
             self.saved = None;
-            if let Some(ref mut slot) = self.slot {
-                if was_saved {
-                    slot(Signal::Saved(false));
-                }
-            }
+            self.slot.emit_if(was_saved, Signal::Saved(false));
         }
     }
 
@@ -175,14 +173,8 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.entries.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
-        if let Some(ref mut slot) = self.slot {
-            if could_undo {
-                slot(Signal::Undo(false));
-            }
-            if could_redo {
-                slot(Signal::Redo(false));
-            }
-        }
+        self.slot.emit_if(could_undo, Signal::Undo(false));
+        self.slot.emit_if(could_redo, Signal::Redo(false));
     }
 
     /// Pushes the command on top of the record and executes its [`apply`] method.
@@ -234,17 +226,9 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
             }
         };
         debug_assert_eq!(self.current(), self.len());
-        if let Some(ref mut slot) = self.slot {
-            if could_redo {
-                slot(Signal::Redo(false));
-            }
-            if !could_undo {
-                slot(Signal::Undo(true));
-            }
-            if was_saved {
-                slot(Signal::Saved(false));
-            }
-        }
+        self.slot.emit_if(could_redo, Signal::Redo(false));
+        self.slot.emit_if(!could_undo, Signal::Undo(true));
+        self.slot.emit_if(was_saved, Signal::Saved(false));
         Ok((merged_or_annulled, tail))
     }
 
@@ -265,17 +249,10 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            if old == len {
-                slot(Signal::Redo(true));
-            }
-            if old == 1 {
-                slot(Signal::Undo(false));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
-        }
+        self.slot.emit_if(old == len, Signal::Redo(true));
+        self.slot.emit_if(old == 1, Signal::Undo(false));
+        self.slot
+            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Ok(())
     }
 
@@ -296,17 +273,10 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            if old == len - 1 {
-                slot(Signal::Redo(false));
-            }
-            if old == 0 {
-                slot(Signal::Undo(true));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
-        }
+        self.slot.emit_if(old == len - 1, Signal::Redo(false));
+        self.slot.emit_if(old == 0, Signal::Undo(true));
+        self.slot
+            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Ok(())
     }
 
@@ -325,35 +295,30 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
-        let slot = self.slot.take();
+        let f = self.slot.f.take();
         // Decide if we need to undo or redo to reach current.
-        let f = if current > self.current() {
+        let apply = if current > self.current() {
             Record::redo
         } else {
             Record::undo
         };
         while self.current() != current {
-            if let Err(err) = f(self) {
-                self.slot = slot;
+            if let Err(err) = apply(self) {
+                self.slot.f = f;
                 return Some(Err(err));
             }
         }
         // Add slot back.
-        self.slot = slot;
+        self.slot.f = f;
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
-        if let Some(ref mut slot) = self.slot {
-            if could_undo != can_undo {
-                slot(Signal::Undo(can_undo));
-            }
-            if could_redo != can_redo {
-                slot(Signal::Redo(can_redo));
-            }
-            if was_saved != is_saved {
-                slot(Signal::Saved(is_saved));
-            }
-        }
+        self.slot
+            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
+        self.slot
+            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
+        self.slot
+            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Some(Ok(()))
     }
 
@@ -472,6 +437,7 @@ where
             .field("current", &self.current)
             .field("limit", &self.limit)
             .field("saved", &self.saved)
+            .field("slot", &self.slot)
             .finish()
     }
 }
@@ -525,7 +491,7 @@ impl Builder {
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: None,
+            slot: Slot::default(),
         }
     }
 
@@ -541,7 +507,7 @@ impl Builder {
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: Some(slot),
+            slot: Slot { f: Some(slot) },
         }
     }
 

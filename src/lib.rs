@@ -23,46 +23,6 @@
 //! * Serialization and deserialization is provided when the `serde` feature is enabled.
 //! * The library can be used as `no_std` by default.
 //!
-//! # Examples
-//!
-//! ```
-//! use redo::{Command, Record};
-//!
-//! struct Add(char);
-//!
-//! impl Command for Add {
-//!     type Target = String;
-//!     type Error = &'static str;
-//!
-//!     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
-//!         s.push(self.0);
-//!         Ok(())
-//!     }
-//!
-//!     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
-//!         self.0 = s.pop().ok_or("s is empty")?;
-//!         Ok(())
-//!     }
-//! }
-//!
-//! fn main() -> redo::Result<Add> {
-//!     let mut record = Record::default();
-//!     record.apply(Add('a'))?;
-//!     record.apply(Add('b'))?;
-//!     record.apply(Add('c'))?;
-//!     assert_eq!(record.target(), "abc");
-//!     record.undo()?;
-//!     record.undo()?;
-//!     record.undo()?;
-//!     assert_eq!(record.target(), "");
-//!     record.redo()?;
-//!     record.redo()?;
-//!     record.redo()?;
-//!     assert_eq!(record.target(), "abc");
-//!     Ok(())
-//! }
-//! ```
-//!
 //! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
@@ -162,6 +122,41 @@ struct At {
 impl At {
     fn new(branch: usize, current: usize) -> At {
         At { branch, current }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+struct Slot<F> {
+    #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
+    f: Option<F>,
+}
+
+impl<F: FnMut(Signal)> Slot<F> {
+    fn emit(&mut self, signal: Signal) {
+        if let Some(ref mut f) = self.f {
+            f(signal);
+        }
+    }
+
+    fn emit_if(&mut self, cond: bool, signal: Signal) {
+        if cond {
+            self.emit(signal)
+        }
+    }
+}
+
+impl<F> Default for Slot<F> {
+    fn default() -> Self {
+        Slot { f: None }
+    }
+}
+
+impl<F> fmt::Debug for Slot<F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.f {
+            Some(_) => f.pad("Slot { .. }"),
+            None => f.pad("Empty"),
+        }
     }
 }
 

@@ -333,15 +333,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         {
             self.saved = None;
             self.record.saved = Some(saved);
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Saved(true));
-            }
+            self.record.slot.emit(Signal::Saved(true));
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At::new(old, saved));
             self.record.saved = None;
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Saved(false));
-            }
+            self.record.slot.emit(Signal::Saved(false));
         }
     }
 
