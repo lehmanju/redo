@@ -37,7 +37,7 @@
 
 extern crate alloc;
 
-mod display;
+mod format;
 pub mod history;
 pub mod record;
 pub mod timeline;
@@ -48,7 +48,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use self::{display::Display, history::History, record::Record, timeline::Timeline};
+pub use self::{history::History, record::Record, timeline::Timeline};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<C> = core::result::Result<(), <C as Command>::Error>;

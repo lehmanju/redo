@@ -1,12 +1,15 @@
 //! A record of commands.
 
-use crate::{Command, Display, Entry, History, Merge, Result, Signal, Slot};
+use crate::{format::Format, At, Command, Entry, History, Merge, Result, Signal, Slot};
 use alloc::{
     collections::VecDeque,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt, num::NonZeroUsize};
+use core::{
+    fmt::{self, Write},
+    num::NonZeroUsize,
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "chrono")]
@@ -405,8 +408,11 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<Self> {
-        Display::from(self)
+    pub fn display(&self) -> Display<C, F> {
+        Display {
+            record: self,
+            format: Format::default(),
+        }
     }
 }
 
@@ -633,7 +639,7 @@ enum CheckpointCommand<C> {
     Redo,
 }
 
-/// A checkpoint wrapper.
+/// Wraps a record and gives it checkpoint functionality.
 pub struct Checkpoint<'a, C: Command, F> {
     record: &'a mut Record<C, F>,
     commands: Vec<CheckpointCommand<C>>,
@@ -703,6 +709,81 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     /// Returns a reference to the target.
     pub fn target(&self) -> &C::Target {
         self.record.target()
+    }
+}
+
+/// Configurable display formatting for record.
+#[derive(Copy, Clone)]
+pub struct Display<'a, C: Command, F: FnMut(Signal)> {
+    record: &'a Record<C, F>,
+    format: crate::format::Format,
+}
+
+impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
+    /// Show colored output (on by default).
+    ///
+    /// Requires the `colored` feature to be enabled.
+    #[cfg(feature = "colored")]
+    pub fn colored(&mut self, on: bool) -> &mut Self {
+        self.format.colored = on;
+        self
+    }
+
+    /// Show the current position in the output (on by default).
+    pub fn current(&mut self, on: bool) -> &mut Self {
+        self.format.current = on;
+        self
+    }
+
+    /// Show detailed output (on by default).
+    pub fn detailed(&mut self, on: bool) -> &mut Self {
+        self.format.detailed = on;
+        self
+    }
+
+    /// Show the position of the command (on by default).
+    pub fn position(&mut self, on: bool) -> &mut Self {
+        self.format.position = on;
+        self
+    }
+
+    /// Show the saved command (on by default).
+    pub fn saved(&mut self, on: bool) -> &mut Self {
+        self.format.saved = on;
+        self
+    }
+}
+
+impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
+        self.format.mark(f, 0)?;
+        self.format.position(f, at, false)?;
+        if self.format.detailed {
+            #[cfg(feature = "chrono")]
+            self.format.timestamp(f, &entry.timestamp)?;
+        }
+        self.format
+            .current(f, at, At::new(0, self.record.current()))?;
+        self.format
+            .saved(f, at, self.record.saved.map(|saved| At::new(0, saved)))?;
+        if self.format.detailed {
+            writeln!(f)?;
+            self.format.message(f, entry, 0)
+        } else {
+            f.write_char(' ')?;
+            self.format.message(f, entry, 0)?;
+            writeln!(f)
+        }
+    }
+}
+
+impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, C, F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, entry) in self.record.entries.iter().enumerate().rev() {
+            let at = At::new(0, i + 1);
+            self.fmt_list(f, at, entry)?;
+        }
+        Ok(())
     }
 }
 

@@ -1,6 +1,6 @@
 //! A history of commands.
 
-use crate::{At, Command, Display, Entry, Record, Result, Signal};
+use crate::{format::Format, At, Command, Entry, Record, Result, Signal};
 use alloc::{
     collections::{BTreeMap, VecDeque},
     string::String,
@@ -9,7 +9,7 @@ use alloc::{
 };
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use core::fmt;
+use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -394,8 +394,11 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<Self> {
-        Display::from(self)
+    pub fn display(&self) -> Display<C, F> {
+        Display {
+            history: self,
+            format: Format::default(),
+        }
     }
 }
 
@@ -626,7 +629,7 @@ enum CheckpointCommand {
     Redo,
 }
 
-/// A checkpoint wrapper.
+/// Wraps a history and gives it checkpoint functionality.
 pub struct Checkpoint<'a, C: Command, F> {
     history: &'a mut History<C, F>,
     commands: Vec<CheckpointCommand>,
@@ -699,6 +702,128 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     /// Returns a reference to the target.
     pub fn target(&self) -> &C::Target {
         self.history.target()
+    }
+}
+
+/// Configurable display formatting for history.
+#[derive(Copy, Clone)]
+pub struct Display<'a, C: Command, F: FnMut(Signal)> {
+    history: &'a History<C, F>,
+    format: Format,
+}
+
+impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
+    /// Show colored output (on by default).
+    ///
+    /// Requires the `colored` feature to be enabled.
+    #[cfg(feature = "colored")]
+    pub fn colored(&mut self, on: bool) -> &mut Self {
+        self.format.colored = on;
+        self
+    }
+
+    /// Show the current position in the output (on by default).
+    pub fn current(&mut self, on: bool) -> &mut Self {
+        self.format.current = on;
+        self
+    }
+
+    /// Show detailed output (on by default).
+    pub fn detailed(&mut self, on: bool) -> &mut Self {
+        self.format.detailed = on;
+        self
+    }
+
+    /// Show the position of the command (on by default).
+    pub fn position(&mut self, on: bool) -> &mut Self {
+        self.format.position = on;
+        self
+    }
+
+    /// Show the saved command (on by default).
+    pub fn saved(&mut self, on: bool) -> &mut Self {
+        self.format.saved = on;
+        self
+    }
+}
+
+impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
+    fn fmt_list(
+        &self,
+        f: &mut fmt::Formatter,
+        at: At,
+        entry: &Entry<C>,
+        level: usize,
+    ) -> fmt::Result {
+        self.format.mark(f, level)?;
+        self.format.position(f, at, true)?;
+        if self.format.detailed {
+            #[cfg(feature = "chrono")]
+            self.format.timestamp(f, &entry.timestamp)?;
+        }
+        self.format.current(
+            f,
+            at,
+            At::new(self.history.branch(), self.history.current()),
+        )?;
+        self.format.saved(
+            f,
+            at,
+            self.history
+                .record
+                .saved
+                .map(|saved| At::new(self.history.branch(), saved))
+                .or(self.history.saved),
+        )?;
+        if self.format.detailed {
+            writeln!(f)?;
+            self.format.message(f, entry, level)
+        } else {
+            f.write_char(' ')?;
+            self.format.message(f, entry, level)?;
+            writeln!(f)
+        }
+    }
+
+    fn fmt_graph(
+        &self,
+        f: &mut fmt::Formatter,
+        at: At,
+        entry: &Entry<C>,
+        level: usize,
+    ) -> fmt::Result {
+        for (&i, branch) in self
+            .history
+            .branches
+            .iter()
+            .filter(|(_, branch)| branch.parent == at)
+        {
+            for (j, entry) in branch.entries.iter().enumerate().rev() {
+                let at = At::new(i, j + branch.parent.current + 1);
+                self.fmt_graph(f, at, entry, level + 1)?;
+            }
+            for j in 0..level {
+                self.format.edge(f, j)?;
+                f.write_char(' ')?;
+            }
+            self.format.split(f, level)?;
+            writeln!(f)?;
+        }
+        for i in 0..level {
+            self.format.edge(f, i)?;
+            f.write_char(' ')?;
+        }
+        self.fmt_list(f, at, entry, level)
+    }
+}
+
+impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, C, F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
+            let at = At::new(self.history.branch(), i + 1);
+            self.fmt_graph(f, at, entry, 0)?;
+        }
+        Ok(())
     }
 }
 
