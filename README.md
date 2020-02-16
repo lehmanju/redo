@@ -13,18 +13,19 @@ it is easy to apply, undo, and redo changes made to a target.
 
 ## Features
 
-* [Command] provides the base functionality for all commands.
-* [Record] provides linear undo-redo functionality.
-* [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
-* [Queue] wraps a record or history and extends them with queue functionality.
-* [Checkpoint] wraps a record or history and extends them with checkpoint functionality.
-* Commands can be merged into a single command by implementing the [merge] method on the command.
+* [Command](https://docs.rs/redo/latest/redo/trait.Command.html) provides the base functionality for all commands.
+* [Record](https://docs.rs/redo/latest/redo/struct.Record.html) provides linear undo-redo functionality.
+* [History](https://docs.rs/redo/latest/redo/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
+* A queue wraps a record or history and extends them with queue functionality.
+* A checkpoint wraps a record or history and extends them with checkpoint functionality.
+* Commands can be merged into a single command by implementing the 
+  [merge](https://docs.rs/redo/latest/redo/trait.Command.html#method.merge) method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
   merged into larger changes that can be undone and redone in a single step.
 * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-* Configurable display formatting using [Display].
+* Configurable display formatting using [Display](https://docs.rs/undo/latest/undo/struct.Display.html).
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 * The library can be used as `no_std` by default.
@@ -83,11 +84,3 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
-
-[Command]: https://docs.rs/redo/latest/redo/trait.Command.html
-[Record]: https://docs.rs/redo/latest/redo/struct.Record.html
-[History]: https://docs.rs/redo/latest/redo/struct.History.html
-[Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
-[Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
-[merge]: https://docs.rs/redo/latest/redo/trait.Command.html#method.merge
-[Display]: https://docs.rs/undo/latest/undo/struct.Display.html

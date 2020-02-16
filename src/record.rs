@@ -22,9 +22,9 @@ use {
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the target through [signal]. The user
-/// can give the record a function that is called each time the state changes
-/// by using the [`builder`].
+/// about changes to the stack or the target through [signal](enum.Signal.html).
+/// The user can give the record a function that is called each time the state
+/// changes by using the [`builder`](struct.RecordBuilder.html).
 ///
 /// # Examples
 /// ```
@@ -59,9 +59,6 @@ use {
 /// # Ok(())
 /// # }
 /// ```
-///
-/// [`builder`]: struct.RecordBuilder.html
-/// [signal]: enum.Signal.html
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -401,10 +398,7 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
 
     /// Returns a structure for configurable formatting of the record.
     pub fn display(&self) -> Display<C, F> {
-        Display {
-            record: self,
-            format: Format::default(),
-        }
+        Display::from(self)
     }
 }
 

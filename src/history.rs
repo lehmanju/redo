@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 /// A history of commands.
 ///
-/// Unlike [Record] which maintains a linear undo history, History maintains an undo tree
+/// Unlike [Record](struct.Record.html) which maintains a linear undo history, History maintains an undo tree
 /// containing every edit made to the target.
 ///
 /// # Examples
@@ -49,8 +49,6 @@ use serde::{Deserialize, Serialize};
 /// # Ok(())
 /// # }
 /// ```
-///
-/// [Record]: struct.Record.html
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -389,10 +387,7 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
 
     /// Returns a structure for configurable formatting of the record.
     pub fn display(&self) -> Display<C, F> {
-        Display {
-            history: self,
-            format: Format::default(),
-        }
+        Display::from(self)
     }
 }
 
