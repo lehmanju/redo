@@ -33,6 +33,7 @@ extern crate alloc;
 mod format;
 pub mod history;
 pub mod record;
+#[doc(hidden)]
 pub mod timeline;
 
 #[cfg(feature = "chrono")]
@@ -41,7 +42,9 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use self::{history::History, record::Record, timeline::Timeline};
+#[doc(hidden)]
+pub use self::timeline::Timeline;
+pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
@@ -84,9 +87,9 @@ pub trait Command: Sized {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
-    /// Says if the `Timeline` can undo.
+    /// Says if the structures can undo.
     Undo(bool),
-    /// Says if the `Timeline` can redo.
+    /// Says if the structures can redo.
     Redo(bool),
     /// Says if the target is in a saved state.
     Saved(bool),
