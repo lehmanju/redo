@@ -115,7 +115,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.connect(slot)
     }
 
-    /// Removes and returns the slot.
+    /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
         self.record.disconnect()
     }
@@ -258,18 +258,12 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<C, F> {
-        Queue {
-            history: self,
-            commands: Vec::new(),
-        }
+        Queue::from(self)
     }
 
     /// Returns a checkpoint.
     pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
-        Checkpoint {
-            history: self,
-            commands: Vec::new(),
-        }
+        Checkpoint::from(self)
     }
 
     /// Returns a reference to the `target`.
@@ -622,6 +616,15 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     }
 }
 
+impl<'a, C: Command, F> From<&'a mut History<C, F>> for Queue<'a, C, F> {
+    fn from(history: &'a mut History<C, F>) -> Self {
+        Queue {
+            history,
+            commands: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 enum CheckpointCommand {
     Apply(usize),
@@ -702,6 +705,15 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     /// Returns a reference to the target.
     pub fn target(&self) -> &C::Target {
         self.history.target()
+    }
+}
+
+impl<'a, C: Command, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
+    fn from(history: &'a mut History<C, F>) -> Self {
+        Checkpoint {
+            history,
+            commands: Vec::new(),
+        }
     }
 }
 
@@ -814,6 +826,15 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
             f.write_char(' ')?;
         }
         self.fmt_list(f, at, entry, level)
+    }
+}
+
+impl<'a, C: Command, F: FnMut(Signal)> From<&'a History<C, F>> for Display<'a, C, F> {
+    fn from(history: &'a History<C, F>) -> Self {
+        Display {
+            history,
+            format: Format::default(),
+        }
     }
 }
 

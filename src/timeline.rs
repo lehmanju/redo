@@ -24,16 +24,16 @@ use serde::{Deserialize, Serialize};
 /// #     }
 /// # }
 /// # fn main() -> redo::Result<Add> {
-/// let mut history = Timeline::default();
-/// history.apply(Add('a'))?;
-/// history.apply(Add('b'))?;
-/// assert_eq!(history.target(), "ab");
-/// history.undo()?;
-/// history.apply(Add('c'))?;
-/// assert_eq!(history.target(), "ac");
-/// history.undo()?;
-/// history.undo()?;
-/// assert_eq!(history.target(), "ab");
+/// let mut timeline = Timeline::default();
+/// timeline.apply(Add('a'))?;
+/// timeline.apply(Add('b'))?;
+/// assert_eq!(timeline.target(), "ab");
+/// timeline.undo()?;
+/// timeline.apply(Add('c'))?;
+/// assert_eq!(timeline.target(), "ac");
+/// timeline.undo()?;
+/// timeline.undo()?;
+/// assert_eq!(timeline.target(), "ab");
 /// # Ok(())
 /// # }
 /// ```

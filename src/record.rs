@@ -127,7 +127,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.slot.f.replace(slot)
     }
 
-    /// Removes and returns the slot.
+    /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
         self.slot.f.take()
     }
@@ -201,7 +201,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let was_saved = self.is_saved();
         // Pop off all elements after len from record.
         let tail = self.entries.split_off(current);
-        debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
@@ -228,7 +227,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 false
             }
         };
-        debug_assert_eq!(self.current(), self.len());
         self.slot.emit_if(could_redo, Signal::Redo(false));
         self.slot.emit_if(!could_undo, Signal::Undo(true));
         self.slot.emit_if(was_saved, Signal::Saved(false));
@@ -352,18 +350,12 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<C, F> {
-        Queue {
-            record: self,
-            commands: Vec::new(),
-        }
+        Queue::from(self)
     }
 
     /// Returns a checkpoint.
     pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
-        Checkpoint {
-            record: self,
-            commands: Vec::new(),
-        }
+        Checkpoint::from(self)
     }
 
     /// Returns a reference to the `target`.
@@ -632,6 +624,15 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     }
 }
 
+impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Queue<'a, C, F> {
+    fn from(record: &'a mut Record<C, F>) -> Self {
+        Queue {
+            record,
+            commands: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 enum CheckpointCommand<C> {
     Apply(Option<usize>, VecDeque<Entry<C>>),
@@ -712,6 +713,15 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     }
 }
 
+impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
+    fn from(record: &'a mut Record<C, F>) -> Self {
+        Checkpoint {
+            record,
+            commands: Vec::new(),
+        }
+    }
+}
+
 /// Configurable display formatting for record.
 #[derive(Copy, Clone)]
 pub struct Display<'a, C: Command, F: FnMut(Signal)> {
@@ -773,6 +783,15 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
             f.write_char(' ')?;
             self.format.message(f, entry, 0)?;
             writeln!(f)
+        }
+    }
+}
+
+impl<'a, C: Command, F: FnMut(Signal)> From<&'a Record<C, F>> for Display<'a, C, F> {
+    fn from(record: &'a Record<C, F>) -> Self {
+        Display {
+            record,
+            format: Format::default(),
         }
     }
 }
