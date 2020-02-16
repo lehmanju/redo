@@ -3,7 +3,7 @@
 use crate::{format::Format, At, Command, Entry, Record, Result, Signal};
 use alloc::{
     collections::{BTreeMap, VecDeque},
-    string::String,
+    string::{String, ToString},
     vec,
     vec::Vec,
 };
@@ -72,7 +72,7 @@ impl<C: Command> History<C> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> History<C, F> {
+impl<C: Command, F> History<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -123,12 +123,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.is_saved()
     }
 
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        self.saved = None;
-        self.record.set_saved(saved);
-    }
-
     /// Returns `true` if the history can undo.
     pub fn can_undo(&self) -> bool {
         self.record.can_undo()
@@ -147,6 +141,50 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Returns the position of the current command.
     pub fn current(&self) -> usize {
         self.record.current()
+    }
+
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<C, F> {
+        Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a structure for configurable formatting of the record.
+    pub fn display(&self) -> Display<C, F> {
+        Display::from(self)
+    }
+
+    /// Returns a reference to the `target`.
+    pub fn target(&self) -> &C::Target {
+        self.record.target()
+    }
+
+    /// Returns a mutable reference to the `target`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.record.target_mut()
+    }
+
+    /// Consumes the history, returning the `target`.
+    pub fn into_target(self) -> C::Target {
+        self.record.into_target()
+    }
+
+    fn at(&self) -> At {
+        At::new(self.branch(), self.current())
+    }
+}
+
+impl<C: Command, F: FnMut(Signal)> History<C, F> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        self.saved = None;
+        self.record.set_saved(saved);
     }
 
     /// Removes all commands from the history without undoing them.
@@ -254,37 +292,6 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.time_travel(to)
     }
 
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
-        Queue::from(self)
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a reference to the `target`.
-    pub fn target(&self) -> &C::Target {
-        self.record.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.record.target_mut()
-    }
-
-    /// Consumes the history, returning the `target`.
-    pub fn into_target(self) -> C::Target {
-        self.record.into_target()
-    }
-
-    fn at(&self) -> At {
-        At::new(self.branch(), self.current())
-    }
-
     pub(crate) fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
@@ -370,7 +377,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
+impl<C: Command + ToString, F> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -384,11 +391,6 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> History<C, F> {
     pub fn redo_text(&self) -> Option<String> {
         self.record.redo_text()
     }
-
-    /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<C, F> {
-        Display::from(self)
-    }
 }
 
 impl<C: Command> Default for History<C>
@@ -400,7 +402,7 @@ where
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
+impl<C: Command, F> From<Record<C, F>> for History<C, F> {
     fn from(record: Record<C, F>) -> Self {
         History {
             root: 0,
@@ -412,7 +414,7 @@ impl<C: Command, F: FnMut(Signal)> From<Record<C, F>> for History<C, F> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> fmt::Debug for History<C, F>
+impl<C: Command, F> fmt::Debug for History<C, F>
 where
     C: fmt::Debug,
     C::Target: fmt::Debug,
@@ -488,11 +490,7 @@ impl Builder {
     }
 
     /// Builds the history with the slot.
-    pub fn build_with<C: Command, F: FnMut(Signal)>(
-        &self,
-        target: C::Target,
-        slot: F,
-    ) -> History<C, F> {
+    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> History<C, F> {
         History::from(self.inner.build_with(target, slot))
     }
 
@@ -505,7 +503,7 @@ impl Builder {
     }
 
     /// Creates the history with a default `target` and with the slot.
-    pub fn default_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> History<C, F>
+    pub fn default_with<C: Command, F>(&self, slot: F) -> History<C, F>
     where
         C::Target: Default,
     {
@@ -714,12 +712,12 @@ impl<'a, C: Command, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
 
 /// Configurable display formatting for history.
 #[derive(Copy, Clone)]
-pub struct Display<'a, C: Command, F: FnMut(Signal)> {
+pub struct Display<'a, C: Command, F> {
     history: &'a History<C, F>,
     format: Format,
 }
 
-impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
+impl<C: Command, F> Display<'_, C, F> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -754,7 +752,7 @@ impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
+impl<C: Command + fmt::Display, F> Display<'_, C, F> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
@@ -824,7 +822,7 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F: FnMut(Signal)> From<&'a History<C, F>> for Display<'a, C, F> {
+impl<'a, C: Command, F> From<&'a History<C, F>> for Display<'a, C, F> {
     fn from(history: &'a History<C, F>) -> Self {
         Display {
             history,
@@ -833,7 +831,7 @@ impl<'a, C: Command, F: FnMut(Signal)> From<&'a History<C, F>> for Display<'a, C
     }
 }
 
-impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, C, F> {
+impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
             let at = At::new(self.history.branch(), i + 1);

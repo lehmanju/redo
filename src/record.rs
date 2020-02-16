@@ -83,7 +83,7 @@ impl<C: Command> Record<C> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Record<C, F> {
+impl<C: Command, F> Record<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -144,6 +144,45 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
+    /// Returns the position of the current command.
+    pub fn current(&self) -> usize {
+        self.current
+    }
+
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<C, F> {
+        Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+        Checkpoint::from(self)
+    }
+
+    /// Returns a structure for configurable formatting of the record.
+    pub fn display(&self) -> Display<C, F> {
+        Display::from(self)
+    }
+
+    /// Returns a reference to the `target`.
+    pub fn target(&self) -> &C::Target {
+        &self.target
+    }
+
+    /// Returns a mutable reference to the `target`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        &mut self.target
+    }
+
+    /// Consumes the record, returning the `target`.
+    pub fn into_target(self) -> C::Target {
+        self.target
+    }
+}
+
+impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
@@ -159,11 +198,6 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self) -> Option<Result<C>> {
         self.saved.and_then(|saved| self.go_to(saved))
-    }
-
-    /// Returns the position of the current command.
-    pub fn current(&self) -> usize {
-        self.current
     }
 
     /// Removes all commands from the record without undoing them.
@@ -344,36 +378,9 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         };
         self.go_to(current)
     }
-
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
-        Queue::from(self)
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
-        Checkpoint::from(self)
-    }
-
-    /// Returns a reference to the `target`.
-    pub fn target(&self) -> &C::Target {
-        &self.target
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        &mut self.target
-    }
-
-    /// Consumes the record, returning the `target`.
-    pub fn into_target(self) -> C::Target {
-        self.target
-    }
 }
 
-impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
+impl<C: Command + ToString, F> Record<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -395,11 +402,6 @@ impl<C: Command + ToString, F: FnMut(Signal)> Record<C, F> {
             None
         }
     }
-
-    /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<C, F> {
-        Display::from(self)
-    }
 }
 
 impl<C: Command> Default for Record<C>
@@ -417,7 +419,7 @@ impl<C: Command, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> fmt::Debug for Record<C, F>
+impl<C: Command, F> fmt::Debug for Record<C, F>
 where
     C: fmt::Debug,
     C::Target: fmt::Debug,
@@ -488,11 +490,7 @@ impl Builder {
     }
 
     /// Builds the record with the slot.
-    pub fn build_with<C: Command, F: FnMut(Signal)>(
-        &self,
-        target: C::Target,
-        slot: F,
-    ) -> Record<C, F> {
+    pub fn build_with<C: Command, F>(&self, target: C::Target, slot: F) -> Record<C, F> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             target,
@@ -512,7 +510,7 @@ impl Builder {
     }
 
     /// Creates the record with a default `target` and with the slot.
-    pub fn default_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> Record<C, F>
+    pub fn default_with<C: Command, F>(&self, slot: F) -> Record<C, F>
     where
         C::Target: Default,
     {
@@ -718,7 +716,7 @@ impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
 
 /// Configurable display formatting for record.
 #[derive(Copy, Clone)]
-pub struct Display<'a, C: Command, F: FnMut(Signal)> {
+pub struct Display<'a, C: Command, F> {
     record: &'a Record<C, F>,
     format: crate::format::Format,
 }
@@ -758,7 +756,7 @@ impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
+impl<C: Command + fmt::Display, F> Display<'_, C, F> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
         self.format.mark(f, 0)?;
         self.format.position(f, at, false)?;
@@ -781,7 +779,7 @@ impl<C: Command + fmt::Display, F: FnMut(Signal)> Display<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F: FnMut(Signal)> From<&'a Record<C, F>> for Display<'a, C, F> {
+impl<'a, C: Command, F> From<&'a Record<C, F>> for Display<'a, C, F> {
     fn from(record: &'a Record<C, F>) -> Self {
         Display {
             record,
@@ -790,7 +788,7 @@ impl<'a, C: Command, F: FnMut(Signal)> From<&'a Record<C, F>> for Display<'a, C,
     }
 }
 
-impl<C: Command + fmt::Display, F: FnMut(Signal)> fmt::Display for Display<'_, C, F> {
+impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);

@@ -62,6 +62,25 @@ impl<C: Command> Timeline<C> {
     }
 }
 
+impl<C: Command, F> Timeline<C, F> {
+    /// Returns a reference to the `target`.
+    pub fn target(&self) -> &C::Target {
+        self.history.target()
+    }
+
+    /// Returns a mutable reference to the `target`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    pub fn target_mut(&mut self) -> &mut C::Target {
+        self.history.target_mut()
+    }
+
+    /// Consumes the history, returning the `target`.
+    pub fn into_target(self) -> C::Target {
+        self.history.into_target()
+    }
+}
+
 impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     /// Removes all commands from the archive without undoing them.
     pub fn clear(&mut self) {
@@ -126,23 +145,6 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
             self.history.jump_to(root);
             Ok(())
         }
-    }
-
-    /// Returns a reference to the `target`.
-    pub fn target(&self) -> &C::Target {
-        self.history.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    pub fn target_mut(&mut self) -> &mut C::Target {
-        self.history.target_mut()
-    }
-
-    /// Consumes the history, returning the `target`.
-    pub fn into_target(self) -> C::Target {
-        self.history.into_target()
     }
 }
 
