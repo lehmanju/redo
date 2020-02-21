@@ -25,7 +25,7 @@ it is easy to apply, undo, and redo changes made to a target.
 * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-* Configurable display formatting using [Display](https://docs.rs/undo/latest/undo/struct.Display.html).
+* Configurable display formatting using the display structure.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 * Serialization and deserialization is provided when the `serde` feature is enabled.
 * The library can be used as `no_std` by default.
