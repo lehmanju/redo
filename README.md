@@ -1,10 +1,10 @@
 # redo
 
+**Provides advanced undo-redo functionality with static dispatch.**
+
 [![Travis](https://travis-ci.com/evenorog/redo.svg?branch=master)](https://travis-ci.com/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
 [![Docs](https://docs.rs/redo/badge.svg)](https://docs.rs/redo)
-
-Provides advanced undo-redo functionality with static dispatch.
 
 It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
