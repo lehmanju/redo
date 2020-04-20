@@ -757,25 +757,35 @@ impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
 }
 
 impl<C: Command + fmt::Display, F> Display<'_, C, F> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<C>) -> fmt::Result {
-        self.format.mark(f, 0)?;
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
         self.format.position(f, at, false)?;
-        if self.format.detailed {
-            #[cfg(feature = "chrono")]
-            self.format.timestamp(f, &entry.timestamp)?;
+
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(entry) = entry {
+                if self.format.detailed {
+                    self.format.timestamp(f, &entry.timestamp)?;
+                }
+            }
         }
-        self.format
-            .current(f, at, At::new(0, self.record.current()))?;
-        self.format
-            .saved(f, at, self.record.saved.map(|saved| At::new(0, saved)))?;
-        if self.format.detailed {
-            writeln!(f)?;
-            self.format.message(f, entry, 0)
-        } else {
-            f.write_char(' ')?;
-            self.format.message(f, entry, 0)?;
-            writeln!(f)
+
+        self.format.labels(
+            f,
+            at,
+            At::new(0, self.record.current()),
+            self.record.saved.map(|saved| At::new(0, saved)),
+        )?;
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                writeln!(f)?;
+                self.format.message(f, entry, None)?;
+            } else {
+                f.write_char(' ')?;
+                self.format.message(f, entry, None)?;
+                writeln!(f)?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -792,9 +802,9 @@ impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
-            self.fmt_list(f, at, entry)?;
+            self.fmt_list(f, at, Some(entry))?;
         }
-        Ok(())
+        self.fmt_list(f, At::new(0, 0), None)
     }
 }
 

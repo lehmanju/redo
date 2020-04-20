@@ -757,37 +757,42 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: &Entry<C>,
+        entry: Option<&Entry<C>>,
         level: usize,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
         self.format.position(f, at, true)?;
-        if self.format.detailed {
-            #[cfg(feature = "chrono")]
-            self.format.timestamp(f, &entry.timestamp)?;
+
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(entry) = entry {
+                if self.format.detailed {
+                    self.format.timestamp(f, &entry.timestamp)?;
+                }
+            }
         }
-        self.format.current(
+
+        self.format.labels(
             f,
             at,
             At::new(self.history.branch(), self.history.current()),
-        )?;
-        self.format.saved(
-            f,
-            at,
             self.history
                 .record
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
         )?;
-        if self.format.detailed {
-            writeln!(f)?;
-            self.format.message(f, entry, level)
-        } else {
-            f.write_char(' ')?;
-            self.format.message(f, entry, level)?;
-            writeln!(f)
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                writeln!(f)?;
+                self.format.message(f, entry, Some(level))?;
+            } else {
+                f.write_char(' ')?;
+                self.format.message(f, entry, Some(level))?;
+                writeln!(f)?;
+            }
         }
+        Ok(())
     }
 
     fn fmt_graph(
@@ -818,7 +823,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
             self.format.edge(f, i)?;
             f.write_char(' ')?;
         }
-        self.fmt_list(f, at, entry, level)
+        self.fmt_list(f, at, Some(entry), level)
     }
 }
 
@@ -833,11 +838,12 @@ impl<'a, C: Command, F> From<&'a History<C, F>> for Display<'a, C, F> {
 
 impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let branch = self.history.branch();
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
-            let at = At::new(self.history.branch(), i + 1);
+            let at = At::new(branch, i + 1);
             self.fmt_graph(f, at, entry, 0)?;
         }
-        Ok(())
+        self.fmt_list(f, At::new(branch, 0), None, 0)
     }
 }
 
