@@ -6,14 +6,14 @@ description = "Provides advanced undo-redo functionality with static dispatch."
 documentation = "https://docs.rs/redo"
 repository = "https://github.com/evenorog/redo"
 readme = "README.md"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 keywords = ["undo", "redo"]
 categories = ["data-structures", "rust-patterns", "no-std"]
 exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
-chrono = { version = "0.4.10", optional = true, features = ["serde"] }
+chrono = { version = "0.4", optional = true, features = ["serde"] }
 colored = { version = "1", optional = true }
 serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive"] }
 
