@@ -52,7 +52,7 @@ pub struct Timeline<C: Command, F = fn(Signal)> {
 }
 
 impl<C: Command> Timeline<C> {
-    /// Returns a new archive.
+    /// Returns a new timeline.
     pub fn new(target: C::Target) -> Timeline<C> {
         Timeline {
             current: 0,
@@ -180,29 +180,29 @@ mod tests {
     }
 
     #[test]
-    fn jump_to() {
-        let mut archive = Timeline::default();
-        archive.apply(Add('a')).unwrap();
-        archive.apply(Add('b')).unwrap();
-        archive.undo().unwrap();
-        archive.apply(Add('c')).unwrap();
-        archive.undo().unwrap();
-        archive.undo().unwrap();
-        assert_eq!(archive.target(), "ab");
-        archive.redo().unwrap();
-        archive.redo().unwrap();
-        assert_eq!(archive.target(), "ac");
-        archive.undo().unwrap();
-        archive.undo().unwrap();
-        assert_eq!(archive.target(), "ab");
-        archive.undo().unwrap();
-        archive.undo().unwrap();
-        assert_eq!(archive.target(), "");
-        archive.redo().unwrap();
-        archive.redo().unwrap();
-        assert_eq!(archive.target(), "ab");
-        archive.redo().unwrap();
-        archive.redo().unwrap();
-        assert_eq!(archive.target(), "ac");
+    fn simple() {
+        let mut timeline = Timeline::default();
+        timeline.apply(Add('a')).unwrap();
+        timeline.apply(Add('b')).unwrap();
+        timeline.undo().unwrap();
+        timeline.apply(Add('c')).unwrap();
+        timeline.undo().unwrap();
+        timeline.undo().unwrap();
+        assert_eq!(timeline.target(), "ab");
+        timeline.redo().unwrap();
+        timeline.redo().unwrap();
+        assert_eq!(timeline.target(), "ac");
+        timeline.undo().unwrap();
+        timeline.undo().unwrap();
+        assert_eq!(timeline.target(), "ab");
+        timeline.undo().unwrap();
+        timeline.undo().unwrap();
+        assert_eq!(timeline.target(), "");
+        timeline.redo().unwrap();
+        timeline.redo().unwrap();
+        assert_eq!(timeline.target(), "ab");
+        timeline.redo().unwrap();
+        timeline.redo().unwrap();
+        assert_eq!(timeline.target(), "ac");
     }
 }
