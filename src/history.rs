@@ -153,7 +153,7 @@ impl<C: Command, F> History<C, F> {
         Checkpoint::from(self)
     }
 
-    /// Returns a structure for configurable formatting of the record.
+    /// Returns a structure for configurable formatting of the history.
     pub fn display(&self) -> Display<C, F> {
         Display::from(self)
     }
@@ -799,7 +799,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: &Entry<C>,
+        entry: Option<&Entry<C>>,
         level: usize,
     ) -> fmt::Result {
         for (&i, branch) in self
@@ -810,7 +810,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
         {
             for (j, entry) in branch.entries.iter().enumerate().rev() {
                 let at = At::new(i, j + branch.parent.current + 1);
-                self.fmt_graph(f, at, entry, level + 1)?;
+                self.fmt_graph(f, at, Some(entry), level + 1)?;
             }
             for j in 0..level {
                 self.format.edge(f, j)?;
@@ -823,7 +823,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
             self.format.edge(f, i)?;
             f.write_char(' ')?;
         }
-        self.fmt_list(f, at, Some(entry), level)
+        self.fmt_list(f, at, entry, level)
     }
 }
 
@@ -841,9 +841,9 @@ impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
         let branch = self.history.branch();
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
             let at = At::new(branch, i + 1);
-            self.fmt_graph(f, at, entry, 0)?;
+            self.fmt_graph(f, at, Some(entry), 0)?;
         }
-        self.fmt_list(f, At::new(branch, 0), None, 0)
+        self.fmt_graph(f, At::new(branch, 0), None, 0)
     }
 }
 

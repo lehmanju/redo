@@ -1,6 +1,6 @@
 //! A timeline of commands.
 
-use crate::{Command, History, Result, Signal};
+use crate::{history::Display, Command, History, Result, Signal};
 use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -46,8 +46,8 @@ use serde::{Deserialize, Serialize};
     ))
 )]
 pub struct Timeline<C: Command, F = fn(Signal)> {
-    current: usize,
-    branches: Vec<usize>,
+    index: usize,
+    timeline: Vec<usize>,
     history: History<C, F>,
 }
 
@@ -55,14 +55,29 @@ impl<C: Command> Timeline<C> {
     /// Returns a new timeline.
     pub fn new(target: C::Target) -> Timeline<C> {
         Timeline {
-            current: 0,
-            branches: Vec::new(),
+            index: 0,
+            timeline: Vec::new(),
             history: History::new(target),
         }
     }
 }
 
 impl<C: Command, F> Timeline<C, F> {
+    /// Returns the current branch.
+    pub fn branch(&self) -> usize {
+        self.history.branch()
+    }
+
+    /// Returns the position of the current command.
+    pub fn current(&self) -> usize {
+        self.history.current()
+    }
+
+    /// Returns a structure for configurable formatting of the timeline.
+    pub fn display(&self) -> Display<C, F> {
+        Display::from(&self.history)
+    }
+
     /// Returns a reference to the `target`.
     pub fn target(&self) -> &C::Target {
         self.history.target()
@@ -82,10 +97,15 @@ impl<C: Command, F> Timeline<C, F> {
 }
 
 impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        self.history.set_saved(saved);
+    }
+
     /// Removes all commands from the archive without undoing them.
     pub fn clear(&mut self) {
-        self.current = 0;
-        self.branches.clear();
+        self.index = 0;
+        self.timeline.clear();
         self.history.clear();
     }
 
@@ -97,8 +117,9 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     pub fn apply(&mut self, command: C) -> Result<C> {
         self.history.apply(command)?;
-        self.branches.push(self.history.branch());
-        self.current = self.branches.len();
+        let root = self.history.branch();
+        self.timeline.push(root);
+        self.index = self.timeline.len();
         Ok(())
     }
 
@@ -110,12 +131,12 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     pub fn undo(&mut self) -> Result<C> {
-        if self.current == 0 || self.current > self.branches.len() {
+        if self.index == 0 || self.index > self.timeline.len() {
             return Ok(());
         }
-        self.current -= 1;
-        let root = self.branches[self.current];
-        self.branches.push(root);
+        self.index -= 1;
+        let root = self.timeline[self.index];
+        self.timeline.push(root);
         if root == self.history.branch() {
             self.history.undo()
         } else {
@@ -132,12 +153,12 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self) -> Result<C> {
-        if self.current == self.branches.len() - 1 {
+        if self.index == self.timeline.len() - 1 {
             return Ok(());
         }
-        self.current += 1;
-        let root = self.branches[self.current];
-        self.branches.push(root);
+        self.index += 1;
+        let root = self.timeline[self.index];
+        self.timeline.push(root);
         if root == self.history.branch() {
             self.history.redo()
         } else {
