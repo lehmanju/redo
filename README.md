@@ -16,8 +16,8 @@ it is easy to apply, undo, and redo changes made to a target.
 * [Command](https://docs.rs/redo/latest/redo/trait.Command.html) provides the base functionality for all commands.
 * [Record](https://docs.rs/redo/latest/redo/struct.Record.html) provides linear undo-redo functionality.
 * [History](https://docs.rs/redo/latest/redo/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-* A queue wraps a record or history and extends them with queue functionality.
-* A checkpoint wraps a record or history and extends them with checkpoint functionality.
+* Queue wraps a record or history and extends them with queue functionality.
+* Checkpoint wraps a record or history and extends them with checkpoint functionality.
 * Commands can be merged into a single command by implementing the 
   [merge](https://docs.rs/redo/latest/redo/trait.Command.html#method.merge) method on the command.
   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
