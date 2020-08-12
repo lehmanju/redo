@@ -33,8 +33,6 @@ extern crate alloc;
 mod format;
 pub mod history;
 pub mod record;
-#[doc(hidden)]
-pub mod timeline;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -42,8 +40,6 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[doc(hidden)]
-pub use self::timeline::Timeline;
 pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
