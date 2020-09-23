@@ -81,7 +81,7 @@ pub trait Command: Sized {
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the structures can undo.
     Undo(bool),
@@ -93,7 +93,7 @@ pub enum Signal {
 
 /// Says if the command have been merged with another command.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Merge<C> {
     /// The commands have been merged.
     Yes,
@@ -105,7 +105,7 @@ pub enum Merge<C> {
 
 /// A position in a history tree.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 struct At {
     branch: usize,
     current: usize,
@@ -153,7 +153,7 @@ impl<F> fmt::Debug for Slot<F> {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Entry<C> {
     command: C,
     #[cfg(feature = "chrono")]

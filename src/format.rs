@@ -11,7 +11,7 @@ use {
     colored::{Color, Colorize},
 };
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Format {
     #[cfg(feature = "colored")]
     pub colored: bool,

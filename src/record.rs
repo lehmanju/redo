@@ -438,7 +438,7 @@ where
 
 /// Builder for a record.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Builder {
     capacity: usize,
     limit: NonZeroUsize,

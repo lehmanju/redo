@@ -432,7 +432,7 @@ where
 
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
     pub(crate) entries: VecDeque<Entry<C>>,
@@ -449,7 +449,7 @@ impl<C> Branch<C> {
 
 /// Builder for a History.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Builder {
     inner: crate::record::Builder,
 }
