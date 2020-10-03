@@ -27,6 +27,7 @@
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/redo")]
 #![deny(missing_docs)]
+#![forbid(unsafe_code)]
 
 extern crate alloc;
 
