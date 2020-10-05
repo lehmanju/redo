@@ -61,78 +61,62 @@ impl Format {
 
     pub fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
-        {
-            if self.colored {
-                write!(f, "{} ", "*".color(color_of_level(level)))
-            } else {
-                f.write_str("* ")
-            }
-        }
-        #[cfg(not(feature = "colored"))]
-        {
+        if self.colored {
+            write!(f, "{} ", "*".color(color_of_level(level)))
+        } else {
             f.write_str("* ")
         }
+        #[cfg(not(feature = "colored"))]
+        f.write_str("* ")
     }
 
     pub fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
-        {
-            if self.colored {
-                write!(f, "{}", "|".color(color_of_level(level)))
-            } else {
-                f.write_char('|')
-            }
-        }
-        #[cfg(not(feature = "colored"))]
-        {
+        if self.colored {
+            write!(f, "{}", "|".color(color_of_level(level)))
+        } else {
             f.write_char('|')
         }
+        #[cfg(not(feature = "colored"))]
+        f.write_char('|')
     }
 
     pub fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
-        {
-            if self.colored {
-                write!(
-                    f,
-                    "{}{}",
-                    "|".color(color_of_level(level)),
-                    "/".color(color_of_level(level + 1))
-                )
-            } else {
-                f.write_str("|/")
-            }
-        }
-        #[cfg(not(feature = "colored"))]
-        {
+        if self.colored {
+            write!(
+                f,
+                "{}{}",
+                "|".color(color_of_level(level)),
+                "/".color(color_of_level(level + 1))
+            )
+        } else {
             f.write_str("|/")
         }
+        #[cfg(not(feature = "colored"))]
+        f.write_str("|/")
     }
 
     pub fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
         if self.position {
             #[cfg(feature = "colored")]
-            {
-                if self.colored {
-                    let position = if use_branch {
-                        format!("{}:{}", at.branch, at.current)
-                    } else {
-                        format!("{}", at.current)
-                    };
-                    write!(f, "{}", position.yellow().bold())
-                } else if use_branch {
-                    write!(f, "{}:{}", at.branch, at.current)
+            if self.colored {
+                let position = if use_branch {
+                    format!("{}:{}", at.branch, at.current)
                 } else {
-                    write!(f, "{}", at.current)
-                }
+                    format!("{}", at.current)
+                };
+                write!(f, "{}", position.yellow().bold())
+            } else if use_branch {
+                write!(f, "{}:{}", at.branch, at.current)
+            } else {
+                write!(f, "{}", at.current)
             }
             #[cfg(not(feature = "colored"))]
-            {
-                if use_branch {
-                    write!(f, "{}:{}", at.branch, at.current)
-                } else {
-                    write!(f, "{}", at.current)
-                }
+            if use_branch {
+                write!(f, "{}:{}", at.branch, at.current)
+            } else {
+                write!(f, "{}", at.current)
             }
         } else {
             Ok(())
@@ -152,65 +136,53 @@ impl Format {
         ) {
             (true, true) => {
                 #[cfg(feature = "colored")]
-                {
-                    if self.colored {
-                        write!(
-                            f,
-                            " {}{}{} {}{}",
-                            "(".yellow(),
-                            "current".cyan().bold(),
-                            ",".yellow(),
-                            "saved".green().bold(),
-                            ")".yellow()
-                        )
-                    } else {
-                        f.write_str(" (current, saved)")
-                    }
+                if self.colored {
+                    write!(
+                        f,
+                        " {}{}{} {}{}",
+                        "(".yellow(),
+                        "current".cyan().bold(),
+                        ",".yellow(),
+                        "saved".green().bold(),
+                        ")".yellow()
+                    )
+                } else {
+                    f.write_str(" (current, saved)")
                 }
                 #[cfg(not(feature = "colored"))]
-                {
-                    f.write_str(" (current)")
-                }
+                f.write_str(" (current)")
             }
             (true, false) => {
                 #[cfg(feature = "colored")]
-                {
-                    if self.colored {
-                        write!(
-                            f,
-                            " {}{}{}",
-                            "(".yellow(),
-                            "current".cyan().bold(),
-                            ")".yellow()
-                        )
-                    } else {
-                        f.write_str(" (current)")
-                    }
-                }
-                #[cfg(not(feature = "colored"))]
-                {
+                if self.colored {
+                    write!(
+                        f,
+                        " {}{}{}",
+                        "(".yellow(),
+                        "current".cyan().bold(),
+                        ")".yellow()
+                    )
+                } else {
                     f.write_str(" (current)")
                 }
+                #[cfg(not(feature = "colored"))]
+                f.write_str(" (current)")
             }
             (false, true) => {
                 #[cfg(feature = "colored")]
-                {
-                    if self.colored {
-                        write!(
-                            f,
-                            " {}{}{}",
-                            "(".yellow(),
-                            "saved".green().bold(),
-                            ")".yellow()
-                        )
-                    } else {
-                        f.write_str(" (saved)")
-                    }
-                }
-                #[cfg(not(feature = "colored"))]
-                {
+                if self.colored {
+                    write!(
+                        f,
+                        " {}{}{}",
+                        "(".yellow(),
+                        "saved".green().bold(),
+                        ")".yellow()
+                    )
+                } else {
                     f.write_str(" (saved)")
                 }
+                #[cfg(not(feature = "colored"))]
+                f.write_str(" (saved)")
             }
             (false, false) => Ok(()),
         }
@@ -220,17 +192,13 @@ impl Format {
     pub fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
         let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
         #[cfg(feature = "colored")]
-        {
-            if self.colored {
-                write!(f, " {}", rfc2822.yellow())
-            } else {
-                write!(f, " {}", rfc2822)
-            }
-        }
-        #[cfg(not(feature = "colored"))]
-        {
+        if self.colored {
+            write!(f, " {}", rfc2822.yellow())
+        } else {
             write!(f, " {}", rfc2822)
         }
+        #[cfg(not(feature = "colored"))]
+        write!(f, " {}", rfc2822)
     }
 }
 
