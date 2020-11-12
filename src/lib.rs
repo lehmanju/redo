@@ -8,7 +8,7 @@
 //! # Features
 //!
 //! * [Command](trait.Command.html) provides the base functionality for all commands.
-//! * [Record](struct.Record.html) provides linear undo-redo functionality.
+//! * [Record](struct.Record.html) provides basic linear undo-redo functionality.
 //! * [History](struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * Queue wraps a record or history and extends them with queue functionality.
 //! * Checkpoint wraps a record or history and extends them with checkpoint functionality.
@@ -20,9 +20,12 @@
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structure.
-//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
-//! * Serialization and deserialization is provided when the `serde` feature is enabled.
 //! * The library can be used as `no_std` by default.
+//!
+//! # Cargo Feature Flags
+//!
+//! * `chrono`: Enables time stamps and time travel.
+//! * `serde`: Enables serialization and deserialization.
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/redo")]
