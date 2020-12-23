@@ -1,6 +1,6 @@
 # redo
 
-**Provides advanced undo-redo functionality with static dispatch.**
+**High-level undo-redo functionality.**
 
 [![Travis](https://travis-ci.com/evenorog/redo.svg?branch=master)](https://travis-ci.com/evenorog/redo)
 [![Crates.io](https://img.shields.io/crates/v/redo.svg)](https://crates.io/crates/redo)
