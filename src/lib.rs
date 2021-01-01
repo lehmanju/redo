@@ -31,3 +31,29 @@
 #![doc(html_root_url = "https://docs.rs/redo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+
+use serde::{Deserialize, Serialize};
+use undo::Command;
+use undo::Record as Inner;
+use undo::Signal;
+
+/// A history of commands.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "C: Command + Serialize, C::Target: Serialize",
+    deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
+))]
+pub struct Record<C: Command, F = Box<dyn FnMut(Signal)>> {
+    inner: Inner<C, F>,
+    target: C::Target,
+}
+
+impl<C: Command> Record<C> {
+    /// Returns a new history.
+    pub fn new(target: C::Target) -> Record<C> {
+        Record {
+            inner: Inner::new(),
+            target,
+        }
+    }
+}
