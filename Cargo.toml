@@ -13,12 +13,13 @@ exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
-undo = { version = "0.42" }
+undo = { version = "0.42", default-features = false }
 chrono_crate = { package = "chrono", version = "0.4", optional = true }
 serde_crate = { package = "serde", version = "1", optional = true, default-features = false, features = ["derive"] }
 
 [features]
-default = []
+default = ["alloc"]
+alloc = ["undo/alloc", "serde_crate/alloc"]
 chrono = ["chrono_crate", "undo/chrono"]
 colored = ["undo/colored"]
 serde = ["serde_crate", "undo/serde", "chrono_crate/serde"]
