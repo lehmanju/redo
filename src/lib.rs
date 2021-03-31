@@ -117,23 +117,19 @@ impl<C: Command, F> History<C, F> {
 }
 
 impl<C: Command, F: FnMut(Signal)> History<C, F> {
-    /// Pushes the command to the top of the history and executes its [`apply`] method.
+    /// Pushes the command to the top of the history and executes its `apply`method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
+    /// If an error occur when executing `apply` the error is returned.
     pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
         self.inner.apply(target, command)
     }
 
-    /// Calls the [`undo`] method for the active command
+    /// Calls the `undo` method for the active command
     /// and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// If an error occur when executing `undo` the error is returned.
     pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
         self.inner.undo(target)
     }
@@ -149,13 +145,10 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.inner.redo(target)
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
+    /// Repeatedly calls `undo` or`redo` until the command in `branch` at `current` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
+    /// If an error occur when executing `undo` or `redo` the error is returned.
     pub fn go_to(
         &mut self,
         target: &mut C::Target,
