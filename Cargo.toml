@@ -13,8 +13,14 @@ exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
-undo = { version = "0.42", features = ["serde", "chrono", "colored"] }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
+undo = { version = "0.42" }
+serde_crate = { package = "serde", version = "1", optional = true, default-features = false, features = ["derive"] }
+
+[features]
+default = []
+chrono = ["undo/chrono"]
+colored = ["undo/colored"]
+serde = ["serde_crate", "undo/serde"]
 
 [badges]
 travis-ci = { repository = "evenorog/redo" }
