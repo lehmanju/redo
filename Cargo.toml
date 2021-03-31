@@ -14,13 +14,14 @@ edition = "2018"
 
 [dependencies]
 undo = { version = "0.42" }
+chrono_crate = { package = "chrono", version = "0.4", optional = true }
 serde_crate = { package = "serde", version = "1", optional = true, default-features = false, features = ["derive"] }
 
 [features]
 default = []
-chrono = ["undo/chrono"]
+chrono = ["chrono_crate", "undo/chrono"]
 colored = ["undo/colored"]
-serde = ["serde_crate", "undo/serde"]
+serde = ["serde_crate", "undo/serde", "chrono_crate/serde"]
 
 [badges]
 travis-ci = { repository = "evenorog/redo" }
