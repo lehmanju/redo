@@ -28,9 +28,8 @@ pub use undo::{Command, Merge, Result, Signal};
         )
     )
 )]
-#[derive(Clone)]
-pub struct History<C: Command, F = Box<dyn FnMut(Signal)>> {
-    inner: Inner<C, F>,
+pub struct History<C: Command> {
+    inner: Inner<C>,
     target: C::Target,
 }
 
@@ -42,9 +41,7 @@ impl<C: Command> History<C> {
             target,
         }
     }
-}
 
-impl<C: Command, F> History<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -81,12 +78,12 @@ impl<C: Command, F> History<C, F> {
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
-    pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.inner.connect(slot)
+    pub fn connect(&mut self, slot: impl FnMut(Signal) + 'static) -> Option<impl FnMut(Signal)> {
+        self.inner.connect(Box::new(slot))
     }
 
     /// Removes and returns the slot if it exists.
-    pub fn disconnect(&mut self) -> Option<F> {
+    pub fn disconnect(&mut self) -> Option<impl FnMut(Signal)> {
         self.inner.disconnect()
     }
 
@@ -114,9 +111,7 @@ impl<C: Command, F> History<C, F> {
     pub fn current(&self) -> usize {
         self.inner.current()
     }
-}
 
-impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// Pushes the command to the top of the history and executes its `apply`method.
     ///
     /// # Errors
