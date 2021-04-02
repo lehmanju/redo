@@ -1,9 +1,4 @@
 //! **High-level undo-redo functionality.**
-//!
-//! It is an implementation of the command pattern, where all modifications are done
-//! by creating objects of commands that applies the modifications. All commands knows
-//! how to undo the changes it applies, and by using the provided data structures
-//! it is easy to apply, undo, and redo changes made to a target.
 
 #![doc(html_root_url = "https://docs.rs/redo")]
 #![deny(missing_docs)]
@@ -14,18 +9,18 @@ use chrono_crate::{DateTime, TimeZone};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use undo::History as Inner;
-pub use undo::{Command, Merge, Result, Signal};
+pub use undo::{Action, Merged, Result, Signal};
 
-/// The history structs maintains the target and the commands that has benn applied to the target.
+/// The target and the actions that has been applied to the target.
 ///
 /// # Examples
 /// ```
-/// # use redo::{Command, History};
+/// # use redo::{Action, History};
 /// # struct Add(char);
 /// # impl From<char> for Add {
 /// #     fn from(c: char) -> Self { Add(c) }
 /// # }
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
@@ -60,19 +55,19 @@ pub use undo::{Command, Merge, Result, Signal};
     serde(
         crate = "serde_crate",
         bound(
-            serialize = "C: Command + Serialize, C::Target: Serialize",
-            deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
+            serialize = "A: Action + Serialize, A::Target: Serialize",
+            deserialize = "A: Action + Deserialize<'de>, A::Target: Deserialize<'de>"
         )
     )
 )]
-pub struct History<C: Command> {
-    inner: Inner<C>,
-    target: C::Target,
+pub struct History<A: Action> {
+    inner: Inner<A>,
+    target: A::Target,
 }
 
-impl<C: Command> History<C> {
+impl<A: Action> History<A> {
     /// Returns a new history.
-    pub fn new(target: C::Target) -> History<C> {
+    pub fn new(target: A::Target) -> History<A> {
         History {
             inner: Inner::new(),
             target,
@@ -149,17 +144,12 @@ impl<C: Command> History<C> {
         self.inner.current()
     }
 
-    /// Returns a reference to the target.
-    pub fn target(&self) -> &C::Target {
-        &self.target
-    }
-
     /// Pushes the command to the top of the history and executes its `apply`method.
     ///
     /// # Errors
     /// If an error occur when executing `apply` the error is returned.
-    pub fn apply(&mut self, command: impl Into<C>) -> Result<C> {
-        self.inner.apply(&mut self.target, command.into())
+    pub fn apply(&mut self, actions: impl Into<A>) -> Result<A> {
+        self.inner.apply(&mut self.target, actions.into())
     }
 
     /// Calls the `undo` method for the active command
@@ -167,7 +157,7 @@ impl<C: Command> History<C> {
     ///
     /// # Errors
     /// If an error occur when executing `undo` the error is returned.
-    pub fn undo(&mut self) -> Result<C> {
+    pub fn undo(&mut self) -> Result<A> {
         self.inner.undo(&mut self.target)
     }
 
@@ -178,7 +168,7 @@ impl<C: Command> History<C> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self) -> Result<C> {
+    pub fn redo(&mut self) -> Result<A> {
         self.inner.redo(&mut self.target)
     }
 
@@ -186,7 +176,7 @@ impl<C: Command> History<C> {
     ///
     /// # Errors
     /// If an error occur when executing `undo` or `redo` the error is returned.
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<A>> {
         self.inner.go_to(&mut self.target, branch, current)
     }
 
@@ -194,7 +184,7 @@ impl<C: Command> History<C> {
     ///
     /// This method does not jump across branches.
     #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<A>> {
         self.inner.time_travel(&mut self.target, to)
     }
 
@@ -207,13 +197,28 @@ impl<C: Command> History<C> {
     pub fn clear(&mut self) {
         self.inner.clear();
     }
+
+    /// Returns a reference to the target.
+    pub fn target(&self) -> &A::Target {
+        &self.target
+    }
+
+    /// Returns a mutable reference to the target.
+    pub fn target_mut(&mut self) -> &mut A::Target {
+        &mut self.target
+    }
+
+    /// Consumes the history and returns the target.
+    pub fn into_target(self) -> A::Target {
+        self.target
+    }
 }
 
-impl<C: Command> Default for History<C>
+impl<A: Action> Default for History<A>
 where
-    C::Target: Default,
+    A::Target: Default,
 {
     fn default() -> Self {
-        History::new(C::Target::default())
+        History::new(A::Target::default())
     }
 }
