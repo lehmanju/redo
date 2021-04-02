@@ -8,6 +8,7 @@
 use chrono_crate::{DateTime, TimeZone};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
+use undo::history::Builder as InnerBuilder;
 use undo::History as Inner;
 pub use undo::{Action, Merged, Result, Signal};
 
@@ -74,7 +75,7 @@ impl<A: Action> History<A> {
         }
     }
 
-    /// Reserves capacity for at least `additional` more commands.
+    /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -92,7 +93,7 @@ impl<A: Action> History<A> {
         self.inner.shrink_to_fit();
     }
 
-    /// Returns the number of commands in the current branch of the history.
+    /// Returns the number of actions in the current branch of the history.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -139,12 +140,12 @@ impl<A: Action> History<A> {
         self.inner.branch()
     }
 
-    /// Returns the position of the current command.
+    /// Returns the position of the current action.
     pub fn current(&self) -> usize {
         self.inner.current()
     }
 
-    /// Pushes the command to the top of the history and executes its `apply`method.
+    /// Pushes the action to the top of the history and executes its `apply`method.
     ///
     /// # Errors
     /// If an error occur when executing `apply` the error is returned.
@@ -152,7 +153,7 @@ impl<A: Action> History<A> {
         self.inner.apply(&mut self.target, actions.into())
     }
 
-    /// Calls the `undo` method for the active command
+    /// Calls the `undo` method for the active action
     /// and sets the previous one as the new active one.
     ///
     /// # Errors
@@ -161,18 +162,16 @@ impl<A: Action> History<A> {
         self.inner.undo(&mut self.target)
     }
 
-    /// Calls the [`redo`] method for the active command
+    /// Calls the `redo` method for the active action
     /// and sets the next one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned.
-    ///
-    /// [`redo`]: trait.Command.html#method.redo
+    /// If an error occur when executing `redo` the error is returned.
     pub fn redo(&mut self) -> Result<A> {
         self.inner.redo(&mut self.target)
     }
 
-    /// Repeatedly calls `undo` or`redo` until the command in `branch` at `current` is reached.
+    /// Repeatedly calls `undo` or`redo` until the action in `branch` at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing `undo` or `redo` the error is returned.
@@ -180,7 +179,7 @@ impl<A: Action> History<A> {
         self.inner.go_to(&mut self.target, branch, current)
     }
 
-    /// Go back or forward in the history to the command that was made closest to the datetime provided.
+    /// Go back or forward in the history to the action that was made closest to the datetime provided.
     ///
     /// This method does not jump across branches.
     #[cfg(feature = "chrono")]
@@ -193,7 +192,7 @@ impl<A: Action> History<A> {
         self.inner.set_saved(saved);
     }
 
-    /// Removes all commands from the history without undoing them.
+    /// Removes all actions from the history without undoing them.
     pub fn clear(&mut self) {
         self.inner.clear();
     }
@@ -220,5 +219,47 @@ where
 {
     fn default() -> Self {
         History::new(A::Target::default())
+    }
+}
+
+/// Builder for a history.
+pub struct Builder(InnerBuilder);
+
+impl Builder {
+    /// Returns a builder for a history.
+    pub fn new() -> Builder {
+        Builder(InnerBuilder::new())
+    }
+
+    /// Sets the capacity for the history.
+    pub fn capacity(self, capacity: usize) -> Builder {
+        Builder(self.0.capacity(capacity))
+    }
+
+    /// Connects the slot.
+    pub fn connect(self, f: impl FnMut(Signal) + 'static) -> Builder {
+        Builder(self.0.connect(Box::new(f)))
+    }
+
+    /// Sets the `limit` for the history.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
+    pub fn limit(self, limit: usize) -> Builder {
+        Builder(self.0.limit(limit))
+    }
+
+    /// Sets if the target is initially in a saved state.
+    /// By default the target is in a saved state.
+    pub fn saved(self, saved: bool) -> Builder {
+        Builder(self.0.saved(saved))
+    }
+
+    /// Builds the history.
+    pub fn build<A: Action>(self, target: A::Target) -> History<A> {
+        History {
+            inner: self.0.build(),
+            target,
+        }
     }
 }
