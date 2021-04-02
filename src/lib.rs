@@ -16,7 +16,44 @@ use serde_crate::{Deserialize, Serialize};
 use undo::History as Inner;
 pub use undo::{Command, Merge, Result, Signal};
 
-/// A history of commands.
+/// The history structs maintains the target and the commands that has benn applied to the target.
+///
+/// # Examples
+/// ```
+/// # use redo::{Command, History};
+/// # struct Add(char);
+/// # impl From<char> for Add {
+/// #     fn from(c: char) -> Self { Add(c) }
+/// # }
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> redo::Result<Add> {
+/// #         self.0 = s.pop().unwrap();
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> redo::Result<Add> {
+/// let mut history = History::<Add>::default();
+/// history.apply('a')?;
+/// history.apply('b')?;
+/// history.apply('c')?;
+/// assert_eq!(history.target(), "abc");
+/// history.undo()?;
+/// history.undo()?;
+/// history.undo()?;
+/// assert_eq!(history.target(), "");
+/// history.redo()?;
+/// history.redo()?;
+/// history.redo()?;
+/// assert_eq!(history.target(), "abc");
+/// # Ok(())
+/// # }
+/// ```
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -112,12 +149,17 @@ impl<C: Command> History<C> {
         self.inner.current()
     }
 
+    /// Returns a reference to the target.
+    pub fn target(&self) -> &C::Target {
+        &self.target
+    }
+
     /// Pushes the command to the top of the history and executes its `apply`method.
     ///
     /// # Errors
     /// If an error occur when executing `apply` the error is returned.
-    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
-        self.inner.apply(target, command)
+    pub fn apply(&mut self, command: impl Into<C>) -> Result<C> {
+        self.inner.apply(&mut self.target, command.into())
     }
 
     /// Calls the `undo` method for the active command
@@ -125,8 +167,8 @@ impl<C: Command> History<C> {
     ///
     /// # Errors
     /// If an error occur when executing `undo` the error is returned.
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
-        self.inner.undo(target)
+    pub fn undo(&mut self) -> Result<C> {
+        self.inner.undo(&mut self.target)
     }
 
     /// Calls the [`redo`] method for the active command
@@ -136,33 +178,24 @@ impl<C: Command> History<C> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
-        self.inner.redo(target)
+    pub fn redo(&mut self) -> Result<C> {
+        self.inner.redo(&mut self.target)
     }
 
     /// Repeatedly calls `undo` or`redo` until the command in `branch` at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing `undo` or `redo` the error is returned.
-    pub fn go_to(
-        &mut self,
-        target: &mut C::Target,
-        branch: usize,
-        current: usize,
-    ) -> Option<Result<C>> {
-        self.inner.go_to(target, branch, current)
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<C>> {
+        self.inner.go_to(&mut self.target, branch, current)
     }
 
     /// Go back or forward in the history to the command that was made closest to the datetime provided.
     ///
     /// This method does not jump across branches.
     #[cfg(feature = "chrono")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut C::Target,
-        to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<C>> {
-        self.inner.time_travel(target, to)
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<C>> {
+        self.inner.time_travel(&mut self.target, to)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
