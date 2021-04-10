@@ -23,6 +23,7 @@ pub use undo::{Action, Merged, Result, Signal};
 /// # }
 /// # impl Action for Add {
 /// #     type Target = String;
+/// #     type Output = ();
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> redo::Result<Add> {
 /// #         s.push(self.0);
@@ -39,13 +40,13 @@ pub use undo::{Action, Merged, Result, Signal};
 /// history.apply('b')?;
 /// history.apply('c')?;
 /// assert_eq!(history.target(), "abc");
-/// history.undo()?;
-/// history.undo()?;
-/// history.undo()?;
+/// history.undo().unwrap()?;
+/// history.undo().unwrap()?;
+/// history.undo().unwrap()?;
 /// assert_eq!(history.target(), "");
-/// history.redo()?;
-/// history.redo()?;
-/// history.redo()?;
+/// history.redo().unwrap()?;
+/// history.redo().unwrap()?;
+/// history.redo().unwrap()?;
 /// assert_eq!(history.target(), "abc");
 /// # Ok(())
 /// # }
@@ -135,11 +136,6 @@ impl<A: Action> History<A> {
         self.inner.can_redo()
     }
 
-    /// Returns the current branch.
-    pub fn branch(&self) -> usize {
-        self.inner.branch()
-    }
-
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
         self.inner.current()
@@ -158,7 +154,7 @@ impl<A: Action> History<A> {
     ///
     /// # Errors
     /// If an error occur when executing `undo` the error is returned.
-    pub fn undo(&mut self) -> Result<A> {
+    pub fn undo(&mut self) -> Option<Result<A>> {
         self.inner.undo(&mut self.target)
     }
 
@@ -167,24 +163,8 @@ impl<A: Action> History<A> {
     ///
     /// # Errors
     /// If an error occur when executing `redo` the error is returned.
-    pub fn redo(&mut self) -> Result<A> {
+    pub fn redo(&mut self) -> Option<Result<A>> {
         self.inner.redo(&mut self.target)
-    }
-
-    /// Repeatedly calls `undo` or`redo` until the action in `branch` at `current` is reached.
-    ///
-    /// # Errors
-    /// If an error occur when executing `undo` or `redo` the error is returned.
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<A>> {
-        self.inner.go_to(&mut self.target, branch, current)
-    }
-
-    /// Go back or forward in the history to the action that was made closest to the datetime provided.
-    ///
-    /// This method does not jump across branches.
-    #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<A>> {
-        self.inner.time_travel(&mut self.target, to)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
@@ -210,6 +190,24 @@ impl<A: Action> History<A> {
     /// Consumes the history and returns the target.
     pub fn into_target(self) -> A::Target {
         self.target
+    }
+}
+
+impl<A: Action<Output = ()>> History<A> {
+    /// Repeatedly calls `undo` or`redo` until the action in `branch` at `current` is reached.
+    ///
+    /// # Errors
+    /// If an error occur when executing `undo` or `redo` the error is returned.
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result<A>> {
+        self.inner.go_to(&mut self.target, branch, current)
+    }
+
+    /// Go back or forward in the history to the action that was made closest to the datetime provided.
+    ///
+    /// This method does not jump across branches.
+    #[cfg(feature = "chrono")]
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result<A>> {
+        self.inner.time_travel(&mut self.target, to)
     }
 }
 
