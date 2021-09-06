@@ -67,6 +67,7 @@ use {
         deserialize = "C: Command + Deserialize<'de>, C::Target: Deserialize<'de>"
     ))
 )]
+#[derive(Clone)]
 pub struct Record<C: Command, F = fn(Signal)> {
     pub(crate) entries: VecDeque<Entry<C>>,
     target: C::Target,

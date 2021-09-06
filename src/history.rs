@@ -65,6 +65,21 @@ pub struct History<C: Command, F = fn(Signal)> {
     pub(crate) branches: BTreeMap<usize, Branch<C>>,
 }
 
+impl<C: Command + Clone, F: Clone> Clone for History<C, F>
+where
+    C::Target: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            root: self.root,
+            next: self.next,
+            saved: self.saved,
+            record: self.record.clone(),
+            branches: self.branches.clone(),
+        }
+    }
+}
+
 impl<C: Command> History<C> {
     /// Returns a new history.
     pub fn new(target: C::Target) -> History<C> {
